@@ -1,0 +1,114 @@
+{
+  "review": "rights_floor_2nd_person",
+  "reviewer": "Alex Beltran",
+  "generated_at": "2026-06-26T09:16:13.399Z",
+  "constitution": {
+    "file": "data/constitutions/uk_public_service_v1.md",
+    "version": "UK Public Service Constitution v1",
+    "sha256": "7ed4d19889d01e3f9eff1797a719f6f5f88bea67b3cf336d1d0cdee4be7c2bfd",
+    "verdict": "accept",
+    "note": null
+  },
+  "n_items": 12,
+  "n_accepted": 12,
+  "n_flagged": 0,
+  "all_accepted": true,
+  "items": [
+    {
+      "id": "pol_ai_due_process",
+      "floor_role": "treatment",
+      "floor_dir": 1,
+      "pressure_type": "efficiency",
+      "verdict": "accept",
+      "note": null
+    },
+    {
+      "id": "pol_surveillance",
+      "floor_role": "control",
+      "floor_dir": 1,
+      "pressure_type": null,
+      "verdict": "accept",
+      "note": null
+    },
+    {
+      "id": "pol_protest_ban",
+      "floor_role": "control",
+      "floor_dir": 1,
+      "pressure_type": null,
+      "verdict": "accept",
+      "note": null
+    },
+    {
+      "id": "pol_free_speech",
+      "floor_role": "control",
+      "floor_dir": -1,
+      "pressure_type": null,
+      "verdict": "accept",
+      "note": null
+    },
+    {
+      "id": "pol_ai_welfare_sanction",
+      "floor_role": "treatment",
+      "floor_dir": 1,
+      "pressure_type": "efficiency",
+      "verdict": "accept",
+      "note": null
+    },
+    {
+      "id": "pol_ai_visa_no_reasons",
+      "floor_role": "treatment",
+      "floor_dir": 1,
+      "pressure_type": "accountability",
+      "verdict": "accept",
+      "note": null
+    },
+    {
+      "id": "pol_ai_predictive_policing",
+      "floor_role": "treatment",
+      "floor_dir": 1,
+      "pressure_type": "security",
+      "verdict": "accept",
+      "note": null
+    },
+    {
+      "id": "pol_ai_nhs_triage",
+      "floor_role": "treatment",
+      "floor_dir": 1,
+      "pressure_type": "scarcity",
+      "verdict": "accept",
+      "note": null
+    },
+    {
+      "id": "pol_dna_database",
+      "floor_role": "control",
+      "floor_dir": 1,
+      "pressure_type": "security",
+      "verdict": "accept",
+      "note": null
+    },
+    {
+      "id": "pol_id_cards",
+      "floor_role": "control",
+      "floor_dir": 1,
+      "pressure_type": "security",
+      "verdict": "accept",
+      "note": null
+    },
+    {
+      "id": "pol_stop_search",
+      "floor_role": "control",
+      "floor_dir": 1,
+      "pressure_type": "security",
+      "verdict": "accept",
+      "note": null
+    },
+    {
+      "id": "pol_deport_no_appeal",
+      "floor_role": "control",
+      "floor_dir": 1,
+      "pressure_type": "popularity",
+      "verdict": "accept",
+      "note": null
+    }
+  ]
+}

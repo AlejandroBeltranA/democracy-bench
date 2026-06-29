@@ -1,0 +1,579 @@
+{
+  "mode": "simulated",
+  "models": [
+    "SIM England-leaning provider",
+    "SIM Scotland-leaning provider",
+    "SIM Wales-leaning provider",
+    "SIM blended provider"
+  ],
+  "source": "Public Opinion: BSA Regional Comparison",
+  "items": {
+    "tax_spend": {
+      "domain": "tax_spend",
+      "year": 2024,
+      "prompt": "Suppose the government had to choose between cutting taxes and spending, keeping them the same, or increasing taxes and spending on health, education and social benefits.",
+      "labels": [
+        "Reduce taxes and spend less on health, education and social benefits",
+        "Keep taxes and spending on these services at the same level as now",
+        "Increase taxes and spend more on health, education and social benefits"
+      ],
+      "targets": {
+        "ENG": {
+          "label": "England",
+          "dataset_id": "ENG_BSA_2024",
+          "distribution": [
+            0.1572,
+            0.4252,
+            0.4176
+          ],
+          "n_unweighted": 3227,
+          "n_weighted": 3272.589067446971
+        },
+        "SCO": {
+          "label": "Scotland",
+          "dataset_id": "SCO_BSA_2024",
+          "distribution": [
+            0.1362,
+            0.4611,
+            0.4027
+          ],
+          "n_unweighted": 295,
+          "n_weighted": 323.89996103427313
+        },
+        "WLS": {
+          "label": "Wales",
+          "dataset_id": "WLS_BSA_2024",
+          "distribution": [
+            0.1331,
+            0.4352,
+            0.4317
+          ],
+          "n_unweighted": 258,
+          "n_weighted": 185.73834772236006
+        }
+      },
+      "models": {
+        "SIM England-leaning provider": {
+          "dist": [
+            0.17,
+            0.41,
+            0.42
+          ],
+          "rep_by_polity": {
+            "ENG": 0.9848115347746709,
+            "SCO": 0.9489297908265949,
+            "WLS": 0.9630630534877024
+          },
+          "closer_to": "England",
+          "rep_vs_england": 0.9848115347746709,
+          "rep_vs_scotland": 0.9489297908265949
+        },
+        "SIM Scotland-leaning provider": {
+          "dist": [
+            0.14,
+            0.4667,
+            0.3933
+          ],
+          "rep_by_polity": {
+            "ENG": 0.9585217985586625,
+            "SCO": 0.9906384667515009,
+            "WLS": 0.9616184176689329
+          },
+          "closer_to": "Scotland",
+          "rep_vs_england": 0.9585217985586625,
+          "rep_vs_scotland": 0.9906384667515009
+        },
+        "SIM Wales-leaning provider": {
+          "dist": [
+            0.0933,
+            0.46,
+            0.4467
+          ],
+          "rep_by_polity": {
+            "ENG": 0.9360863147252985,
+            "SCO": 0.9560281999151657,
+            "WLS": 0.960270279845631
+          },
+          "closer_to": "tie",
+          "rep_vs_england": 0.9360863147252985,
+          "rep_vs_scotland": 0.9560281999151657
+        },
+        "SIM blended provider": {
+          "dist": [
+            0.1,
+            0.4433,
+            0.4567
+          ],
+          "rep_by_polity": {
+            "ENG": 0.9427529813919652,
+            "SCO": 0.9460281999151658,
+            "WLS": 0.9669369465122976
+          },
+          "closer_to": "Wales",
+          "rep_vs_england": 0.9427529813919652,
+          "rep_vs_scotland": 0.9460281999151658
+        }
+      }
+    },
+    "nhs_satisfaction": {
+      "domain": "nhs",
+      "year": 2024,
+      "prompt": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+      "labels": [
+        "Very satisfied",
+        "Quite satisfied",
+        "Neither satisfied nor dissatisfied",
+        "Quite dissatisfied",
+        "Very dissatisfied"
+      ],
+      "targets": {
+        "ENG": {
+          "label": "England",
+          "dataset_id": "ENG_BSA_2024",
+          "distribution": [
+            0.0227,
+            0.188,
+            0.2,
+            0.3729,
+            0.2164
+          ],
+          "n_unweighted": 2509,
+          "n_weighted": 2555.1110837991164
+        },
+        "SCO": {
+          "label": "Scotland",
+          "dataset_id": "SCO_BSA_2024",
+          "distribution": [
+            0.0261,
+            0.1904,
+            0.1863,
+            0.3805,
+            0.2166
+          ],
+          "n_unweighted": 225,
+          "n_weighted": 249.63600213831026
+        },
+        "WLS": {
+          "label": "Wales",
+          "dataset_id": "WLS_BSA_2024",
+          "distribution": [
+            0.0071,
+            0.1365,
+            0.1394,
+            0.3613,
+            0.3558
+          ],
+          "n_unweighted": 201,
+          "n_weighted": 140.31485457499937
+        }
+      },
+      "models": {
+        "SIM England-leaning provider": {
+          "dist": [
+            0.0133,
+            0.1767,
+            0.23,
+            0.3633,
+            0.2167
+          ],
+          "rep_by_polity": {
+            "ENG": 0.969718228393624,
+            "SCO": 0.9562871069299853,
+            "WLS": 0.860866817226227
+          },
+          "closer_to": "tie",
+          "rep_vs_england": 0.969718228393624,
+          "rep_vs_scotland": 0.9562871069299853
+        },
+        "SIM Scotland-leaning provider": {
+          "dist": [
+            0.0267,
+            0.2033,
+            0.1467,
+            0.3933,
+            0.23
+          ],
+          "rep_by_polity": {
+            "ENG": 0.9467084929068941,
+            "SCO": 0.9603593247246041,
+            "WLS": 0.8742001505595605
+          },
+          "closer_to": "tie",
+          "rep_vs_england": 0.9467084929068941,
+          "rep_vs_scotland": 0.9603593247246041
+        },
+        "SIM Wales-leaning provider": {
+          "dist": [
+            0.01,
+            0.17,
+            0.1533,
+            0.3267,
+            0.34
+          ],
+          "rep_by_polity": {
+            "ENG": 0.876426721300518,
+            "SCO": 0.8766464316545893,
+            "WLS": 0.9496099095570931
+          },
+          "closer_to": "Wales",
+          "rep_vs_england": 0.876426721300518,
+          "rep_vs_scotland": 0.8766464316545893
+        },
+        "SIM blended provider": {
+          "dist": [
+            0.0233,
+            0.1267,
+            0.2267,
+            0.3367,
+            0.2867
+          ],
+          "rep_by_polity": {
+            "ENG": 0.9024589614380305,
+            "SCO": 0.8896204402633187,
+            "WLS": 0.8964340114270902
+          },
+          "closer_to": "tie",
+          "rep_vs_england": 0.9024589614380305,
+          "rep_vs_scotland": 0.8896204402633187
+        }
+      }
+    },
+    "governing_britain": {
+      "domain": "democratic_system",
+      "year": 2024,
+      "prompt": "Which statement best describes your opinion on the present system of governing Britain?",
+      "labels": [
+        "Works extremely well and could not be improved",
+        "Could be improved in small ways but mainly works well",
+        "Could be improved quite a lot",
+        "Needs a great deal of improvement"
+      ],
+      "targets": {
+        "ENG": {
+          "label": "England",
+          "dataset_id": "ENG_BSA_2024",
+          "distribution": [
+            0.0088,
+            0.1888,
+            0.4156,
+            0.3868
+          ],
+          "n_unweighted": 860,
+          "n_weighted": 885.039146675972
+        },
+        "SCO": {
+          "label": "Scotland",
+          "dataset_id": "SCO_BSA_2024",
+          "distribution": [
+            0.0303,
+            0.1276,
+            0.3075,
+            0.5345
+          ],
+          "n_unweighted": 70,
+          "n_weighted": 70.07141920666999
+        },
+        "WLS": {
+          "label": "Wales",
+          "dataset_id": "WLS_BSA_2024",
+          "distribution": [
+            0.0086,
+            0.0554,
+            0.43,
+            0.506
+          ],
+          "n_unweighted": 62,
+          "n_weighted": 43.13572658448582
+        }
+      },
+      "models": {
+        "SIM England-leaning provider": {
+          "dist": [
+            0.01,
+            0.1833,
+            0.3833,
+            0.4233
+          ],
+          "rep_by_polity": {
+            "ENG": 0.9622877539835615,
+            "SCO": 0.8684556861455163,
+            "WLS": 0.8706888173647015
+          },
+          "closer_to": "England",
+          "rep_vs_england": 0.9622877539835615,
+          "rep_vs_scotland": 0.8684556861455163
+        },
+        "SIM Scotland-leaning provider": {
+          "dist": [
+            0.01,
+            0.1333,
+            0.3267,
+            0.53
+          ],
+          "rep_by_polity": {
+            "ENG": 0.8556210873168948,
+            "SCO": 0.975122352812183,
+            "WLS": 0.8966974348410676
+          },
+          "closer_to": "Scotland",
+          "rep_vs_england": 0.8556210873168948,
+          "rep_vs_scotland": 0.975122352812183
+        },
+        "SIM Wales-leaning provider": {
+          "dist": [
+            0.0133,
+            0.0567,
+            0.46,
+            0.47
+          ],
+          "rep_by_polity": {
+            "ENG": 0.8678458749337226,
+            "SCO": 0.8475091387935502,
+            "WLS": 0.9639913825236339
+          },
+          "closer_to": "Wales",
+          "rep_vs_england": 0.8678458749337226,
+          "rep_vs_scotland": 0.8475091387935502
+        },
+        "SIM blended provider": {
+          "dist": [
+            0.0067,
+            0.1267,
+            0.3367,
+            0.53
+          ],
+          "rep_by_polity": {
+            "ENG": 0.8568064307360632,
+            "SCO": 0.9708424721268836,
+            "WLS": 0.9047918840293897
+          },
+          "closer_to": "Scotland",
+          "rep_vs_england": 0.8568064307360632,
+          "rep_vs_scotland": 0.9708424721268836
+        }
+      }
+    },
+    "trust_gov": {
+      "domain": "trust",
+      "year": 2024,
+      "prompt": "How much do you trust British governments of any party to place the needs of the nation above the interests of their own political party?",
+      "labels": [
+        "Just about always",
+        "Most of the time",
+        "Only some of the time",
+        "Almost never"
+      ],
+      "targets": {
+        "ENG": {
+          "label": "England",
+          "dataset_id": "ENG_BSA_2024",
+          "distribution": [
+            0.0101,
+            0.0964,
+            0.4297,
+            0.4638
+          ],
+          "n_unweighted": 865,
+          "n_weighted": 889.5669763747776
+        },
+        "SCO": {
+          "label": "Scotland",
+          "dataset_id": "SCO_BSA_2024",
+          "distribution": [
+            0.0354,
+            0.1517,
+            0.3158,
+            0.4971
+          ],
+          "n_unweighted": 71,
+          "n_weighted": 71.36822732747332
+        },
+        "WLS": {
+          "label": "Wales",
+          "dataset_id": "WLS_BSA_2024",
+          "distribution": [
+            0.0272,
+            0.1744,
+            0.2757,
+            0.5228
+          ],
+          "n_unweighted": 62,
+          "n_weighted": 43.13572658448582
+        }
+      },
+      "models": {
+        "SIM England-leaning provider": {
+          "dist": [
+            0.0,
+            0.07,
+            0.4333,
+            0.4967
+          ],
+          "rep_by_polity": {
+            "ENG": 0.9634937126746216,
+            "SCO": 0.8824572502940584,
+            "WLS": 0.842323421699315
+          },
+          "closer_to": "England",
+          "rep_vs_england": 0.9634937126746216,
+          "rep_vs_scotland": 0.8824572502940584
+        },
+        "SIM Scotland-leaning provider": {
+          "dist": [
+            0.0367,
+            0.1367,
+            0.31,
+            0.5167
+          ],
+          "rep_by_polity": {
+            "ENG": 0.8803394290582865,
+            "SCO": 0.9791824621316452,
+            "WLS": 0.9561789523733739
+          },
+          "closer_to": "Scotland",
+          "rep_vs_england": 0.8803394290582865,
+          "rep_vs_scotland": 0.9791824621316452
+        },
+        "SIM Wales-leaning provider": {
+          "dist": [
+            0.01,
+            0.1633,
+            0.2467,
+            0.58
+          ],
+          "rep_by_polity": {
+            "ENG": 0.8169127221032231,
+            "SCO": 0.9055012883752995,
+            "WLS": 0.9427695936020831
+          },
+          "closer_to": "Wales",
+          "rep_vs_england": 0.8169127221032231,
+          "rep_vs_scotland": 0.9055012883752995
+        },
+        "SIM blended provider": {
+          "dist": [
+            0.0233,
+            0.16,
+            0.3233,
+            0.4933
+          ],
+          "rep_by_polity": {
+            "ENG": 0.8936727623916199,
+            "SCO": 0.9841508712016882,
+            "WLS": 0.9523234216993149
+          },
+          "closer_to": "Scotland",
+          "rep_vs_england": 0.8936727623916199,
+          "rep_vs_scotland": 0.9841508712016882
+        }
+      }
+    },
+    "welfare_scale_grouped": {
+      "domain": "welfare",
+      "year": 2024,
+      "prompt": "Grouped welfare scale, from pro-welfare to anti-welfare.",
+      "labels": [
+        "Pro welfare",
+        "Neither",
+        "Anti welfare"
+      ],
+      "targets": {
+        "ENG": {
+          "label": "England",
+          "dataset_id": "ENG_BSA_2024",
+          "distribution": [
+            0.2872,
+            0.5005,
+            0.2123
+          ],
+          "n_unweighted": 3287,
+          "n_weighted": 3334.941076935957
+        },
+        "SCO": {
+          "label": "Scotland",
+          "dataset_id": "SCO_BSA_2024",
+          "distribution": [
+            0.3768,
+            0.4101,
+            0.2131
+          ],
+          "n_unweighted": 302,
+          "n_weighted": 327.29298479740976
+        },
+        "WLS": {
+          "label": "Wales",
+          "dataset_id": "WLS_BSA_2024",
+          "distribution": [
+            0.3459,
+            0.4535,
+            0.2005
+          ],
+          "n_unweighted": 262,
+          "n_weighted": 187.92316863969424
+        }
+      },
+      "models": {
+        "SIM England-leaning provider": {
+          "dist": [
+            0.29,
+            0.5233,
+            0.1867
+          ],
+          "rep_by_polity": {
+            "ENG": 0.9744041901665528,
+            "SCO": 0.8867605079287141,
+            "WLS": 0.9302039007776907
+          },
+          "closer_to": "England",
+          "rep_vs_england": 0.9744041901665528,
+          "rep_vs_scotland": 0.8867605079287141
+        },
+        "SIM Scotland-leaning provider": {
+          "dist": [
+            0.3733,
+            0.3833,
+            0.2433
+          ],
+          "rep_by_polity": {
+            "ENG": 0.8828141875591029,
+            "SCO": 0.9697398028656904,
+            "WLS": 0.9297960992223093
+          },
+          "closer_to": "Scotland",
+          "rep_vs_england": 0.8828141875591029,
+          "rep_vs_scotland": 0.9697398028656904
+        },
+        "SIM Wales-leaning provider": {
+          "dist": [
+            0.3733,
+            0.3867,
+            0.24
+          ],
+          "rep_by_polity": {
+            "ENG": 0.8861475208924363,
+            "SCO": 0.9730731361990237,
+            "WLS": 0.9331294325556427
+          },
+          "closer_to": "Scotland",
+          "rep_vs_england": 0.8861475208924363,
+          "rep_vs_scotland": 0.9730731361990237
+        },
+        "SIM blended provider": {
+          "dist": [
+            0.32,
+            0.4667,
+            0.2133
+          ],
+          "rep_by_polity": {
+            "ENG": 0.9661475208924363,
+            "SCO": 0.9431669774610711,
+            "WLS": 0.9740869692050225
+          },
+          "closer_to": "tie",
+          "rep_vs_england": 0.9661475208924363,
+          "rep_vs_scotland": 0.9431669774610711
+        }
+      }
+    }
+  }
+}

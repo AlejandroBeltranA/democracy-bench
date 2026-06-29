@@ -1,0 +1,185 @@
+{
+  "datasets": {
+    "ENG_BSA_2022": {
+      "polity": "ENG",
+      "label": "England",
+      "programme": "BSA",
+      "study": "UKDA-9283 British Social Attitudes Survey, 2022",
+      "year": 2022,
+      "zip": "data/bsa microdata/9283tab_6B0D27B861EEC5ED061CFE581E5BD9C23D8CD9196D389DEFDE2CA33A78FF850E_V1.zip",
+      "tab": "UKDA-9283-tab/tab/p16974_bsa22_archive.tab",
+      "weight": "BSA22_final_wt",
+      "filters": [
+        {
+          "var": "GOR",
+          "include_codes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        }
+      ],
+      "n_columns": 430,
+      "configured_vars": [
+        "NHSSat"
+      ],
+      "configured_var_labels": {
+        "NHSSat": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?"
+      },
+      "missing_configured_vars": []
+    },
+    "SCO_SSA_2022": {
+      "polity": "SCO",
+      "label": "Scotland",
+      "programme": "SSA",
+      "study": "UKDA-9296 Scottish Social Attitudes Survey, 2021-22",
+      "year": 2022,
+      "zip": "data/bsa microdata/9296tab_63ED2719E6EA5B3522D3CA3A09EBB728525C461808DD6309CA0B5ADF357061CF_V1.zip",
+      "tab": "UKDA-9296-tab/tab/ssa21_ukds.tab",
+      "weight": "wtfactor",
+      "filters": [],
+      "n_columns": 221,
+      "configured_vars": [
+        "NHSSat",
+        "ScotPar2"
+      ],
+      "configured_var_labels": {
+        "NHSSat": "All in all, how satisfied or dissatisfied would you say you are with the way in which the National Health Service runs nowadays?",
+        "ScotPar2": "Which of these statements comes closest to your view?"
+      },
+      "missing_configured_vars": []
+    },
+    "ENG_BSA_2023": {
+      "polity": "ENG",
+      "label": "England",
+      "programme": "BSA",
+      "study": "UKDA-9363 British Social Attitudes Survey, 2023",
+      "year": 2023,
+      "zip": "data/bsa microdata/9363tab_73E9C7706175A1D68757CC2D79125CD93632E443B25FEA5713908408623712AB_V1.zip",
+      "tab": "UKDA-9363-tab/tab/p18229-bsa23-archive.tab",
+      "weight": "BSA23_final_wt",
+      "filters": [
+        {
+          "var": "GOR",
+          "include_codes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        }
+      ],
+      "n_columns": 407,
+      "configured_vars": [
+        "GovtWork",
+        "NHSSat",
+        "TaxSpend"
+      ],
+      "configured_var_labels": {
+        "GovtWork": "Which of these statements best describes your opinion on the present system of governing Britain?",
+        "NHSSat": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+        "TaxSpend": "Suppose the government had to choose between the following three options. Which do you think it should choose?"
+      },
+      "missing_configured_vars": []
+    },
+    "SCO_SSA_2023": {
+      "polity": "SCO",
+      "label": "Scotland",
+      "programme": "SSA",
+      "study": "UKDA-9364 Scottish Social Attitudes Survey, 2023",
+      "year": 2023,
+      "zip": "data/bsa microdata/9364tab_7393B90E9F6B36CE1FA1D26D2730F496A884A275B3E6E840FDEEE4289B6C8CF4_V1.zip",
+      "tab": "UKDA-9364-tab/tab/ssa_2023.tab",
+      "weight": "SSA23_final_wt",
+      "filters": [],
+      "n_columns": 179,
+      "configured_vars": [
+        "NHSSat",
+        "ScotPar2",
+        "TaxSpend"
+      ],
+      "configured_var_labels": {
+        "NHSSat": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+        "ScotPar2": "Which of the following statements comes closest to your view?",
+        "TaxSpend": "Suppose the government had to choose between the following three options. Which do you think it should choose?"
+      },
+      "missing_configured_vars": []
+    },
+    "ENG_BSA_2024": {
+      "polity": "ENG",
+      "label": "England",
+      "programme": "BSA",
+      "study": "UKDA-9478 British Social Attitudes Survey, 2024",
+      "year": 2024,
+      "zip": "data/bsa microdata/9478tab_9329FE20C68F98CFA29D60E59B63247A7795244200BE1299C4155CAC7295CDF6_V1.zip",
+      "tab": "UKDA-9478-tab/tab/p19056-bsa24-archive.tab",
+      "weight": "BSA24_final_wt_GB18",
+      "filters": [
+        {
+          "var": "GOR",
+          "include_codes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            8,
+            9,
+            11,
+            12
+          ]
+        }
+      ],
+      "n_columns": 354,
+      "configured_vars": [
+        "GovtWork",
+        "NHSSat",
+        "TaxSpend"
+      ],
+      "configured_var_labels": {
+        "GovtWork": "Which of these statements best describes your opinion on the present system of governing Britain?",
+        "NHSSat": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+        "TaxSpend": "Suppose the government had to choose between the following three options. Which do you think it should choose?"
+      },
+      "missing_configured_vars": []
+    },
+    "SCO_SSA_2024": {
+      "polity": "SCO",
+      "label": "Scotland",
+      "programme": "SSA",
+      "study": "UKDA-9557 Scottish Social Attitudes Survey, 2024",
+      "year": 2024,
+      "zip": "data/bsa microdata/9557tab_5A38480391F7820F092F2C58810DDEDDAF7A1A9F5DCDDEB947544C53BA361589_V1.zip",
+      "tab": "UKDA-9557-tab/tab/ssa_2024_data.tab",
+      "weight": "SSA24_final_wt",
+      "filters": [],
+      "n_columns": 152,
+      "configured_vars": [
+        "GovWorkScot",
+        "GovtWork",
+        "NHSSat",
+        "ScotPar2",
+        "TaxSpend"
+      ],
+      "configured_var_labels": {
+        "GovWorkScot": "And which of these statements best describes your opinion on the present system of governing Scotland?",
+        "GovtWork": "Which of these statements best describes your opinion on the present system of governing Britain?",
+        "NHSSat": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+        "ScotPar2": "Which of the following statements comes closest to your view?",
+        "TaxSpend": "Suppose the government had to choose between the following three options. Which do you think it should choose?"
+      },
+      "missing_configured_vars": []
+    }
+  }
+}

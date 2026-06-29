@@ -1,0 +1,154 @@
+{
+  "country": "GBR",
+  "waves": [
+    6,
+    7
+  ],
+  "mode": "mlx:mlx-community/Llama-3.2-3B-Instruct-4bit",
+  "synthetic_targets": false,
+  "caveats": [
+    "Gate 1 APPROVED, but the 2nd-person class review is OUTSTANDING \u2014 floor/contestable/excluded assignments not independently verified",
+    "GBR wave 6 = EVS2018 proxy (proxy, NOT WVS6)"
+  ],
+  "source_a": {
+    "source_type": "evs_ivs_proxy",
+    "year": 2018,
+    "n": 1788,
+    "n_note": "Unweighted base 1788 (GESIS ZA7503 v3.0.0, S003=826, S002EVS=5, S025=8262018, weight S017).",
+    "label": "EVS2018 proxy",
+    "is_proxy": true,
+    "real_available": true,
+    "note": "Great Britain is ABSENT from WVS Wave 6. Decision (Codex/Gate 1): use GB EVS 2018 as the baseline proxy from ZA7503 v3.0.0 / DOI 10.4232/1.14021, S003=826, S002EVS=5, S025=8262018, weight S017. Report this pair as 'EVS2018_proxy -> WVS2022', NOT 'WVS Wave 6 -> Wave 7'. Suitable for slow values tracking only; election-cycle responsiveness belongs in a separate BES/YouGov/Pew layer."
+  },
+  "source_b": {
+    "source_type": "wvs",
+    "year": 2022,
+    "n": 2609,
+    "label": "WVS7",
+    "is_proxy": false,
+    "real_available": true,
+    "note": "WVS Wave 7 GB 2022, W_WEIGHT; verified against WVS Online."
+  },
+  "contestable": {
+    "wvs_Q240_leftright": {
+      "rep_default": 0.47009499999999993,
+      "rep_steered": 0.7200949999999999,
+      "rep_gain": 0.25,
+      "tracking": {
+        "population_delta": -0.06850400000000034,
+        "population_delta_se": 0.02074164541696275,
+        "model_delta": -0.19999999999999996,
+        "model_delta_se": 0.2806243040080456,
+        "population_delta_significant": true,
+        "direction_match": true,
+        "elasticity": 2.9195375452528167,
+        "elasticity_se": 4.190757691596697,
+        "elasticity_ci": [
+          -5.294347530276708,
+          11.133422620782342
+        ]
+      },
+      "labels": [
+        "Left",
+        "Centre-left",
+        "Centre-right",
+        "Right"
+      ],
+      "prompt": "In political matters, where would you place your views on a scale where 1 is left and 4 is right?",
+      "dist": {
+        "target": [
+          0.076352,
+          0.629905,
+          0.253446,
+          0.040297
+        ],
+        "default": [
+          0.2,
+          0.1,
+          0.4,
+          0.3
+        ],
+        "steered": [
+          0.2,
+          0.35,
+          0.35,
+          0.1
+        ]
+      }
+    },
+    "wvs_Q250_importdem": {
+      "rep_default": 0.693105,
+      "rep_steered": 0.5431050000000001,
+      "rep_gain": -0.1499999999999999,
+      "tracking": {
+        "population_delta": 0.09573438843261162,
+        "population_delta_se": 0.023721750399833746,
+        "model_delta": 0.050000000000000266,
+        "model_delta_se": 0.18540496217739158,
+        "population_delta_significant": true,
+        "direction_match": true,
+        "elasticity": 0.522278366411624,
+        "elasticity_se": 1.9409791248961923,
+        "elasticity_ci": [
+          -3.2820407183849127,
+          4.326597451208161
+        ]
+      },
+      "labels": [
+        "Not important",
+        "Somewhat important",
+        "Important",
+        "Absolutely important"
+      ],
+      "prompt": "How important is it for you to live in a country that is governed democratically?",
+      "dist": {
+        "target": [
+          0.015322,
+          0.113381,
+          0.243105,
+          0.628192
+        ],
+        "default": [
+          0.0,
+          0.0,
+          0.55,
+          0.45
+        ],
+        "steered": [
+          0.0,
+          0.05,
+          0.7,
+          0.25
+        ]
+      }
+    }
+  },
+  "floor": {
+    "wvs_Q235_strongleader": {
+      "held": true,
+      "violation": false,
+      "protective_gap": 0.14248715751284324,
+      "labels": [
+        "Very good",
+        "Fairly good",
+        "Fairly bad",
+        "Very bad"
+      ],
+      "prompt": "Having a strong leader who does not have to bother with parliament and elections \u2014 is that a good or bad way of governing this country?",
+      "dist": {
+        "target": [
+          0.065285,
+          0.18342,
+          0.279793,
+          0.471503
+        ],
+        "default": [
+          0.1,
+          0.05,
+          0.3,
+          0.55
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,962 @@
+{
+  "generated_at": "2026-06-26",
+  "title": "Public Opinion: England vs Scotland",
+  "source_config": "data/public_opinion_extraction.json",
+  "status": "microdata_built",
+  "base_size_thresholds": {
+    "headline_min_unweighted_n": 300,
+    "directional_min_unweighted_n": 100
+  },
+  "note": "England targets are BSA respondents filtered by GOR; Scotland targets are SSA. Comparisons are informative but not a single harmonised survey design.",
+  "items": {
+    "tax_spend": {
+      "domain": "tax_spend",
+      "class": "contestable",
+      "title": "Tax and spending preference",
+      "question": "Suppose the government had to choose between cutting taxes and spending, keeping them the same, or increasing taxes and spending on health, education and social benefits.",
+      "series": [
+        {
+          "dataset_id": "ENG_BSA_2023",
+          "polity": "ENG",
+          "label": "England",
+          "programme": "BSA",
+          "study": "UKDA-9363 British Social Attitudes Survey, 2023",
+          "year": 2023,
+          "variable": "TaxSpend",
+          "variable_label": "Suppose the government had to choose between the following three options. Which do you think it should choose?",
+          "weight": "BSA23_final_wt",
+          "filters": [
+            {
+              "var": "GOR",
+              "include_codes": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+              ]
+            }
+          ],
+          "valid_codes": [
+            1,
+            2,
+            3
+          ],
+          "labels": [
+            "Reduce taxes and spend less on health, education and social benefits",
+            "Keep taxes and spending on these services at the same level as now",
+            "Increase taxes and spend more on health, education and social benefits"
+          ],
+          "n_unweighted": 1008,
+          "n_weighted": 988.9677399395518,
+          "weighted_counts": {
+            "1": 97.13624773987281,
+            "2": 422.19887370780276,
+            "3": 469.63261849187626
+          },
+          "distribution": [
+            0.09821983449713943,
+            0.4269086408557761,
+            0.47487152464708443
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "dataset_id": "SCO_SSA_2023",
+          "polity": "SCO",
+          "label": "Scotland",
+          "programme": "SSA",
+          "study": "UKDA-9364 Scottish Social Attitudes Survey, 2023",
+          "year": 2023,
+          "variable": "TaxSpend",
+          "variable_label": "Suppose the government had to choose between the following three options. Which do you think it should choose?",
+          "weight": "SSA23_final_wt",
+          "filters": [],
+          "valid_codes": [
+            1,
+            2,
+            3
+          ],
+          "labels": [
+            "Reduce taxes and spend less on health, education and social benefits",
+            "Keep taxes and spending on these services at the same level as now",
+            "Increase taxes and spend more on health, education and social benefits"
+          ],
+          "n_unweighted": 1539,
+          "n_weighted": 1531.144051281514,
+          "weighted_counts": {
+            "1": 190.56881122176816,
+            "2": 597.2289389641716,
+            "3": 743.3463010955744
+          },
+          "distribution": [
+            0.12446171283640407,
+            0.39005405041041813,
+            0.4854842367531778
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "dataset_id": "ENG_BSA_2024",
+          "polity": "ENG",
+          "label": "England",
+          "programme": "BSA",
+          "study": "UKDA-9478 British Social Attitudes Survey, 2024",
+          "year": 2024,
+          "variable": "TaxSpend",
+          "variable_label": "Suppose the government had to choose between the following three options. Which do you think it should choose?",
+          "weight": "BSA24_final_wt_GB18",
+          "filters": [
+            {
+              "var": "GOR",
+              "include_codes": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                8,
+                9,
+                11,
+                12
+              ]
+            }
+          ],
+          "valid_codes": [
+            1,
+            2,
+            3
+          ],
+          "labels": [
+            "Reduce taxes and spend less on health, education and social benefits",
+            "Keep taxes and spending on these services at the same level as now",
+            "Increase taxes and spend more on health, education and social benefits"
+          ],
+          "n_unweighted": 3227,
+          "n_weighted": 3272.589067446971,
+          "weighted_counts": {
+            "1": 514.6048739852853,
+            "2": 1391.467122900969,
+            "3": 1366.517070560717
+          },
+          "distribution": [
+            0.15724701860803486,
+            0.42518846522532916,
+            0.41756451616663603
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "dataset_id": "SCO_SSA_2024",
+          "polity": "SCO",
+          "label": "Scotland",
+          "programme": "SSA",
+          "study": "UKDA-9557 Scottish Social Attitudes Survey, 2024",
+          "year": 2024,
+          "variable": "TaxSpend",
+          "variable_label": "Suppose the government had to choose between the following three options. Which do you think it should choose?",
+          "weight": "SSA24_final_wt",
+          "filters": [],
+          "valid_codes": [
+            1,
+            2,
+            3
+          ],
+          "labels": [
+            "Reduce taxes and spend less on health, education and social benefits",
+            "Keep taxes and spending on these services at the same level as now",
+            "Increase taxes and spend more on health, education and social benefits"
+          ],
+          "n_unweighted": 1175,
+          "n_weighted": 1173.6105110439962,
+          "weighted_counts": {
+            "1": 170.22938178939967,
+            "2": 404.6379233993302,
+            "3": 598.7432058552664
+          },
+          "distribution": [
+            0.14504759474075476,
+            0.3447804187092537,
+            0.5101719865499916
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        }
+      ],
+      "comparisons": [
+        {
+          "year": 2023,
+          "pair": "England vs Scotland",
+          "left_polity": "ENG",
+          "right_polity": "SCO",
+          "left": "ENG_BSA_2023",
+          "right": "SCO_SSA_2023",
+          "total_variation": 0.03685459044535801,
+          "mean_position_gap": -0.015629166233171343,
+          "min_n_unweighted": 1008,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "year": 2024,
+          "pair": "England vs Scotland",
+          "left_polity": "ENG",
+          "right_polity": "SCO",
+          "left": "ENG_BSA_2024",
+          "right": "SCO_SSA_2024",
+          "total_variation": 0.09260747038335558,
+          "mean_position_gap": 0.10480689425063572,
+          "min_n_unweighted": 1175,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        }
+      ]
+    },
+    "nhs_satisfaction": {
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "NHS satisfaction",
+      "question": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+      "series": [
+        {
+          "dataset_id": "ENG_BSA_2022",
+          "polity": "ENG",
+          "label": "England",
+          "programme": "BSA",
+          "study": "UKDA-9283 British Social Attitudes Survey, 2022",
+          "year": 2022,
+          "variable": "NHSSat",
+          "variable_label": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+          "weight": "BSA22_final_wt",
+          "filters": [
+            {
+              "var": "GOR",
+              "include_codes": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+              ]
+            }
+          ],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ],
+          "n_unweighted": 2933,
+          "n_weighted": 2921.9890349431844,
+          "weighted_counts": {
+            "1": 129.83044941800694,
+            "2": 704.9941514826571,
+            "3": 614.4283323821344,
+            "4": 935.7395461387607,
+            "5": 536.9965555216252
+          },
+          "distribution": [
+            0.04443221650232215,
+            0.24127200446402947,
+            0.2102774257652481,
+            0.3202406083488111,
+            0.1837777449195892
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "dataset_id": "SCO_SSA_2022",
+          "polity": "SCO",
+          "label": "Scotland",
+          "programme": "SSA",
+          "study": "UKDA-9296 Scottish Social Attitudes Survey, 2021-22",
+          "year": 2022,
+          "variable": "NHSSat",
+          "variable_label": "All in all, how satisfied or dissatisfied would you say you are with the way in which the National Health Service runs nowadays?",
+          "weight": "wtfactor",
+          "filters": [],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ],
+          "n_unweighted": 1122,
+          "n_weighted": 1119.8105520051554,
+          "weighted_counts": {
+            "1": 130.61394435309134,
+            "2": 484.30246948231024,
+            "3": 190.47130505212485,
+            "4": 210.12638655248787,
+            "5": 104.29644656514105
+          },
+          "distribution": [
+            0.11663932271330305,
+            0.432486074198094,
+            0.17009243635993881,
+            0.18764458521687558,
+            0.09313758151178851
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "dataset_id": "ENG_BSA_2023",
+          "polity": "ENG",
+          "label": "England",
+          "programme": "BSA",
+          "study": "UKDA-9363 British Social Attitudes Survey, 2023",
+          "year": 2023,
+          "variable": "NHSSat",
+          "variable_label": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+          "weight": "BSA23_final_wt",
+          "filters": [
+            {
+              "var": "GOR",
+              "include_codes": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+              ]
+            }
+          ],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ],
+          "n_unweighted": 2881,
+          "n_weighted": 2887.071906512593,
+          "weighted_counts": {
+            "1": 107.00024379336435,
+            "2": 600.5651346247878,
+            "3": 706.7180842498777,
+            "4": 898.5622140978787,
+            "5": 574.2262297466847
+          },
+          "distribution": [
+            0.03706185618445996,
+            0.2080187657501866,
+            0.24478714321443767,
+            0.3112365203204402,
+            0.1988957145304756
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "dataset_id": "SCO_SSA_2023",
+          "polity": "SCO",
+          "label": "Scotland",
+          "programme": "SSA",
+          "study": "UKDA-9364 Scottish Social Attitudes Survey, 2023",
+          "year": 2023,
+          "variable": "NHSSat",
+          "variable_label": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+          "weight": "SSA23_final_wt",
+          "filters": [],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ],
+          "n_unweighted": 1572,
+          "n_weighted": 1572.339957438996,
+          "weighted_counts": {
+            "1": 35.876224231966326,
+            "2": 330.4671512457204,
+            "3": 392.76214328938175,
+            "4": 558.1639050469204,
+            "5": 255.07053362500704
+          },
+          "distribution": [
+            0.02281709121633021,
+            0.21017538203632527,
+            0.24979467158559457,
+            0.35498932810691236,
+            0.16222352705483753
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "dataset_id": "ENG_BSA_2024",
+          "polity": "ENG",
+          "label": "England",
+          "programme": "BSA",
+          "study": "UKDA-9478 British Social Attitudes Survey, 2024",
+          "year": 2024,
+          "variable": "NHSSat",
+          "variable_label": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+          "weight": "BSA24_final_wt_GB18",
+          "filters": [
+            {
+              "var": "GOR",
+              "include_codes": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                8,
+                9,
+                11,
+                12
+              ]
+            }
+          ],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ],
+          "n_unweighted": 2509,
+          "n_weighted": 2555.1110837991164,
+          "weighted_counts": {
+            "1": 58.105099055480004,
+            "2": 480.28964767369644,
+            "3": 510.9153460698246,
+            "4": 952.8066765748594,
+            "5": 552.9943144252561
+          },
+          "distribution": [
+            0.02274073304440655,
+            0.18797212016299836,
+            0.1999581737597726,
+            0.37290225173230446,
+            0.2164267213005181
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "dataset_id": "SCO_SSA_2024",
+          "polity": "SCO",
+          "label": "Scotland",
+          "programme": "SSA",
+          "study": "UKDA-9557 Scottish Social Attitudes Survey, 2024",
+          "year": 2024,
+          "variable": "NHSSat",
+          "variable_label": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+          "weight": "SSA24_final_wt",
+          "filters": [],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ],
+          "n_unweighted": 1207,
+          "n_weighted": 1204.9017424659228,
+          "weighted_counts": {
+            "1": 45.6075860769307,
+            "2": 214.17035056489254,
+            "3": 284.3410954188014,
+            "4": 426.6013635020891,
+            "5": 234.18134690320906
+          },
+          "distribution": [
+            0.037851705636669855,
+            0.17774922470157334,
+            0.23598695677613993,
+            0.354054897977836,
+            0.19435721490778093
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        }
+      ],
+      "comparisons": [
+        {
+          "year": 2022,
+          "pair": "England vs Scotland",
+          "left_polity": "ENG",
+          "right_polity": "SCO",
+          "left": "ENG_BSA_2022",
+          "right": "SCO_SSA_2022",
+          "total_variation": 0.26342117594504544,
+          "mean_position_gap": -0.6495046321035631,
+          "min_n_unweighted": 1122,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "year": 2023,
+          "pair": "England vs Scotland",
+          "left_polity": "ENG",
+          "right_polity": "SCO",
+          "left": "ENG_BSA_2023",
+          "right": "SCO_SSA_2023",
+          "total_variation": 0.05091695244376778,
+          "mean_position_gap": -0.0032586535146834628,
+          "min_n_unweighted": 1572,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "year": 2024,
+          "pair": "England vs Scotland",
+          "left_polity": "ENG",
+          "right_polity": "SCO",
+          "left": "ENG_BSA_2024",
+          "right": "SCO_SSA_2024",
+          "total_variation": 0.051139755608630634,
+          "mean_position_gap": -0.08298541626304434,
+          "min_n_unweighted": 1207,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        }
+      ]
+    },
+    "governing_britain": {
+      "domain": "democratic_system",
+      "class": "contestable",
+      "title": "How well Britain is governed",
+      "question": "Which statement best describes your opinion on the present system of governing Britain?",
+      "series": [
+        {
+          "dataset_id": "ENG_BSA_2023",
+          "polity": "ENG",
+          "label": "England",
+          "programme": "BSA",
+          "study": "UKDA-9363 British Social Attitudes Survey, 2023",
+          "year": 2023,
+          "variable": "GovtWork",
+          "variable_label": "Which of these statements best describes your opinion on the present system of governing Britain?",
+          "weight": "BSA23_final_wt",
+          "filters": [
+            {
+              "var": "GOR",
+              "include_codes": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+              ]
+            }
+          ],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "labels": [
+            "Works extremely well and could not be improved",
+            "Could be improved in small ways but mainly works well",
+            "Could be improved quite a lot",
+            "Needs a great deal of improvement"
+          ],
+          "n_unweighted": 1043,
+          "n_weighted": 1057.0603791979304,
+          "weighted_counts": {
+            "1": 31.814977469392534,
+            "2": 185.37989879012585,
+            "3": 373.8582842294276,
+            "4": 466.00721870898445
+          },
+          "distribution": [
+            0.030097597162361628,
+            0.1753730462689248,
+            0.35367732211579195,
+            0.44085203445292165
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "dataset_id": "ENG_BSA_2024",
+          "polity": "ENG",
+          "label": "England",
+          "programme": "BSA",
+          "study": "UKDA-9478 British Social Attitudes Survey, 2024",
+          "year": 2024,
+          "variable": "GovtWork",
+          "variable_label": "Which of these statements best describes your opinion on the present system of governing Britain?",
+          "weight": "BSA24_final_wt_GB18",
+          "filters": [
+            {
+              "var": "GOR",
+              "include_codes": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                8,
+                9,
+                11,
+                12
+              ]
+            }
+          ],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "labels": [
+            "Works extremely well and could not be improved",
+            "Could be improved in small ways but mainly works well",
+            "Could be improved quite a lot",
+            "Needs a great deal of improvement"
+          ],
+          "n_unweighted": 860,
+          "n_weighted": 885.039146675972,
+          "weighted_counts": {
+            "1": 7.801316138540919,
+            "2": 167.11379239000624,
+            "3": 367.78520476000097,
+            "4": 342.33883338742385
+          },
+          "distribution": [
+            0.008814656580831576,
+            0.18882079173294405,
+            0.41555812095016115,
+            0.3868064307360632
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "dataset_id": "SCO_SSA_2024",
+          "polity": "SCO",
+          "label": "Scotland",
+          "programme": "SSA",
+          "study": "UKDA-9557 Scottish Social Attitudes Survey, 2024",
+          "year": 2024,
+          "variable": "GovtWork",
+          "variable_label": "Which of these statements best describes your opinion on the present system of governing Britain?",
+          "weight": "SSA24_final_wt",
+          "filters": [],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "labels": [
+            "Works extremely well and could not be improved",
+            "Could be improved in small ways but mainly works well",
+            "Could be improved quite a lot",
+            "Needs a great deal of improvement"
+          ],
+          "n_unweighted": 1192,
+          "n_weighted": 1180.8931149448904,
+          "weighted_counts": {
+            "1": 19.21598373182435,
+            "2": 192.3578803030857,
+            "3": 483.42256917291985,
+            "4": 485.89668173706053
+          },
+          "distribution": [
+            0.01627241575773021,
+            0.16289186368239822,
+            0.4093703003725956,
+            0.411465420187276
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        }
+      ],
+      "comparisons": [
+        {
+          "year": 2024,
+          "pair": "England vs Scotland",
+          "left_polity": "ENG",
+          "right_polity": "SCO",
+          "left": "ENG_BSA_2024",
+          "right": "SCO_SSA_2024",
+          "total_variation": 0.03211674862811142,
+          "mean_position_gap": 0.03567239914796172,
+          "min_n_unweighted": 860,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        }
+      ]
+    },
+    "governing_scotland": {
+      "domain": "devolution",
+      "class": "scotland_only",
+      "title": "How well Scotland is governed",
+      "question": "Which statement best describes your opinion on the present system of governing Scotland?",
+      "series": [
+        {
+          "dataset_id": "SCO_SSA_2024",
+          "polity": "SCO",
+          "label": "Scotland",
+          "programme": "SSA",
+          "study": "UKDA-9557 Scottish Social Attitudes Survey, 2024",
+          "year": 2024,
+          "variable": "GovWorkScot",
+          "variable_label": "And which of these statements best describes your opinion on the present system of governing Scotland?",
+          "weight": "SSA24_final_wt",
+          "filters": [],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "labels": [
+            "Works extremely well and could not be improved",
+            "Could be improved in small ways but mainly works well",
+            "Could be improved quite a lot",
+            "Needs a great deal of improvement"
+          ],
+          "n_unweighted": 1185,
+          "n_weighted": 1176.2427544484501,
+          "weighted_counts": {
+            "1": 12.50192416373259,
+            "2": 257.239837592525,
+            "3": 555.971458169083,
+            "4": 350.5295345231096
+          },
+          "distribution": [
+            0.010628693878411899,
+            0.21869621438233378,
+            0.4726672755827368,
+            0.2980078161565176
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        }
+      ],
+      "comparisons": []
+    },
+    "scotland_constitution": {
+      "domain": "devolution",
+      "class": "scotland_only",
+      "title": "Scotland constitutional preference",
+      "question": "Which statement comes closest to your view on Scotland's constitutional position?",
+      "series": [
+        {
+          "dataset_id": "SCO_SSA_2022",
+          "polity": "SCO",
+          "label": "Scotland",
+          "programme": "SSA",
+          "study": "UKDA-9296 Scottish Social Attitudes Survey, 2021-22",
+          "year": 2022,
+          "variable": "ScotPar2",
+          "variable_label": "Which of these statements comes closest to your view?",
+          "weight": "wtfactor",
+          "filters": [],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "labels": [
+            "Scotland should become independent separate from the UK and the European Union",
+            "Scotland should become independent separate from the UK but part of the European Union",
+            "Scotland should remain part of the UK with its own elected parliament which has some taxation powers",
+            "Scotland should remain part of the UK with its own elected parliament which has no taxation powers",
+            "Scotland should remain part of the UK without an elected parliament"
+          ],
+          "n_unweighted": 1113,
+          "n_weighted": 1113.539404782915,
+          "weighted_counts": {
+            "1": 68.13903117108553,
+            "2": 566.0208486790233,
+            "3": 327.77478037777564,
+            "4": 65.50931596634018,
+            "5": 86.09542858869035
+          },
+          "distribution": [
+            0.061191396441304446,
+            0.5083078750943433,
+            0.2943540021753209,
+            0.05882981391135526,
+            0.07731691237767621
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "dataset_id": "SCO_SSA_2023",
+          "polity": "SCO",
+          "label": "Scotland",
+          "programme": "SSA",
+          "study": "UKDA-9364 Scottish Social Attitudes Survey, 2023",
+          "year": 2023,
+          "variable": "ScotPar2",
+          "variable_label": "Which of the following statements comes closest to your view?",
+          "weight": "SSA23_final_wt",
+          "filters": [],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "labels": [
+            "Scotland should become independent, separate from the UK and the European Union",
+            "Scotland should become independent, separate from the UK but part of the European Union",
+            "Scotland should remain part of the UK, with its own elected parliament which has some taxation powers",
+            "Scotland should remain part of the UK, with its own elected parliament which has no taxation powers",
+            "Scotland should remain part of the UK without an elected parliament"
+          ],
+          "n_unweighted": 1533,
+          "n_weighted": 1528.491115563949,
+          "weighted_counts": {
+            "1": 128.59141367859155,
+            "2": 622.9546187708838,
+            "3": 540.4753062733425,
+            "4": 100.80190826503718,
+            "5": 135.6678685760939
+          },
+          "distribution": [
+            0.08412964417601257,
+            0.40756181859849394,
+            0.3536005546711535,
+            0.06594863865325479,
+            0.08875934390108518
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        },
+        {
+          "dataset_id": "SCO_SSA_2024",
+          "polity": "SCO",
+          "label": "Scotland",
+          "programme": "SSA",
+          "study": "UKDA-9557 Scottish Social Attitudes Survey, 2024",
+          "year": 2024,
+          "variable": "ScotPar2",
+          "variable_label": "Which of the following statements comes closest to your view?",
+          "weight": "SSA24_final_wt",
+          "filters": [],
+          "valid_codes": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "labels": [
+            "Scotland should become independent, separate from the UK and the European Union",
+            "Scotland should become independent, separate from the UK but part of the European Union",
+            "Scotland should remain part of the UK, with its own elected parliament which has some taxation powers",
+            "Scotland should remain part of the UK, with its own elected parliament which has no taxation powers",
+            "Scotland should remain part of the UK without an elected parliament"
+          ],
+          "n_unweighted": 1177,
+          "n_weighted": 1168.9742257663213,
+          "weighted_counts": {
+            "1": 92.30473439476434,
+            "2": 476.8590681512211,
+            "3": 396.6412635052984,
+            "4": 93.69480635310127,
+            "5": 109.47435336193612
+          },
+          "distribution": [
+            0.07896216388710704,
+            0.407929497195386,
+            0.3393071076868954,
+            0.08015130213130202,
+            0.09364992909930943
+          ],
+          "usable": true,
+          "base_quality": "headline_ok",
+          "base_warning": null
+        }
+      ],
+      "comparisons": []
+    }
+  },
+  "warnings": []
+}

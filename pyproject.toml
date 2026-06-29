@@ -1,0 +1,37 @@
+[project]
+name = "democracy-bench"
+version = "0.1.0"
+description = "Real-time alignment of LLMs to public democratic values, scored with a survey-grounded instrument (representation + tracking elasticity over the World Values Survey)."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "inspect-ai>=0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+]
+# Optional: full hierarchical multinomial estimator for presentation-grade posteriors.
+# NOT needed for the demo or to run the experiment — estimation.py ships a pure-numpy
+# Dirichlet-multinomial + empirical-Bayes path. Install (`pip install -e '.[bayes]'`) only
+# when writing up external claims; pymc is a heavy build (pytensor + compiler toolchain).
+bayes = [
+    "pymc>=5.10",
+]
+# Needed only to run the Inspect tasks against OpenRouter live (`inspect eval ... --model
+# openrouter/...`). The standalone drivers reach OpenRouter via urllib and don't need this.
+openrouter = [
+    "openai>=1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/alignment"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

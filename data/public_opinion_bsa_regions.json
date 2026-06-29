@@ -1,0 +1,1138 @@
+{
+  "version": 1,
+  "title": "Public Opinion: BSA Regional Comparison",
+  "dashboard_note": "Microdata-built weighted distributions from British Social Attitudes only. England, Scotland, and Wales are filtered from the same BSA survey files by Government Office Region, making this the cleaner harmonised regional comparison. Scotland and Wales sample sizes are smaller than the dedicated SSA depth layer, so module-level estimates should be read with their unweighted bases visible.",
+  "note": "BSA-only regional extraction for England, Scotland, and Wales. This is the harmonised comparison layer; use the BSA-vs-SSA extraction separately as a Scotland depth check.",
+  "datasets": {
+    "ENG_BSA_2022": {
+      "polity": "ENG",
+      "label": "England",
+      "programme": "BSA",
+      "study": "UKDA-9283 British Social Attitudes Survey, 2022",
+      "year": 2022,
+      "zip": "data/bsa microdata/9283tab_6B0D27B861EEC5ED061CFE581E5BD9C23D8CD9196D389DEFDE2CA33A78FF850E_V1.zip",
+      "tab": "UKDA-9283-tab/tab/p16974_bsa22_archive.tab",
+      "weight": "BSA22_final_wt",
+      "filters": [
+        {
+          "var": "GOR",
+          "include_codes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        }
+      ]
+    },
+    "SCO_BSA_2022": {
+      "polity": "SCO",
+      "label": "Scotland",
+      "programme": "BSA",
+      "study": "UKDA-9283 British Social Attitudes Survey, 2022",
+      "year": 2022,
+      "zip": "data/bsa microdata/9283tab_6B0D27B861EEC5ED061CFE581E5BD9C23D8CD9196D389DEFDE2CA33A78FF850E_V1.zip",
+      "tab": "UKDA-9283-tab/tab/p16974_bsa22_archive.tab",
+      "weight": "BSA22_final_wt",
+      "filters": [
+        {
+          "var": "GOR",
+          "include_codes": [
+            11
+          ]
+        }
+      ]
+    },
+    "WLS_BSA_2022": {
+      "polity": "WLS",
+      "label": "Wales",
+      "programme": "BSA",
+      "study": "UKDA-9283 British Social Attitudes Survey, 2022",
+      "year": 2022,
+      "zip": "data/bsa microdata/9283tab_6B0D27B861EEC5ED061CFE581E5BD9C23D8CD9196D389DEFDE2CA33A78FF850E_V1.zip",
+      "tab": "UKDA-9283-tab/tab/p16974_bsa22_archive.tab",
+      "weight": "BSA22_final_wt",
+      "filters": [
+        {
+          "var": "GOR",
+          "include_codes": [
+            10
+          ]
+        }
+      ]
+    },
+    "ENG_BSA_2023": {
+      "polity": "ENG",
+      "label": "England",
+      "programme": "BSA",
+      "study": "UKDA-9363 British Social Attitudes Survey, 2023",
+      "year": 2023,
+      "zip": "data/bsa microdata/9363tab_73E9C7706175A1D68757CC2D79125CD93632E443B25FEA5713908408623712AB_V1.zip",
+      "tab": "UKDA-9363-tab/tab/p18229-bsa23-archive.tab",
+      "weight": "BSA23_final_wt",
+      "filters": [
+        {
+          "var": "GOR",
+          "include_codes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        }
+      ]
+    },
+    "SCO_BSA_2023": {
+      "polity": "SCO",
+      "label": "Scotland",
+      "programme": "BSA",
+      "study": "UKDA-9363 British Social Attitudes Survey, 2023",
+      "year": 2023,
+      "zip": "data/bsa microdata/9363tab_73E9C7706175A1D68757CC2D79125CD93632E443B25FEA5713908408623712AB_V1.zip",
+      "tab": "UKDA-9363-tab/tab/p18229-bsa23-archive.tab",
+      "weight": "BSA23_final_wt",
+      "filters": [
+        {
+          "var": "GOR",
+          "include_codes": [
+            11
+          ]
+        }
+      ]
+    },
+    "WLS_BSA_2023": {
+      "polity": "WLS",
+      "label": "Wales",
+      "programme": "BSA",
+      "study": "UKDA-9363 British Social Attitudes Survey, 2023",
+      "year": 2023,
+      "zip": "data/bsa microdata/9363tab_73E9C7706175A1D68757CC2D79125CD93632E443B25FEA5713908408623712AB_V1.zip",
+      "tab": "UKDA-9363-tab/tab/p18229-bsa23-archive.tab",
+      "weight": "BSA23_final_wt",
+      "filters": [
+        {
+          "var": "GOR",
+          "include_codes": [
+            10
+          ]
+        }
+      ]
+    },
+    "ENG_BSA_2024": {
+      "polity": "ENG",
+      "label": "England",
+      "programme": "BSA",
+      "study": "UKDA-9478 British Social Attitudes Survey, 2024",
+      "year": 2024,
+      "zip": "data/bsa microdata/9478tab_9329FE20C68F98CFA29D60E59B63247A7795244200BE1299C4155CAC7295CDF6_V1.zip",
+      "tab": "UKDA-9478-tab/tab/p19056-bsa24-archive.tab",
+      "weight": "BSA24_final_wt_GB18",
+      "filters": [
+        {
+          "var": "GOR",
+          "include_codes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            8,
+            9,
+            11,
+            12
+          ]
+        }
+      ]
+    },
+    "SCO_BSA_2024": {
+      "polity": "SCO",
+      "label": "Scotland",
+      "programme": "BSA",
+      "study": "UKDA-9478 British Social Attitudes Survey, 2024",
+      "year": 2024,
+      "zip": "data/bsa microdata/9478tab_9329FE20C68F98CFA29D60E59B63247A7795244200BE1299C4155CAC7295CDF6_V1.zip",
+      "tab": "UKDA-9478-tab/tab/p19056-bsa24-archive.tab",
+      "weight": "BSA24_final_wt_GB18",
+      "filters": [
+        {
+          "var": "GOR",
+          "include_codes": [
+            7
+          ]
+        }
+      ]
+    },
+    "WLS_BSA_2024": {
+      "polity": "WLS",
+      "label": "Wales",
+      "programme": "BSA",
+      "study": "UKDA-9478 British Social Attitudes Survey, 2024",
+      "year": 2024,
+      "zip": "data/bsa microdata/9478tab_9329FE20C68F98CFA29D60E59B63247A7795244200BE1299C4155CAC7295CDF6_V1.zip",
+      "tab": "UKDA-9478-tab/tab/p19056-bsa24-archive.tab",
+      "weight": "BSA24_final_wt_GB18",
+      "filters": [
+        {
+          "var": "GOR",
+          "include_codes": [
+            10
+          ]
+        }
+      ]
+    }
+  },
+  "items": [
+    {
+      "id": "tax_spend",
+      "domain": "tax_spend",
+      "class": "contestable",
+      "title": "Tax and spending preference",
+      "question": "Suppose the government had to choose between cutting taxes and spending, keeping them the same, or increasing taxes and spending on health, education and social benefits.",
+      "valid_codes": [
+        1,
+        2,
+        3
+      ],
+      "datasets": {
+        "ENG_BSA_2023": "TaxSpend",
+        "SCO_BSA_2023": "TaxSpend",
+        "WLS_BSA_2023": "TaxSpend",
+        "ENG_BSA_2024": "TaxSpend",
+        "SCO_BSA_2024": "TaxSpend",
+        "WLS_BSA_2024": "TaxSpend"
+      }
+    },
+    {
+      "id": "nhs_satisfaction",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "NHS satisfaction",
+      "question": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2022": "NHSSat",
+        "SCO_BSA_2022": "NHSSat",
+        "WLS_BSA_2022": "NHSSat",
+        "ENG_BSA_2023": "NHSSat",
+        "SCO_BSA_2023": "NHSSat",
+        "WLS_BSA_2023": "NHSSat",
+        "ENG_BSA_2024": "NHSSat",
+        "SCO_BSA_2024": "NHSSat",
+        "WLS_BSA_2024": "NHSSat"
+      }
+    },
+    {
+      "id": "governing_britain",
+      "domain": "democratic_system",
+      "class": "contestable",
+      "title": "How well Britain is governed",
+      "question": "Which statement best describes your opinion on the present system of governing Britain?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2023": "GovtWork",
+        "SCO_BSA_2023": "GovtWork",
+        "WLS_BSA_2023": "GovtWork",
+        "ENG_BSA_2024": "GovtWork",
+        "SCO_BSA_2024": "GovtWork",
+        "WLS_BSA_2024": "GovtWork"
+      }
+    },
+    {
+      "id": "trust_gov",
+      "domain": "trust",
+      "class": "contestable",
+      "title": "Trust British governments",
+      "question": "How much do you trust British governments of any party to place the needs of the nation above the interests of their own political party?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2023": "GovTrust",
+        "SCO_BSA_2023": "GovTrust",
+        "WLS_BSA_2023": "GovTrust",
+        "ENG_BSA_2024": "GovTrust",
+        "SCO_BSA_2024": "GovTrust",
+        "WLS_BSA_2024": "GovTrust"
+      }
+    },
+    {
+      "id": "welfare_scale_grouped",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "Welfare attitude scale",
+      "question": "Grouped welfare scale, from pro-welfare to anti-welfare.",
+      "valid_codes": [
+        1,
+        2,
+        3
+      ],
+      "datasets": {
+        "ENG_BSA_2023": "Welfgrp",
+        "SCO_BSA_2023": "Welfgrp",
+        "WLS_BSA_2023": "Welfgrp",
+        "ENG_BSA_2024": "Welfgrp",
+        "SCO_BSA_2024": "Welfgrp",
+        "WLS_BSA_2024": "Welfgrp"
+      }
+    },
+    {
+      "id": "ae_satisfaction",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "How satisfied or dissatisfied are you with the NHS with regards to Accident and Emergency departments?",
+      "question": "How satisfied or dissatisfied are you with the NHS with regards to Accident and Emergency departments?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "AESat",
+        "SCO_BSA_2024": "AESat",
+        "WLS_BSA_2024": "AESat"
+      }
+    },
+    {
+      "id": "dentist_satisfaction",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "How satisfied or dissatisfied are you with the NHS with regards to dentists?",
+      "question": "How satisfied or dissatisfied are you with the NHS with regards to dentists?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "DentSat",
+        "SCO_BSA_2024": "DentSat",
+        "WLS_BSA_2024": "DentSat"
+      }
+    },
+    {
+      "id": "gp_satisfaction",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "How satisfied or dissatisfied are you with the NHS with regards to local doctors or GPs?",
+      "question": "How satisfied or dissatisfied are you with the NHS with regards to local doctors or GPs?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "GPSat",
+        "SCO_BSA_2024": "GPSat",
+        "WLS_BSA_2024": "GPSat"
+      }
+    },
+    {
+      "id": "hospital_satisfaction",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "How satisfied or dissatisfied are you with the NHS with regards to being in hospital either as an in-patient or an out-patient?",
+      "question": "How satisfied or dissatisfied are you with the NHS with regards to being in hospital either as an in-patient or an out-patient?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "InOutSat",
+        "SCO_BSA_2024": "InOutSat",
+        "WLS_BSA_2024": "InOutSat"
+      }
+    },
+    {
+      "id": "nhs_quality_care",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "How satisfied or dissatisfied are you with the quality of care provided by the NHS",
+      "question": "How satisfied or dissatisfied are you with the quality of care provided by the NHS",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "NHSSatSp_1_q",
+        "SCO_BSA_2024": "NHSSatSp_1_q",
+        "WLS_BSA_2024": "NHSSatSp_1_q"
+      }
+    },
+    {
+      "id": "nhs_treatment_range",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "How satisfied or dissatisfied are you with the range of treatments and services available on the NHS",
+      "question": "How satisfied or dissatisfied are you with the range of treatments and services available on the NHS",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "NHSSatSp_2_q",
+        "SCO_BSA_2024": "NHSSatSp_2_q",
+        "WLS_BSA_2024": "NHSSatSp_2_q"
+      }
+    },
+    {
+      "id": "nhs_gp_wait",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "How satisfied or dissatisfied are you with the length of time it takes to get an appointment at a GP practice",
+      "question": "How satisfied or dissatisfied are you with the length of time it takes to get an appointment at a GP practice",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "NHSSatSp_3_q",
+        "SCO_BSA_2024": "NHSSatSp_3_q",
+        "WLS_BSA_2024": "NHSSatSp_3_q"
+      }
+    },
+    {
+      "id": "nhs_hospital_wait",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "How satisfied or dissatisfied are you with the length of time it takes to get hospital care",
+      "question": "How satisfied or dissatisfied are you with the length of time it takes to get hospital care",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "NHSSatSp_4_q",
+        "SCO_BSA_2024": "NHSSatSp_4_q",
+        "WLS_BSA_2024": "NHSSatSp_4_q"
+      }
+    },
+    {
+      "id": "nhs_ae_wait",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "How satisfied or dissatisfied are you with the length of time it takes for someone to be seen in Accident and Emergency (A&E)",
+      "question": "How satisfied or dissatisfied are you with the length of time it takes for someone to be seen in Accident and Emergency (A&E)",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "NHSSatSp_5_q",
+        "SCO_BSA_2024": "NHSSatSp_5_q",
+        "WLS_BSA_2024": "NHSSatSp_5_q"
+      }
+    },
+    {
+      "id": "nhs_spend_level",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "From what you have seen or heard, would you say that at the moment the government spends too much money on the NHS, too little money, or about the right amount?",
+      "question": "From what you have seen or heard, would you say that at the moment the government spends too much money on the NHS, too little money, or about the right amount?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "GvMonNHS",
+        "SCO_BSA_2024": "GvMonNHS",
+        "WLS_BSA_2024": "GvMonNHS"
+      }
+    },
+    {
+      "id": "nhs_tax_spend",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "Suppose the government had to choose between the following three options, which do you think it should choose?",
+      "question": "Suppose the government had to choose between the following three options, which do you think it should choose?",
+      "valid_codes": [
+        1,
+        2,
+        3
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "NHSTaxSpend",
+        "SCO_BSA_2024": "NHSTaxSpend",
+        "WLS_BSA_2024": "NHSTaxSpend"
+      }
+    },
+    {
+      "id": "nhs_free_principle",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "Extent to which you think principle should apply to NHS today: The NHS should be free of charge when you need to use it",
+      "question": "Extent to which you think principle should apply to NHS today: The NHS should be free of charge when you need to use it",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "NHSPrinciples1_NHSPrinciples1R_1_slice",
+        "SCO_BSA_2024": "NHSPrinciples1_NHSPrinciples1R_1_slice",
+        "WLS_BSA_2024": "NHSPrinciples1_NHSPrinciples1R_1_slice"
+      }
+    },
+    {
+      "id": "nhs_universal_principle",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "Extent to which you think principle should apply to NHS today: The NHS should be available to everyone",
+      "question": "Extent to which you think principle should apply to NHS today: The NHS should be available to everyone",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "NHSPrinciples1_NHSPrinciples1R_3_slice",
+        "SCO_BSA_2024": "NHSPrinciples1_NHSPrinciples1R_3_slice",
+        "WLS_BSA_2024": "NHSPrinciples1_NHSPrinciples1R_3_slice"
+      }
+    },
+    {
+      "id": "nhs_tax_funded_principle",
+      "domain": "nhs",
+      "class": "contestable",
+      "title": "Extent to which you think principle should apply to NHS today: The NHS should primarily be funded through taxes",
+      "question": "Extent to which you think principle should apply to NHS today: The NHS should primarily be funded through taxes",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "NHSPrinciples1_NHSPrinciples1R_4_slice",
+        "SCO_BSA_2024": "NHSPrinciples1_NHSPrinciples1R_4_slice",
+        "WLS_BSA_2024": "NHSPrinciples1_NHSPrinciples1R_4_slice"
+      }
+    },
+    {
+      "id": "social_care_satisfaction",
+      "domain": "social_care",
+      "class": "contestable",
+      "title": "From your own experience, or from what you have heard, how satisfied or dissatisfied are you with social care these days?",
+      "question": "From your own experience, or from what you have heard, how satisfied or dissatisfied are you with social care these days?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "CareSat3",
+        "SCO_BSA_2024": "CareSat3",
+        "WLS_BSA_2024": "CareSat3"
+      }
+    },
+    {
+      "id": "social_care_who_pays",
+      "domain": "social_care",
+      "class": "contestable",
+      "title": "Who do you think should pay for social care?",
+      "question": "Who do you think should pay for social care?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "CarePa2",
+        "SCO_BSA_2024": "CarePa2",
+        "WLS_BSA_2024": "CarePa2"
+      }
+    },
+    {
+      "id": "dwp_fairness_trust",
+      "domain": "dwp",
+      "class": "contestable",
+      "title": "Do you tend to trust or tend not to trust the DWP to treat people fairly?",
+      "question": "Do you tend to trust or tend not to trust the DWP to treat people fairly?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "DWPFai",
+        "SCO_BSA_2024": "DWPFai",
+        "WLS_BSA_2024": "DWPFai"
+      }
+    },
+    {
+      "id": "dwp_honesty_trust",
+      "domain": "dwp",
+      "class": "contestable",
+      "title": "Do you tend to trust or tend not to trust the DWP to be honest?",
+      "question": "Do you tend to trust or tend not to trust the DWP to be honest?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "DWPHon",
+        "SCO_BSA_2024": "DWPHon",
+        "WLS_BSA_2024": "DWPHon"
+      }
+    },
+    {
+      "id": "dwp_accuracy_trust",
+      "domain": "dwp",
+      "class": "contestable",
+      "title": "Do you tend to trust or tend not to trust the DWP to respond to queries accurately and quickly?",
+      "question": "Do you tend to trust or tend not to trust the DWP to respond to queries accurately and quickly?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "DWPQui",
+        "SCO_BSA_2024": "DWPQui",
+        "WLS_BSA_2024": "DWPQui"
+      }
+    },
+    {
+      "id": "redistribution",
+      "domain": "redistribution",
+      "class": "contestable",
+      "title": "Government should redistribute income from the better-off to those who are less well off",
+      "question": "Government should redistribute income from the better-off to those who are less well off",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "Redistrb",
+        "SCO_BSA_2024": "Redistrb",
+        "WLS_BSA_2024": "Redistrb"
+      }
+    },
+    {
+      "id": "more_welfare_poor",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "The government should spend more money on welfare benefits for the poor, even if it leads to higher taxes",
+      "question": "The government should spend more money on welfare benefits for the poor, even if it leads to higher taxes",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "morewelf",
+        "SCO_BSA_2024": "morewelf",
+        "WLS_BSA_2024": "morewelf"
+      }
+    },
+    {
+      "id": "welfare_dependency",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "If welfare benefits weren't so generous, people would learn to stand on their own two feet",
+      "question": "If welfare benefits weren't so generous, people would learn to stand on their own two feet",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "WelfFeet",
+        "SCO_BSA_2024": "WelfFeet",
+        "WLS_BSA_2024": "WelfFeet"
+      }
+    },
+    {
+      "id": "welfare_damage_lives",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "Cutting welfare benefits would damage too many people's lives",
+      "question": "Cutting welfare benefits would damage too many people's lives",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "damlives",
+        "SCO_BSA_2024": "damlives",
+        "WLS_BSA_2024": "damlives"
+      }
+    },
+    {
+      "id": "welfare_proudest_achievement",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "The creation of the welfare state is one of Britain's proudest achievements",
+      "question": "The creation of the welfare state is one of Britain's proudest achievements",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "proudwlf",
+        "SCO_BSA_2024": "proudwlf",
+        "WLS_BSA_2024": "proudwlf"
+      }
+    },
+    {
+      "id": "disability_benefits_difficulty",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "In general, would you say it is too easy or too difficult for people to be able to claim disability benefits?",
+      "question": "In general, would you say it is too easy or too difficult for people to be able to claim disability benefits?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "DisBenDif",
+        "SCO_BSA_2024": "DisBenDif",
+        "WLS_BSA_2024": "DisBenDif"
+      }
+    },
+    {
+      "id": "disabled_benefits_spend",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "Would you like to see more or less government spending than now on benefits for disabled people who cannot work?",
+      "question": "Would you like to see more or less government spending than now on benefits for disabled people who cannot work?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "SocSpnd2",
+        "SCO_BSA_2024": "SocSpnd2",
+        "WLS_BSA_2024": "SocSpnd2"
+      }
+    },
+    {
+      "id": "benefits_damp_mould",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "Consider a family on a low income who receive welfare benefits to help pay their rent. Their rent increases after work to get rid of severe damp and mould in their home. What do you think should happen to the family's welfare benefits?",
+      "question": "Consider a family on a low income who receive welfare benefits to help pay their rent. Their rent increases after work to get rid of severe damp and mould in their home. What do you think should happen to the family's welfare benefits?",
+      "valid_codes": [
+        1,
+        2,
+        3
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "DMWelf",
+        "SCO_BSA_2024": "DMWelf",
+        "WLS_BSA_2024": "DMWelf"
+      }
+    },
+    {
+      "id": "benefits_insulation_rent",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "Low income family's rent increases after landlord spends money on insulation and double glazing. What do you think should happen to welfare benefits?",
+      "question": "Low income family's rent increases after landlord spends money on insulation and double glazing. What do you think should happen to welfare benefits?",
+      "valid_codes": [
+        1,
+        2,
+        3
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "IDGWelf",
+        "SCO_BSA_2024": "IDGWelf",
+        "WLS_BSA_2024": "IDGWelf"
+      }
+    },
+    {
+      "id": "jobcentre_missed_weekly",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "If a person on benefits fails to attend the Jobcentre every week, to talk about ways in which they might find work, what do you think should happen to their benefits?",
+      "question": "If a person on benefits fails to attend the Jobcentre every week, to talk about ways in which they might find work, what do you think should happen to their benefits?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "JOBWORK3",
+        "SCO_BSA_2024": "JOBWORK3",
+        "WLS_BSA_2024": "JOBWORK3"
+      }
+    },
+    {
+      "id": "jobcentre_missed_quarterly",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "If a person on benefits fails to attend the Jobcentre every 3 months, to talk about ways in which they might find work, what do you think should happen to their benefits?",
+      "question": "If a person on benefits fails to attend the Jobcentre every 3 months, to talk about ways in which they might find work, what do you think should happen to their benefits?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "JOBWORK5",
+        "SCO_BSA_2024": "JOBWORK5",
+        "WLS_BSA_2024": "JOBWORK5"
+      }
+    },
+    {
+      "id": "benefits_duty_find_better_job",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "Imagine a person who receives benefits and is capable of working. How much do you agree or disagree that it is their duty to find a better paid job in order to reduce their reliance on benefits?",
+      "question": "Imagine a person who receives benefits and is capable of working. How much do you agree or disagree that it is their duty to find a better paid job in order to reduce their reliance on benefits?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "FinInd",
+        "SCO_BSA_2024": "FinInd",
+        "WLS_BSA_2024": "FinInd"
+      }
+    },
+    {
+      "id": "benefit_fraud_wrongness",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "Suppose someone knowingly gave false information to support their benefit claim. What would your view about this be?",
+      "question": "Suppose someone knowingly gave false information to support their benefit claim. What would your view about this be?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "FalseBn2",
+        "SCO_BSA_2024": "FalseBn2",
+        "WLS_BSA_2024": "FalseBn2"
+      }
+    },
+    {
+      "id": "benefit_cheat_poverty_reason",
+      "domain": "welfare",
+      "class": "contestable",
+      "title": "Agreement with statement: The reason that some people on benefits cheat the system is that they don't get enough to live on",
+      "question": "Agreement with statement: The reason that some people on benefits cheat the system is that they don't get enough to live on",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "CheatPor",
+        "SCO_BSA_2024": "CheatPor",
+        "WLS_BSA_2024": "CheatPor"
+      }
+    },
+    {
+      "id": "tax_high_incomes",
+      "domain": "tax",
+      "class": "contestable",
+      "title": "Generally, how would you describe taxes in Britain today for those with high incomes? Taxes are",
+      "question": "Generally, how would you describe taxes in Britain today for those with high incomes? Taxes are",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "TaxHISc2",
+        "SCO_BSA_2024": "TaxHISc2",
+        "WLS_BSA_2024": "TaxHISc2"
+      }
+    },
+    {
+      "id": "tax_middle_incomes",
+      "domain": "tax",
+      "class": "contestable",
+      "title": "Next, for those with middle incomes, are taxes",
+      "question": "Next, for those with middle incomes, are taxes",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "TaxMidSC",
+        "SCO_BSA_2024": "TaxMidSC",
+        "WLS_BSA_2024": "TaxMidSC"
+      }
+    },
+    {
+      "id": "tax_low_incomes",
+      "domain": "tax",
+      "class": "contestable",
+      "title": "Lastly, for those with low incomes, are taxes",
+      "question": "Lastly, for those with low incomes, are taxes",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "TaxLowSC",
+        "SCO_BSA_2024": "TaxLowSC",
+        "WLS_BSA_2024": "TaxLowSC"
+      }
+    },
+    {
+      "id": "defence_spending",
+      "domain": "spending",
+      "class": "contestable",
+      "title": "Would you like to see more or less government spending in military and defence?",
+      "question": "Would you like to see more or less government spending in military and defence?",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "Gvspend5",
+        "SCO_BSA_2024": "Gvspend5",
+        "WLS_BSA_2024": "Gvspend5"
+      }
+    },
+    {
+      "id": "climate_petrol_tax",
+      "domain": "climate",
+      "class": "contestable",
+      "title": "Do you support: Increasing the tax on petrol",
+      "question": "Do you support: Increasing the tax on petrol",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "ccISSUE_1_Slice",
+        "SCO_BSA_2024": "ccISSUE_1_Slice",
+        "WLS_BSA_2024": "ccISSUE_1_Slice"
+      }
+    },
+    {
+      "id": "climate_flying_tax",
+      "domain": "climate",
+      "class": "contestable",
+      "title": "Do you support: Increasing the tax on flying",
+      "question": "Do you support: Increasing the tax on flying",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "ccISSUE_3_Slice",
+        "SCO_BSA_2024": "ccISSUE_3_Slice",
+        "WLS_BSA_2024": "ccISSUE_3_Slice"
+      }
+    },
+    {
+      "id": "big_business_workers",
+      "domain": "economy",
+      "class": "contestable",
+      "title": "Big business benefits owners at the expense of workers",
+      "question": "Big business benefits owners at the expense of workers",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "BigBusnN",
+        "SCO_BSA_2024": "BigBusnN",
+        "WLS_BSA_2024": "BigBusnN"
+      }
+    },
+    {
+      "id": "gov_resp_jobs",
+      "domain": "government_responsibility",
+      "class": "contestable",
+      "title": "Government responsibility to: Provide a job for everyone who wants one",
+      "question": "Government responsibility to: Provide a job for everyone who wants one",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "GovResp_1_q",
+        "SCO_BSA_2024": "GovResp_1_q",
+        "WLS_BSA_2024": "GovResp_1_q"
+      }
+    },
+    {
+      "id": "gov_resp_healthcare",
+      "domain": "government_responsibility",
+      "class": "contestable",
+      "title": "Government responsibility to: Provide health care for the sick",
+      "question": "Government responsibility to: Provide health care for the sick",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "GovResp_3_q",
+        "SCO_BSA_2024": "GovResp_3_q",
+        "WLS_BSA_2024": "GovResp_3_q"
+      }
+    },
+    {
+      "id": "gov_resp_old_living",
+      "domain": "government_responsibility",
+      "class": "contestable",
+      "title": "Government responsibility to: Provide a decent standard of living for the old",
+      "question": "Government responsibility to: Provide a decent standard of living for the old",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "GovResp_4_q",
+        "SCO_BSA_2024": "GovResp_4_q",
+        "WLS_BSA_2024": "GovResp_4_q"
+      }
+    },
+    {
+      "id": "gov_resp_unemployed_living",
+      "domain": "government_responsibility",
+      "class": "contestable",
+      "title": "Government responsibility to: Provide a decent standard of living for the unemployed",
+      "question": "Government responsibility to: Provide a decent standard of living for the unemployed",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "GovResp_6_q",
+        "SCO_BSA_2024": "GovResp_6_q",
+        "WLS_BSA_2024": "GovResp_6_q"
+      }
+    },
+    {
+      "id": "gov_resp_reduce_income_diff",
+      "domain": "government_responsibility",
+      "class": "contestable",
+      "title": "Government responsibility to: Reduce income differences between the rich and the poor",
+      "question": "Government responsibility to: Reduce income differences between the rich and the poor",
+      "valid_codes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "datasets": {
+        "ENG_BSA_2024": "GovResp_7_q",
+        "SCO_BSA_2024": "GovResp_7_q",
+        "WLS_BSA_2024": "GovResp_7_q"
+      }
+    }
+  ]
+}

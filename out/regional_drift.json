@@ -1,0 +1,194 @@
+{
+  "mode": "simulated",
+  "models": [
+    "SIM England-leaning provider",
+    "SIM Scotland-leaning provider",
+    "SIM blended provider"
+  ],
+  "source": "BSA England filtered by GOR vs SSA Scotland",
+  "items": {
+    "tax_spend": {
+      "domain": "tax_spend",
+      "year": 2024,
+      "prompt": "Suppose the government had to choose between cutting taxes and spending, keeping them the same, or increasing taxes and spending on health, education and social benefits.",
+      "labels": [
+        "Reduce taxes and spend less on health, education and social benefits",
+        "Keep taxes and spending on these services at the same level as now",
+        "Increase taxes and spend more on health, education and social benefits"
+      ],
+      "england_target": [
+        0.1572,
+        0.4252,
+        0.4176
+      ],
+      "scotland_target": [
+        0.145,
+        0.3448,
+        0.5102
+      ],
+      "england_source": "ENG_BSA_2024",
+      "scotland_source": "SCO_SSA_2024",
+      "eng_sco_tv": 0.09260747038335558,
+      "models": {
+        "SIM England-leaning provider": {
+          "dist": [
+            0.17,
+            0.41,
+            0.42
+          ],
+          "rep_vs_england": 0.9848115347746709,
+          "rep_vs_scotland": 0.9098280134500084,
+          "closer_to": "England"
+        },
+        "SIM Scotland-leaning provider": {
+          "dist": [
+            0.14,
+            0.3867,
+            0.4733
+          ],
+          "rep_vs_england": 0.9442311828333027,
+          "rep_vs_scotland": 0.958113752042587,
+          "closer_to": "tie"
+        },
+        "SIM blended provider": {
+          "dist": [
+            0.12,
+            0.3733,
+            0.5067
+          ],
+          "rep_vs_england": 0.9108978494999693,
+          "rep_vs_scotland": 0.9714470853759203,
+          "closer_to": "Scotland"
+        }
+      }
+    },
+    "nhs_satisfaction": {
+      "domain": "nhs",
+      "year": 2024,
+      "prompt": "How satisfied or dissatisfied are you with the way the National Health Service runs nowadays?",
+      "labels": [
+        "Very satisfied",
+        "Quite satisfied",
+        "Neither satisfied nor dissatisfied",
+        "Quite dissatisfied",
+        "Very dissatisfied"
+      ],
+      "england_target": [
+        0.0227,
+        0.188,
+        0.2,
+        0.3729,
+        0.2164
+      ],
+      "scotland_target": [
+        0.0379,
+        0.1777,
+        0.236,
+        0.3541,
+        0.1944
+      ],
+      "england_source": "ENG_BSA_2024",
+      "scotland_source": "SCO_SSA_2024",
+      "eng_sco_tv": 0.051139755608630634,
+      "models": {
+        "SIM England-leaning provider": {
+          "dist": [
+            0.0133,
+            0.1767,
+            0.23,
+            0.3633,
+            0.2167
+          ],
+          "rep_vs_england": 0.969718228393624,
+          "rep_vs_scotland": 0.9684121128856169,
+          "closer_to": "tie"
+        },
+        "SIM Scotland-leaning provider": {
+          "dist": [
+            0.0333,
+            0.1967,
+            0.18,
+            0.3833,
+            0.2067
+          ],
+          "rep_vs_england": 0.970281771606376,
+          "rep_vs_scotland": 0.9394946709205235,
+          "closer_to": "England"
+        },
+        "SIM blended provider": {
+          "dist": [
+            0.03,
+            0.2267,
+            0.23,
+            0.3367,
+            0.1767
+          ],
+          "rep_vs_england": 0.9240043603005108,
+          "rep_vs_scotland": 0.9510825580349067,
+          "closer_to": "Scotland"
+        }
+      }
+    },
+    "governing_britain": {
+      "domain": "democratic_system",
+      "year": 2024,
+      "prompt": "Which statement best describes your opinion on the present system of governing Britain?",
+      "labels": [
+        "Works extremely well and could not be improved",
+        "Could be improved in small ways but mainly works well",
+        "Could be improved quite a lot",
+        "Needs a great deal of improvement"
+      ],
+      "england_target": [
+        0.0088,
+        0.1888,
+        0.4156,
+        0.3868
+      ],
+      "scotland_target": [
+        0.0163,
+        0.1629,
+        0.4094,
+        0.4115
+      ],
+      "england_source": "ENG_BSA_2024",
+      "scotland_source": "SCO_SSA_2024",
+      "eng_sco_tv": 0.03211674862811142,
+      "models": {
+        "SIM England-leaning provider": {
+          "dist": [
+            0.01,
+            0.1833,
+            0.3833,
+            0.4233
+          ],
+          "rep_vs_england": 0.9622877539835615,
+          "rep_vs_scotland": 0.9676906172030075,
+          "closer_to": "tie"
+        },
+        "SIM Scotland-leaning provider": {
+          "dist": [
+            0.0067,
+            0.1567,
+            0.4267,
+            0.41
+          ],
+          "rep_vs_england": 0.9656978850195577,
+          "rep_vs_scotland": 0.982703633705929,
+          "closer_to": "tie"
+        },
+        "SIM blended provider": {
+          "dist": [
+            0.0133,
+            0.2067,
+            0.4133,
+            0.3667
+          ],
+          "rep_vs_england": 0.9776354483137757,
+          "rep_vs_scotland": 0.9522621640549938,
+          "closer_to": "England"
+        }
+      }
+    }
+  }
+}

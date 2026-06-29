@@ -1,0 +1,56 @@
+{
+  "_note": "Provenance per polity-wave. Gate 1 is SIGNED OFF (see gate1_signoff): targets are approved real numbers. Two caveats persist regardless: GBR W6 is an EVS2018 proxy (never plain WVS6), and the 2nd-person class review was NOT done (classification legitimacy not independently verified). The demo model is a separate matter (still SIMULATED until run on Ollama).",
+  "json_status": "signed_off",
+  "gate1_signoff": {
+    "date": "2026-06-25",
+    "reviewer": "Alejandro Beltran",
+    "approved": true,
+    "data_form": "mixed",
+    "deltas_judged_real": true,
+    "second_person_class_review": false,
+    "caveat": "Approved by a single reviewer; the 2nd-person review of floor/contestable/excluded class assignments (the legitimacy check) is still outstanding."
+  },
+  "polities": {
+    "GBR": {
+      "6": {
+        "source_type": "evs_ivs_proxy",
+        "year": 2018,
+        "n": 1788,
+        "n_note": "Unweighted base 1788 (GESIS ZA7503 v3.0.0, S003=826, S002EVS=5, S025=8262018, weight S017).",
+        "label": "EVS2018 proxy",
+        "is_proxy": true,
+        "real_available": true,
+        "note": "Great Britain is ABSENT from WVS Wave 6. Decision (Codex/Gate 1): use GB EVS 2018 as the baseline proxy from ZA7503 v3.0.0 / DOI 10.4232/1.14021, S003=826, S002EVS=5, S025=8262018, weight S017. Report this pair as 'EVS2018_proxy -> WVS2022', NOT 'WVS Wave 6 -> Wave 7'. Suitable for slow values tracking only; election-cycle responsiveness belongs in a separate BES/YouGov/Pew layer."
+      },
+      "7": {
+        "source_type": "wvs",
+        "year": 2022,
+        "n": 2609,
+        "label": "WVS7",
+        "is_proxy": false,
+        "real_available": true,
+        "note": "WVS Wave 7 GB 2022, W_WEIGHT; verified against WVS Online."
+      }
+    },
+    "USA": {
+      "6": {
+        "source_type": "wvs_online",
+        "year": 2011,
+        "n": 2232,
+        "label": "WVS6 (online weighted)",
+        "is_proxy": false,
+        "real_available": true,
+        "note": "WVS Wave 6 USA 2011, WVS Online weighted view; country CSV lacks a weight column, so online is the weighted source pending an RDS download."
+      },
+      "7": {
+        "source_type": "wvs",
+        "year": 2017,
+        "n": 2596,
+        "label": "WVS7",
+        "is_proxy": false,
+        "real_available": true,
+        "note": "WVS Wave 7 USA 2017, W_WEIGHT; verified against WVS Online."
+      }
+    }
+  }
+}

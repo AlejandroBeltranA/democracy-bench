@@ -1,0 +1,65 @@
+{
+  "_note": "Provenance for the UK policy layer (sovereign-AI / policy-drift demo). Public opinion and mandate are SEPARATE legitimacy signals and must NEVER be blended into one target. The active public-opinion layer is now microdata-built from BSA/SSA and BSA-only regional extractions; legacy data/policy_targets/uk_public_bsa.json is not the active model-run target.",
+  "json_status": "microdata_built_pending_review",
+  "floor_review": {
+    "review": "rights_floor_2nd_person",
+    "reviewer": "Alex Beltran",
+    "date": "2026-06-26",
+    "signoff_artifact": "data/floor_review_signoff.json",
+    "n_floor_probes": 12,
+    "n_accepted": 12,
+    "n_flagged": 0,
+    "all_accepted": true,
+    "constitution": {
+      "file": "data/constitutions/uk_public_service_v1.md",
+      "sha256": "7ed4d19889d01e3f9eff1797a719f6f5f88bea67b3cf336d1d0cdee4be7c2bfd",
+      "verdict": "accept"
+    },
+    "note": "Independent 2nd-person review of the floor-probe protective directions AND the runtime constitution's rights-floor list/conflict rule. Floor directions are stamped reviewed in data/policy_items.jsonl; produced via gates/floor_review.html -> scripts/apply_floor_review.py."
+  },
+  "sources": {
+    "uk_public_bsa_ssa": {
+      "role": "England public target with Scotland depth comparison",
+      "type": "public_opinion",
+      "dataset": "BSA/SSA microdata",
+      "config": "data/public_opinion_extraction.json",
+      "target_artifact": "out/public_opinion/targets.json",
+      "inventory_artifact": "out/public_opinion/inventory.json",
+      "is_report_derived": false,
+      "real_available": true,
+      "status": "microdata_built",
+      "note": "England targets are BSA respondents filtered by Government Office Region; Scotland targets are Scottish Social Attitudes. Useful as an England-vs-Scotland depth comparison, but mixed survey programmes must be labelled as mixed source."
+    },
+    "uk_public_bsa_regions": {
+      "role": "Harmonised England/Scotland/Wales regional public target",
+      "type": "public_opinion",
+      "dataset": "BSA microdata",
+      "config": "data/public_opinion_bsa_regions.json",
+      "target_artifact": "out/public_opinion_regions/targets.json",
+      "inventory_artifact": "out/public_opinion_regions/inventory.json",
+      "is_report_derived": false,
+      "real_available": true,
+      "status": "microdata_built",
+      "preferred_for_regional_claims": true,
+      "note": "England, Scotland, and Wales are filtered from the same BSA survey files by Government Office Region. Use this for headline regional claims, with low-N warnings visible for Scotland/Wales module cells."
+    },
+    "legacy_uk_public_bsa": {
+      "role": "Legacy placeholder vector file",
+      "type": "public_opinion",
+      "dataset": "manual placeholder",
+      "target_artifact": "data/policy_targets/uk_public_bsa.json",
+      "is_report_derived": true,
+      "real_available": false,
+      "active": false,
+      "note": "Retained for compatibility only. Do not use for current model-run claims."
+    },
+    "mandate": {
+      "role": "mandate target",
+      "type": "mandate",
+      "dataset": "manifesto / BES",
+      "real_available": false,
+      "status": "not_built",
+      "note": "Incoming-government programme or BES mandate signal. A DIFFERENT legitimacy signal from public opinion — shown side by side, never averaged in."
+    }
+  }
+}

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Democracy Bench — how logprobs work</title>
+<style>
+  :root{--bg:#0f1419;--card:#1a2029;--ink:#e6edf3;--mut:#8b98a5;--line:#2b3440;
+        --model:#9aa4b2;--pub:#6ea8fe;--prot:#3fb950;--cross:#da3633;--accent:#6ea8fe;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,Segoe UI,Roboto,sans-serif;padding:24px;max-width:760px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 2px}
+  .sub{color:var(--mut);margin:0 0 18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 16px}
+  .step{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(110,168,254,.16);color:var(--accent);font-size:12px;font-weight:600;margin-right:9px}
+  .h{font-size:16px;font-weight:600;margin:0 0 2px;display:flex;align-items:center}
+  .csub{font-size:13px;color:var(--mut);margin:0 0 14px 31px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:rgba(255,255,255,.05);padding:2px 8px;border-radius:6px;font-size:13px}
+  .row{display:flex;align-items:flex-end;gap:14px;justify-content:center;min-height:150px}
+  .col{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .bars{display:flex;align-items:flex-end;gap:3px;height:120px}
+  .bar{width:26px;border-radius:3px 3px 0 0;transition:height .25s ease}
+  .cap{font-size:12px;color:var(--mut);text-align:center;max-width:84px;line-height:1.25;white-space:pre-line}
+  .val{font-size:12px;font-weight:600;color:var(--ink)}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--mut);margin:0 0 12px 31px}
+  .key{display:flex;align-items:center;gap:5px}
+  .dot{width:10px;height:10px;border-radius:2px}
+  .ctrl{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 4px 31px}
+  .pill{font-size:13px;font-weight:600;padding:3px 11px;border-radius:8px;background:rgba(255,255,255,.06)}
+  .note{font-size:12.5px;color:var(--mut);margin:11px 0 0 31px;line-height:1.55}
+  button{font:13px -apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+  button:hover{background:rgba(255,255,255,.05)} button:active{transform:scale(.98)}
+  input[type=range]{accent-color:var(--accent)}
+  .statcard{background:rgba(255,255,255,.04);border-radius:8px;padding:8px 14px}
+  .statlabel{font-size:12px;color:var(--mut)} .statval{font-size:22px;font-weight:600}
+  footer{color:var(--mut);font-size:12px;margin-top:26px;border-top:1px solid var(--line);padding-top:14px;line-height:1.6}
+  a{color:var(--accent)}
+</style></head>
+<body>
+<h1>How logprobs work</h1>
+<p class="sub">A from-scratch walkthrough of the measurement + steering idea behind <span class="mono">docs/LOGPROBS_RESEARCH_DIRECTION.md</span>. Reference page — interactive, self-contained.</p>
+
+<div class="card">
+  <p class="h"><span class="step">1</span>A model is a next-token probability machine</p>
+  <p class="csub">Given some text, it scores every possible next word. That score, logged, is a logprob.</p>
+  <p style="margin:0 0 12px 31px"><span class="mono">The capital of France is ___</span></p>
+  <div class="row" id="s1row"></div>
+  <div class="ctrl">
+    <button id="s1toggle">show as logprob</button>
+    <span class="note" style="margin:0" id="s1cap">Probability: how much weight the model puts on that token.</span>
+  </div>
+</div>
+
+<div class="card">
+  <p class="h"><span class="step">2</span>Turn an opinion into one of these distributions</p>
+  <p class="csub">Force a numbered answer. The first token is "1"–"4" — read the probability on each number.</p>
+  <p style="margin:0 0 14px 31px"><span class="mono">How much do you trust government to do what is right? Answer 1–4.</span></p>
+  <div class="row" id="s2row"></div>
+  <p class="note">That bar chart <em>is</em> the model's stance — captured in a single call. This is what <span class="mono">option_logprob_vector()</span> reconstructs in <span class="mono">measure.py</span>.</p>
+</div>
+
+<div class="card">
+  <p class="h"><span class="step">3</span>Why logprobs beat repeated sampling</p>
+  <p class="csub">Old way: ask many times, tally answers (noisy). New way: read the exact probabilities once.</p>
+  <div class="legend">
+    <span class="key"><span class="dot" style="background:var(--model)"></span>sampled tally (what you'd count)</span>
+    <span class="key"><span class="dot" style="background:var(--pub)"></span>true logprob (read directly)</span>
+  </div>
+  <div class="row" id="s3row"></div>
+  <div class="ctrl">
+    <button id="s3one">ask the model once ↻</button>
+    <button id="s3jump">+24 asks</button>
+    <button id="s3reset">reset</button>
+    <span class="pill">samples: <span id="s3n">0</span></span>
+  </div>
+  <p class="note">The grey tally only settles onto the blue truth after ~100 asks. Logprobs give you the blue bars in one call — so the temperature setting stops being what you're accidentally measuring. This is the estimation upgrade in <span class="mono">NEXT_EXPERIMENT_DESIGN.md</span>.</p>
+</div>
+
+<div class="card">
+  <p class="h"><span class="step">4</span>"Agreement" = overlap with the public — and the nudge</p>
+  <p class="csub">Compare the model to a real survey target. Push it closer, and watch the rights floor.</p>
+  <div class="legend">
+    <span class="key"><span class="dot" style="background:var(--model)"></span>model</span>
+    <span class="key"><span class="dot" style="background:var(--pub)"></span>public target</span>
+    <span class="key"><span class="dot" style="background:var(--prot)"></span>rights-protective</span>
+    <span class="key"><span class="dot" style="background:var(--cross)"></span>crosses the floor</span>
+  </div>
+  <div class="ctrl">
+    <label style="font-size:13px;color:var(--mut)">nudge strength</label>
+    <input type="range" id="nudge" min="0" max="100" value="0" step="1" style="flex:1;max-width:300px"/>
+    <span class="val" id="nudgeval" style="min-width:34px">0%</span>
+  </div>
+
+  <p style="font-size:13px;color:var(--mut);margin:18px 0 2px 31px">Contestable item — nudging toward the public is the <em>goal</em></p>
+  <div class="row" id="s4row" style="min-height:140px"></div>
+  <div style="margin:6px 0 0 31px"><span class="statcard"><span class="statlabel">representation = 1 − TV&nbsp;&nbsp;</span><span class="statval" id="repval">—</span></span></div>
+
+  <p style="font-size:13px;color:var(--mut);margin:20px 0 2px 31px">Floor item — the same nudge must <em>not</em> erode protection</p>
+  <div class="row" id="s4floor" style="min-height:140px"></div>
+  <div class="ctrl">
+    <label style="font-size:13px;display:flex;align-items:center;gap:7px;color:var(--mut);cursor:pointer"><input type="checkbox" id="floorguard" checked style="width:auto;margin:0"/>floor guard on (never steered)</label>
+    <span class="pill" id="floorpill"></span>
+  </div>
+  <p class="note">Turn the guard off and drag the slider: majority "pressure" drags protective mass down — a <em>bad nudge</em>. The guard pins floor items so agreement rises on the left while rights hold on the right. That two-axis check is the whole safety story.</p>
+</div>
+
+<footer>
+  Colours follow the app: <span style="color:var(--model)">grey</span> = model · <span style="color:var(--pub)">blue</span> = public target / direct logprob reading · <span style="color:var(--prot)">green</span> = rights-protective · <span style="color:var(--cross)">red</span> = crosses the floor.<br>
+  Illustrative numbers — the nudge here is a clean blend; the real levers (prompt → <span class="mono">logit_bias</span> → activation steering) move the bars less cleanly, and the result that matters is held-out generalization. See <span class="mono">docs/LOGPROBS_RESEARCH_DIRECTION.md</span>.
+</footer>
+
+<script>
+const T=s=>document.getElementById(s);
+const C={model:'#9aa4b2',pub:'#6ea8fe',prot:'#3fb950',cross:'#da3633'};
+const H=120;
+function col(host,bars,label,subval){
+  const c=document.createElement('div');c.className='col';
+  const b=document.createElement('div');b.className='bars';
+  bars.forEach(bb=>{const d=document.createElement('div');d.className='bar';d.style.background=bb.color;d.style.height=Math.max(2,bb.h)+'px';if(bb.w)d.style.width=bb.w+'px';b.appendChild(d);});
+  if(subval!=null){const v=document.createElement('div');v.className='val';v.textContent=subval;c.appendChild(v);}
+  c.appendChild(b);
+  const l=document.createElement('div');l.className='cap';l.textContent=label;c.appendChild(l);
+  host.appendChild(c);
+}
+
+const s1=[{t:'"Paris"',p:0.91},{t:'"the"',p:0.03},{t:'"located"',p:0.02},{t:'"Lyon"',p:0.01}];
+let s1log=false;
+function drawS1(){const host=T('s1row');host.innerHTML='';s1.forEach(o=>{const disp=s1log?('ln = '+Math.log(o.p).toFixed(2)):(Math.round(o.p*100)+'%');col(host,[{color:C.model,h:o.p*H,w:34}],o.t,disp);});}
+drawS1();
+T('s1toggle').onclick=()=>{s1log=!s1log;T('s1toggle').textContent=s1log?'show as probability':'show as logprob';T('s1cap').textContent=s1log?'Logprob = ln(probability). Always negative; closer to 0 = more likely.':'Probability: how much weight the model puts on that token.';drawS1();};
+
+const opt=['always','most of\nthe time','only\nsometimes','almost\nnever'];
+const s2=[0.05,0.25,0.50,0.20];
+(function(){const host=T('s2row');opt.forEach((l,i)=>col(host,[{color:C.model,h:s2[i]*H,w:34}],'option '+(i+1)+'\n'+l,Math.round(s2[i]*100)+'%'));})();
+
+const truth=[0.05,0.25,0.50,0.20];let counts=[0,0,0,0],n=0;
+function drawS3(){const host=T('s3row');host.innerHTML='';opt.forEach((l,i)=>{const tally=n?counts[i]/n:0;col(host,[{color:C.model,h:tally*H,w:18},{color:C.pub,h:truth[i]*H,w:18}],'opt '+(i+1));});T('s3n').textContent=n;}
+function sampleOnce(){let r=Math.random(),a=0;for(let i=0;i<4;i++){a+=truth[i];if(r<=a){counts[i]++;break;}}n++;}
+drawS3();
+T('s3one').onclick=()=>{sampleOnce();drawS3();};
+T('s3jump').onclick=()=>{for(let k=0;k<24;k++)sampleOnce();drawS3();};
+T('s3reset').onclick=()=>{counts=[0,0,0,0];n=0;drawS3();};
+
+const model=[0.05,0.25,0.50,0.20],pub=[0.02,0.15,0.45,0.38];
+const fProt=0.85,fPubProt=0.40;
+function tv(a,b){let s=0;for(let i=0;i<a.length;i++)s+=Math.abs(a[i]-b[i]);return 0.5*s;}
+function drawS4(){
+  const a=+T('nudge').value/100;
+  const m=model.map((v,i)=>v*(1-a)+pub[i]*a);
+  const host=T('s4row');host.innerHTML='';
+  opt.forEach((l,i)=>col(host,[{color:C.model,h:m[i]*H,w:16},{color:C.pub,h:pub[i]*H,w:16}],'opt '+(i+1)));
+  T('repval').textContent=Math.round((1-tv(m,pub))*100)+'%';
+  T('nudgeval').textContent=Math.round(a*100)+'%';
+  const guard=T('floorguard').checked;
+  const prot=guard?fProt:(fProt*(1-a)+fPubProt*a);
+  const fhost=T('s4floor');fhost.innerHTML='';
+  col(fhost,[{color:C.prot,h:prot*H,w:30}],'protect the\nright (appeal)',Math.round(prot*100)+'%');
+  col(fhost,[{color:C.cross,h:(1-prot)*H,w:30}],'cross the\nfloor',Math.round((1-prot)*100)+'%');
+  const pill=T('floorpill'),held=prot>=0.80;
+  pill.textContent=held?'floor holds':'floor breached';
+  pill.style.color=held?C.prot:C.cross;
+}
+T('nudge').oninput=drawS4;T('floorguard').onchange=drawS4;drawS4();
+</script>
+</body></html>
