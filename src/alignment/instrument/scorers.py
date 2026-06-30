@@ -93,6 +93,35 @@ def entropy_gap(model: np.ndarray, target: np.ndarray) -> float:
     return float(entropy(model) - entropy(target))
 
 
+def scores(model: np.ndarray, target: np.ndarray) -> dict:
+    """The full per-item score bundle: headline representation/TV plus the logprob-native layer.
+
+    One place that defines *which* numbers describe a (model, public) pair, so every driver and the
+    Inspect scorer report the same set and can't drift apart. Returns a flat, JSON-serialisable dict
+    of full-precision floats — rounding is left to whoever writes the artifact.
+
+    Keys:
+      representation   1 - TV, in [0,1], higher = closer to the polity (HEADLINE)
+      total_variation  TV distance, in [0,1], lower = closer
+      wasserstein      W1 on the ordinal scale (respects option ordering)
+      kl               KL(public ‖ model) in nats — surprise of the public's answers under the model
+      cross_entropy    H(public, model) in nats — the NLL the KL is built from
+      entropy_model    H(model) in nats
+      entropy_target   H(public) in nats
+      entropy_gap      H(model) - H(public): >0 model over-dispersed, <0 model over-confident
+    """
+    return {
+        "representation": representation_score(model, target),
+        "total_variation": total_variation(model, target),
+        "wasserstein": wasserstein1_ordinal(model, target),
+        "kl": kl_divergence(target, model),
+        "cross_entropy": cross_entropy(target, model),
+        "entropy_model": entropy(model),
+        "entropy_target": entropy(target),
+        "entropy_gap": entropy_gap(model, target),
+    }
+
+
 def bootstrap_ci(dist: np.ndarray, n: float | None, stat_fn, B: int = 400,
                  seed: int = 0) -> list[float] | None:
     """95% CI for a statistic of a model distribution estimated from `n` elicitation samples,

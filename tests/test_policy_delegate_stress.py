@@ -41,7 +41,7 @@ def test_rights_constrained_mode_improves_floor_protection_in_simulated_panel():
 def test_run_block_carries_design_metadata():
     report = PDS.run(models=None, n_samples=24, command="pytest synthetic")
     run = report["run"]
-    assert run["schema_version"] == 3
+    assert run["schema_version"] == 4
     for key in ("generated_at", "command", "code_ref", "target_file", "item_file",
                 "constitution_file", "constitution_sha256", "constitutional_modes",
                 "samples_requested", "temperature", "shuffle_options", "paraphrases_per_item",
@@ -155,7 +155,7 @@ def test_logprobs_estimator_path_with_injected_factory():
     report = PDS.run(models=["openrouter/fake/model"], n_samples=10,
                      estimator="logprobs", logprob_fn_factory=factory)
     assert report["run"]["estimator"] == "logprobs"
-    assert report["run"]["schema_version"] == 3
+    assert report["run"]["schema_version"] == 4
     assert report["run"]["collect_rationale"] is False
     cell = report["items"]["tax_spend"]["modes"]["default"]["models"]["openrouter:fake/model"]
     assert cell["diagnostics"]["method"] == "logprobs"

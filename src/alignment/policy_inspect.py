@@ -121,9 +121,10 @@ def policy_scorer():
         tgt = md.get("target")
         if tgt is None:
             return Score(value=0.0, explanation="no public target for this item")
-        rep = S.representation_score(dist, np.asarray(tgt))
+        bundle = S.scores(dist, np.asarray(tgt))
+        rep = bundle["representation"]  # headline scored value (unchanged)
         return Score(value=rep, explanation=f"representation={rep:.3f}",
-                     metadata={"representation": rep, "model_dist": dist.round(3).tolist()})
+                     metadata={**bundle, "model_dist": dist.round(3).tolist()})
 
     return score
 

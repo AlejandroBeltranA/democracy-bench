@@ -32,8 +32,9 @@ democracy-bench/
     BUILD_LOOP.md                  earlier harness-integration plan (reference)
     wvs_values_reference.py        earlier Inspect task (reference)
   src/alignment/
-    wvs_values.py                  ✅ CANONICAL HARNESS — Inspect @task + multi-sample @solver + @scorer
-    instrument/scorers.py          ✅ TV / Wasserstein / tracking / floor (self-tests, works)
+    policy_inspect.py              ✅ CANONICAL HARNESS — Inspect @task + multi-sample @solver + @scorer
+    policy_delegate_stress.py      ✅ no-Inspect driver for the policy-delegate stress test
+    instrument/scorers.py          ✅ TV / Wasserstein / KL / entropy-gap / tracking / floor (self-tests, works)
     instrument/measure.py          ✅ forced-choice elicitor, fails closed; Ollama backend
     steer/tier1_prompt.py          ✅ country/year persona conditioning
     steer/tier2_preference.py      ✅ inject the polity's ACTUAL distribution (tier3 LoRA — to build)
@@ -55,9 +56,11 @@ democracy-bench/
 - ✅ Elicitor (`instrument/measure.py`) — forced-choice multi-sample, **fails closed**
   (raises, never uniform-fallback) on unreadable elicitation. Ollama backend (no extra deps).
 - ✅ Tier-1 steering (`steer/tier1_prompt.py`) — country/year persona conditioning.
-- ✅ **Inspect AI is the canonical harness** — `wvs_values.py` is an Inspect `@task` with a
-  real multi-sample `@solver` (fails closed) + distributional `@scorer`. Runs `default` and
-  `steer` modes; gives the Inspect log viewer + shares plumbing with the sibling Welsh tool.
+- ✅ **Inspect AI is the canonical harness** — `policy_inspect.py` is an Inspect `@task`
+  (`policy_delegate`) with a real multi-sample `@solver` (fails closed) + distributional
+  `@scorer`. Runs the policy-delegate prompt modes; gives the Inspect log viewer + shares
+  plumbing with the sibling Welsh tool. (`wvs_values_reference.py` in `docs/` is the earlier
+  WVS task, kept for reference only.)
 - ✅ **Checkpoint H5 reached** — full measure→steer→re-measure→track arc runs end-to-end.
   `loop.py` is a quick no-Inspect driver: on a labelled **SIMULATED** model (no Ollama) it
   shows representation rising under steering, positive tracking elasticity, floor held.
@@ -89,9 +92,9 @@ python3 -m venv .venv && . .venv/bin/activate && pip install -e '.[dev]'   # num
 MODEL=ollama/llama3 ./scripts/run_all.sh   # measure a real model against the approved targets
 
 # or piecemeal:
-python -m pytest -q                                            # 101 tests
+python -m pytest -q                                            # 115 tests
 python scripts/apply_gate1.py                                  # read-only Gate-1 validator
-inspect eval src/alignment/wvs_values.py@wvs_values --model ollama/llama3 -T country=USA -T mode=steer
+inspect eval src/alignment/policy_inspect.py@policy_delegate --model ollama/llama3 -T mode=default
 python src/alignment/loop.py --country USA                     # WVS wave tracking (sim)
 python src/alignment/scenario.py                               # UK government-change beat (sim)
 python src/alignment/build_demo.py                             # rebuild demo/app.html

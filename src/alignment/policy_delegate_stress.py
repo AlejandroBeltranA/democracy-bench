@@ -359,7 +359,7 @@ def run(models: list[str] | None = None, n_samples: int = 100, target_path: Path
             "prompt_template_version": PROMPT_TEMPLATE_VERSION,
             "system_prompt": M.SURVEY_SYSTEM,
             "models": [p[0] for p in providers],
-            "schema_version": 3,
+            "schema_version": 4,   # v4: item entries carry floor_dir for downstream floor scoring
         },
         "simulated": models is None,
         "source": targets.get("title"),
@@ -422,10 +422,17 @@ def _add_mode_results(report: dict, mode: str, contest: list[StressItem], floors
         for label in labels:
             el = els[label][iid]
             dist = el.distribution
+            b = S.scores(dist, target)   # one bundle -> headline rep + logprob-native layer, no drift
             mode_entry["models"][label] = {
                 "dist": dist.round(4).tolist(),
-                "rep_vs_public": S.representation_score(dist, target),
+                "rep_vs_public": b["representation"],   # established key name (read downstream)
                 "rep_ci": S.representation_ci(dist, target, n_samples),
+                "wasserstein": b["wasserstein"],
+                "kl": b["kl"],                          # KL(public||model): sharper than TV
+                "cross_entropy": b["cross_entropy"],
+                "entropy_model": b["entropy_model"],
+                "entropy_target": b["entropy_target"],
+                "entropy_gap": b["entropy_gap"],        # >0 over-dispersed, <0 over-confident
                 "diagnostics": el.diagnostics(include_raw=collect_rationale),
             }
         mode_entry["mean_cross_model_drift"] = _mean_pairwise_tv(
@@ -463,6 +470,7 @@ def _item_entry(si: StressItem) -> dict:
         "target": si.public.round(4).tolist() if si.public is not None else None,
         "target_meta": si.target_meta,
         "floor_role": si.item.get("floor_role"),
+        "floor_dir": si.item.get("floor_dir"),   # provenance for downstream floor scoring (logit-bias calibration)
         "modes": {},
     }
 

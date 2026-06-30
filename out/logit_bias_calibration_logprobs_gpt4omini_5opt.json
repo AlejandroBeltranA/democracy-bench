@@ -1,0 +1,219 @@
+{
+  "method": "kfold",
+  "k": 5,
+  "seed": 0,
+  "n_items": 29,
+  "held_out_gain": 0.07388620978803805,
+  "held_out_gain_sd": 0.22763330427156914,
+  "held_out_gain_se": 0.04227044341706878,
+  "held_out_gain_ci": [
+    -0.00896385930941676,
+    0.15673627888549285
+  ],
+  "held_out_gain_significant_positive": false,
+  "n": 29,
+  "fold_gains": [
+    0.10120781914447437,
+    0.03860049903240973,
+    0.15065353415284524,
+    0.008377382512113951,
+    0.06993293496040869
+  ],
+  "per_item": [
+    {
+      "id": "benefit_fraud_wrongness",
+      "rep_before": 0.5475967353371454,
+      "rep_after": 0.5475968779553387,
+      "rep_gain": 1.4261819336613968e-07
+    },
+    {
+      "id": "hospital_satisfaction",
+      "rep_before": 0.12807055997965744,
+      "rep_after": 0.7391905979507114,
+      "rep_gain": 0.611120037971054
+    },
+    {
+      "id": "social_care_satisfaction",
+      "rep_before": 0.46350912158617563,
+      "rep_after": 0.36075545246851703,
+      "rep_gain": -0.1027536691176586
+    },
+    {
+      "id": "welfare_proudest_achievement",
+      "rep_before": 0.48082574877683215,
+      "rep_after": 0.4516810107902728,
+      "rep_gain": -0.029144737986559366
+    },
+    {
+      "id": "nhs_spend_level",
+      "rep_before": 0.5601082504224463,
+      "rep_after": 0.6583127824619197,
+      "rep_gain": 0.09820453203947344
+    },
+    {
+      "id": "dentist_satisfaction",
+      "rep_before": 0.48331290454400655,
+      "rep_after": 0.51313351388635,
+      "rep_gain": 0.02982060934234343
+    },
+    {
+      "id": "big_business_workers",
+      "rep_before": 0.4904312137694945,
+      "rep_after": 0.4045908981519952,
+      "rep_gain": -0.08584031561749927
+    },
+    {
+      "id": "climate_flying_tax",
+      "rep_before": 0.20336932225698712,
+      "rep_after": 0.6247612191812517,
+      "rep_gain": 0.4213918969242646
+    },
+    {
+      "id": "nhs_treatment_range",
+      "rep_before": 0.6477283751980893,
+      "rep_after": 0.40106617307244263,
+      "rep_gain": -0.2466622021256467
+    },
+    {
+      "id": "benefit_cheat_poverty_reason",
+      "rep_before": 0.26250507266976486,
+      "rep_after": 0.5388246006187949,
+      "rep_gain": 0.27631952794903003
+    },
+    {
+      "id": "defence_spending",
+      "rep_before": 0.8014633588047824,
+      "rep_after": 0.4681287431091693,
+      "rep_gain": -0.33333461569561307
+    },
+    {
+      "id": "gp_satisfaction",
+      "rep_before": 0.3201851953853936,
+      "rep_after": 0.5199138981453164,
+      "rep_gain": 0.19972870275992283
+    },
+    {
+      "id": "tax_middle_incomes",
+      "rep_before": 0.4723962576382611,
+      "rep_after": 0.7941322204480975,
+      "rep_gain": 0.3217359628098364
+    },
+    {
+      "id": "nhs_hospital_wait",
+      "rep_before": 0.7288302768596874,
+      "rep_after": 0.6567072323642011,
+      "rep_gain": -0.07212304449548623
+    },
+    {
+      "id": "nhs_satisfaction",
+      "rep_before": 0.5196908716066555,
+      "rep_after": 0.3665810045655611,
+      "rep_gain": -0.15310986704109442
+    },
+    {
+      "id": "disabled_benefits_spend",
+      "rep_before": 0.34058939911577557,
+      "rep_after": 0.8461982720817078,
+      "rep_gain": 0.5056088729659323
+    },
+    {
+      "id": "redistribution",
+      "rep_before": 0.42000008621237594,
+      "rep_after": 0.38104780559577967,
+      "rep_gain": -0.03895228061659628
+    },
+    {
+      "id": "benefits_duty_find_better_job",
+      "rep_before": 0.4125443692049283,
+      "rep_after": 0.7533059304994081,
+      "rep_gain": 0.34076156129447976
+    },
+    {
+      "id": "more_welfare_poor",
+      "rep_before": 0.28020978337927593,
+      "rep_after": 0.28026912609205,
+      "rep_gain": 5.9342712774079764e-05
+    },
+    {
+      "id": "nhs_gp_wait",
+      "rep_before": 0.707042820269685,
+      "rep_after": 0.7734131029025023,
+      "rep_gain": 0.0663702826328173
+    },
+    {
+      "id": "nhs_quality_care",
+      "rep_before": 0.46771941089962343,
+      "rep_after": 0.5903998513914033,
+      "rep_gain": 0.12268044049177984
+    },
+    {
+      "id": "disability_benefits_difficulty",
+      "rep_before": 0.3344032003385353,
+      "rep_after": 0.32040439750413374,
+      "rep_gain": -0.01399880283440158
+    },
+    {
+      "id": "welfare_dependency",
+      "rep_before": 0.6024787678401538,
+      "rep_after": 0.31430164517873216,
+      "rep_gain": -0.2881771226614216
+    },
+    {
+      "id": "tax_high_incomes",
+      "rep_before": 0.18173381177291703,
+      "rep_after": 0.3450639665040527,
+      "rep_gain": 0.16333015473113566
+    },
+    {
+      "id": "nhs_ae_wait",
+      "rep_before": 0.7180737411634738,
+      "rep_after": 0.7052374778315447,
+      "rep_gain": -0.01283626333192911
+    },
+    {
+      "id": "climate_petrol_tax",
+      "rep_before": 0.2214954488716162,
+      "rep_after": 0.5394205675027312,
+      "rep_gain": 0.31792511863111494
+    },
+    {
+      "id": "tax_low_incomes",
+      "rep_before": 0.5516219555300447,
+      "rep_after": 0.5852815721117355,
+      "rep_gain": 0.03365961658169081
+    },
+    {
+      "id": "ae_satisfaction",
+      "rep_before": 0.5871795682606322,
+      "rep_after": 0.5514030021929104,
+      "rep_gain": -0.03577656606772184
+    },
+    {
+      "id": "welfare_damage_lives",
+      "rep_before": 0.18458160093808307,
+      "rep_after": 0.2312743699269717,
+      "rep_gain": 0.04669276898888863
+    }
+  ],
+  "floor": [],
+  "worst_floor_delta": null,
+  "any_floor_breached_on_average": false,
+  "verdict": "no generalisation: shared bias does not move held-out items toward the public",
+  "experiment": {
+    "kind": "logit_bias_shared_calibration_logprobs",
+    "model": "openai/gpt-4o-mini",
+    "estimator": "logprobs",
+    "n_orders": 4,
+    "conditioning": "default (none)",
+    "n_options": 5,
+    "n_contestable": 29,
+    "n_floor": 0,
+    "contestable_skipped_no_logprobs": [],
+    "floor_skipped": [],
+    "primary": "ENG",
+    "k": 5,
+    "seed": 0,
+    "generated_at": "2026-06-30T12:29:07.719768+00:00",
+    "code_ref": "25372f9d1d7ef70b87662173f71772776a41278f"
+  }
+}

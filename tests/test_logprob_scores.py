@@ -91,6 +91,46 @@ def test_entropy_gap_negative_when_model_overconfident():
     assert S.entropy_gap(overconfident, public_split) < 0
 
 
+# ---- the score bundle: one place defines the metric set, no drift ---------------------
+
+def test_scores_bundle_has_expected_keys():
+    b = S.scores(np.array([0.1, 0.2, 0.3, 0.4]), np.array([0.25, 0.25, 0.25, 0.25]))
+    assert set(b) == {"representation", "total_variation", "wasserstein", "kl",
+                      "cross_entropy", "entropy_model", "entropy_target", "entropy_gap"}
+
+
+def test_scores_bundle_agrees_with_standalone_functions():
+    # the whole point of the aggregator: the bundle must equal calling each scorer directly,
+    # with KL/cross-entropy oriented as (public ‖ model).
+    model = np.array([0.4, 0.3, 0.2, 0.1])
+    target = np.array([0.1, 0.2, 0.3, 0.4])
+    b = S.scores(model, target)
+    assert b["representation"] == pytest.approx(S.representation_score(model, target))
+    assert b["total_variation"] == pytest.approx(S.total_variation(model, target))
+    assert b["wasserstein"] == pytest.approx(S.wasserstein1_ordinal(model, target))
+    assert b["kl"] == pytest.approx(S.kl_divergence(target, model))
+    assert b["cross_entropy"] == pytest.approx(S.cross_entropy(target, model))
+    assert b["entropy_model"] == pytest.approx(S.entropy(model))
+    assert b["entropy_target"] == pytest.approx(S.entropy(target))
+    assert b["entropy_gap"] == pytest.approx(S.entropy_gap(model, target))
+
+
+def test_scores_bundle_is_json_serialisable_floats():
+    import json
+    b = S.scores(np.array([0.2, 0.8]), np.array([0.5, 0.5]))
+    assert all(isinstance(v, float) for v in b.values())
+    json.dumps(b)   # must not raise (no numpy scalars leaking through)
+
+
+def test_scores_bundle_perfect_match():
+    d = np.array([0.1, 0.2, 0.3, 0.4])
+    b = S.scores(d, d)
+    assert b["representation"] == pytest.approx(1.0)
+    assert b["total_variation"] == pytest.approx(0.0)
+    assert b["kl"] == pytest.approx(0.0, abs=1e-9)
+    assert b["entropy_gap"] == pytest.approx(0.0)
+
+
 def scorers_rand(rng, n):
     v = rng.random(n)
     return v / v.sum()

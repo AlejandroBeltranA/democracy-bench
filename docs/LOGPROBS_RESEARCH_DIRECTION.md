@@ -95,12 +95,21 @@ Each rung is a different answer to "where does alignment live," measured in the 
 
 The two genuinely novel rungs:
 
-- **Rung 2 — logit-bias calibration (API).** OpenRouter/OpenAI expose `logit_bias`. Solve for the
-  per-item bias vector on the option-number tokens that makes the normalized option logprobs match
-  the public distribution — a small convex calibration. Claim: "we can calibrate a frontier API
-  model's option logprobs to a public target via a logit-bias vector." The honest test is **held-out
-  generalization** (a bias fit on items A–C applied to D–F), not fit on the calibrated item — the
-  same inject-then-score-against trap as the Tier-2 honesty caveat.
+- **Rung 2 — logit-bias calibration (API).** OpenRouter/OpenAI expose `logit_bias`, which adds a
+  constant `b_i` to each option-number token's logit. Because the first-token option distribution is
+  `p_i ∝ exp(logit_i)`, the post-bias distribution is exactly `q = softmax(log p + b)`. So calibrating
+  a *single* item is closed-form and trivial: `b_i = log t_i − log p_i` maps `p` onto target `t`
+  exactly (up to an additive constant — softmax is shift-invariant). **Per-item fit is therefore not
+  a result.** The real question is whether ONE *shared* position-bias vector, fit across training
+  items, also moves *held-out* items toward the public — which it can only do if the model's miss is a
+  systematic, correctable prior. That fit minimises `Σ_k KL(t_k ‖ softmax(log p_k + b))`, is convex,
+  and at its optimum makes the panel's *average* prediction equal the average target. The honest test
+  is **held-out generalization** (fit on items A–C, score on D–F), not fit on the calibrated item —
+  the same inject-then-score-against trap as the Tier-2 honesty caveat.
+
+  Constraint: a shared bias is per ordinal *position*, so it only means something within one
+  option-length — fit and evaluate per option-count group (the UK item bank has 3-, 4-, and 5-option
+  items; the 4-option group carries the rights floors).
 
 - **Rung 4 — activation steering (local).** On an MLX open model, extract a "public-agreement"
   direction as the diff-of-means between default and persona-conditioned activations, then add it at
@@ -157,12 +166,84 @@ are the sharper secondary layer.
   infra.
 - **Phase 1 (API).** Logit-bias calibration: solve per-item bias vectors to match the target, test
   held-out generalization, check the floor margin. First "move the logprobs" result.
-- **Phase 2 (local).** Activation steering on one MLX model: diff-of-means agreement vector,
-  dose-response sweep on both axes. The headline logit-steering lever.
+- **Phase 2 (local). SCAFFOLDED** — `branch: phase2-activation-steering`. Activation steering on a
+  local MLX model: diff-of-means agreement vector, dose-response sweep on both axes.
+  - Engine: `src/alignment/steer/activation_steer.py` — `install_tap` (wraps a decoder block to
+    capture the residual stream and add `alpha·direction`), `capture_direction` (diff-of-means,
+    default vs median-UK persona), `dose_response` (sweeps alpha, measures representation + floor
+    protective mass, counts items where steering broke the model). Measurement reuses the Phase-1
+    `option_logprob_vector`, so default/steered numbers are comparable.
+  - Driver: `src/alignment/activation_steering_run.py` — sweeps layers × alphas, picks the safe
+    operating point (max representation gain whose floor still holds), writes a per-layer curve.
+  - Overnight command (validated on Llama-3.2-1B and 3B):
+    ```
+    python -m alignment.activation_steering_run \
+      --model mlx-community/Llama-3.2-3B-Instruct-4bit \
+      --n-options 4 --alphas 0 1 2 4 6 8 --n-orders 2 \
+      --out out/activation_steering_3b_4opt.json
+    ```
+    Default layers = a spread around the middle; raise `--n-orders` for less position-bias noise.
+    Steering pushed too far breaks coherence (the model stops emitting option numbers) — the driver
+    records that as `broke` per alpha rather than crashing, so the curve shows the ceiling.
 - **Phase 3 (stretch, local).** LoRA fine-tune to a KL target; compare where alignment "sticks"
   (context vs decode vs activations vs weights). Ties to the existing Tier-3 stretch.
 
 Each phase yields a defensible claim and a demo beat.
+
+## Phase 1 status (in progress)
+
+Implemented and tested (offline, pure numpy):
+
+- `src/alignment/steer/logit_bias.py` — `apply_bias` (`= softmax(log p + b)`), `exact_item_bias`
+  (closed-form single-item), `fit_shared_bias` (convex shared-vector fit).
+- `src/alignment/logit_bias_calibration.py` — `held_out_calibration` (train/test split, held-out
+  representation gain, unguarded floor collateral-damage), a `verdict` in the good/bad/no-nudge
+  taxonomy, plus a `from_stress_artifact` adapter + CLI that runs the experiment off a
+  `policy_delegate_stress` artifact (grouping by option-length, resolving `floor_dir`).
+- `policy_delegate_stress` artifacts now carry `floor_dir` per item (schema v4) so floor scoring is
+  self-describing.
+
+Cross-validated read (5-fold, mean held-out gain ± 95% CI; on the **sampled** S=24 published run — a
+method demonstration, NOT a logprob result yet; artifact: `out/logit_bias_calibration.json`). A cell is
+"significant" only when the 95% CI clears zero:
+
+| option group | items | models with significant positive gain | note |
+|---|---|---|---|
+| 3-option | 5 | **0 / 6** | deepseek significantly *negative* |
+| 4-option (carries the rights floors) | 16 | **0 / 6** | gemini significantly *negative* |
+| 5-option (NHS satisfaction) | 29 | **1 / 6** | only gpt-4o-mini: +0.13, CI [+0.04, +0.22] |
+
+Headline (provisional): **a single shared logit-bias does not reliably move held-out items toward the
+public** — across 18 model×group cells exactly one shows a significant positive held-out gain, and two
+are significantly negative. The model's misses are mostly *idiosyncratic per item*, not a systematic
+prior one global bias vector can correct. (The single-split "command-r bad nudge" from the first pass
+was noise: under 5-fold it is −0.015, CI straddling zero.) This is the honest negative result for the
+cheapest steering rung — it is exactly what motivates Phase 2 (activation steering), which can move
+per-item rather than applying one global tilt. The lone exception (gpt-4o-mini on the NHS-satisfaction
+block, where items share a strong common skew) is the shape of case where a shared nudge *can* work.
+
+### Real-logprobs check (gpt-4o-mini, via OpenRouter)
+
+Re-ran the experiment on **actual first-token option logprobs** (temperature 0, `max_tokens=1`,
+4 option-orderings averaged per item; `--elicit openai/gpt-4o-mini`) instead of the sampled dists.
+The real logprob distributions are smooth and non-degenerate — e.g. `governing_britain` returns
+`[0.00, 0.25, 0.62, 0.13]` where S=24 sampling had collapsed many items to a one-hot like `[0,0,1]`.
+
+| group | sampled (S=24) | real logprobs | survives? |
+|---|---|---|---|
+| 4-option (16 items, has floors) | −0.067, CI [−0.18, +0.04] | −0.043, CI [−0.12, +0.03] | confirms negative; floor Δ ≈ −0.004 |
+| 5-option NHS (29 items) | **+0.129, CI [+0.04, +0.22] (significant)** | +0.074, CI [−0.01, +0.16] | **no** — CI now straddles zero |
+
+So the single significant-positive cell from the sampled sweep does **not** survive on real logprobs:
+the better-quality measurement *strengthens* the negative result rather than rescuing the nudge. A
+shared logit-bias does not significantly steer gpt-4o-mini toward the UK public on either group.
+Artifacts: `out/logit_bias_calibration_logprobs_gpt4omini_{4,5}opt.json`.
+
+Phase 1 conclusion: **the cheapest steering rung (one shared logit-bias) fails to generalise** — on
+sampled *and* logprob data. This is the result that justifies Phase 2 (activation steering), which can
+move per item rather than applying one global tilt. Open follow-ups: sweep more logprob-capable models
+(deepseek, others) to confirm the pattern isn't gpt-4o-mini-specific; try a *grouped/clustered* bias
+(per item-domain) rather than one global vector.
 
 ## Claims this design can support
 
