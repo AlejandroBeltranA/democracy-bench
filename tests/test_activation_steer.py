@@ -401,3 +401,65 @@ def test_ci_layer_requires_baseline_alpha():
 def test_ci_layer_requires_at_least_one_seed():
     with pytest.raises(ValueError):
         R.summarize_ci_layer([], floor_min=0.5, B=100, seed=0)
+
+
+# ---- W3 arrow geometry: cosine helpers ------------------------------------------------
+
+def test_cosine_matrix_identity_and_orthogonality():
+    arrows = np.array([[1.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+    C = A.cosine_matrix(arrows)
+    assert C[0, 0] == pytest.approx(1.0)
+    assert C[0, 1] == pytest.approx(1.0)          # identical directions
+    assert C[0, 2] == pytest.approx(0.0)          # orthogonal
+    assert np.allclose(C, C.T)                     # symmetric
+
+
+def test_cosine_matrix_zero_row_is_zero_not_nan():
+    arrows = np.array([[0.0, 0.0], [1.0, 1.0]])
+    C = A.cosine_matrix(arrows)
+    assert not np.isnan(C).any()
+    assert C[0, 1] == pytest.approx(0.0)
+
+
+def test_cosine_matrix_rejects_non_2d():
+    with pytest.raises(ValueError):
+        A.cosine_matrix(np.array([1.0, 2.0, 3.0]))
+
+
+def test_within_cross_domain_separates_aligned_clusters():
+    # two domains; arrows within a domain are identical, across domains orthogonal
+    arrows = np.array([[1.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 1.0]])
+    domains = ["a", "a", "b", "b"]
+    out = A.within_cross_domain_cosine(arrows, domains)
+    assert out["within_mean"] == pytest.approx(1.0)   # same-domain arrows aligned
+    assert out["cross_mean"] == pytest.approx(0.0)     # cross-domain arrows orthogonal
+    assert out["within_n"] == 2 and out["cross_n"] == 4
+
+
+def test_within_cross_domain_length_mismatch_raises():
+    with pytest.raises(ValueError):
+        A.within_cross_domain_cosine(np.zeros((3, 2)), ["a", "b"])
+
+
+def test_cosine_to_mean_high_when_aligned_low_when_divergent():
+    aligned = np.array([[1.0, 0.0], [1.0, 0.01], [1.0, -0.01]])
+    assert A.cosine_to_mean(aligned)["mean"] > 0.99    # all point ~same way -> mean represents them
+
+    # opposing pairs: the mean cancels toward zero and represents no arrow well
+    divergent = np.array([[1.0, 0.0], [-1.0, 0.0], [0.0, 1.0], [0.0, -1.0]])
+    out = A.cosine_to_mean(divergent)
+    assert out["mean_arrow_norm"] == pytest.approx(0.0)  # mean washes out
+    assert out["mean"] == pytest.approx(0.0)
+
+
+def test_cosine_to_mean_rejects_non_2d():
+    with pytest.raises(ValueError):
+        A.cosine_to_mean(np.array([1.0, 2.0]))
+
+
+def test_diff_of_means_equals_mean_of_item_arrows():
+    # capture_direction == mean of the per-item arrows capture_item_directions returns
+    default = np.array([[0.0, 0.0], [1.0, 2.0], [3.0, 1.0]])
+    persona = np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])
+    arrows = persona - default
+    assert np.allclose(A.diff_of_means(default, persona), arrows.mean(axis=0))

@@ -477,6 +477,63 @@ def run_ci(model_name: str, layers: list[int], alphas: list[float], seeds: list[
     }
 
 
+def run_geometry(model_name: str, layers: list[int], n_options: int = 4,
+                 primary: str = "ENG") -> dict:
+    """W3 driver: capture PER-ITEM steering arrows at each layer and measure their geometry — pairwise
+    cosine, within- vs cross-domain cosine, and each arrow's cosine to the mean (diff-of-means)
+    direction. Cheap: two forward passes per item per layer, no alpha sweep. The mechanism section: if
+    mid/late-layer arrows are mutually misaligned, the single mean direction steering injects cannot
+    express any item well, which is WHY R1–R4 found no generalising, floor-safe gain."""
+    model, tok = A.load_model(model_name)
+    n_layers = len(model.model.layers)
+
+    contest = [si for si in PDS.contestable_items(PDS.load_targets(), primary)
+               if si.public is not None and len(si.item["scale"]["labels"]) == n_options]
+    if len(contest) < 2:
+        raise ValueError(f"need >= 2 contestable {n_options}-option items, found {len(contest)}")
+    items = [si.item for si in contest]
+    domains = [si.item.get("domain") for si in contest]
+    item_ids = [si.item["id"] for si in contest]
+
+    per_layer = []
+    for li in layers:
+        tap, restore = A.install_tap(model, li)
+        try:
+            arrows = A.capture_item_directions(model, tok, tap, items,
+                                               country=A.PERSONA_COUNTRY, year=A.PERSONA_YEAR)
+        finally:
+            restore()
+        C = A.cosine_matrix(arrows)
+        dom = A.within_cross_domain_cosine(arrows, domains)
+        to_mean = A.cosine_to_mean(arrows)
+        per_layer.append({
+            "layer": li,
+            "cosine_matrix": [[float(x) for x in row] for row in C],
+            "mean_offdiag_cosine": dom["mean_offdiag"],
+            "within_domain_cosine": dom["within_mean"], "cross_domain_cosine": dom["cross_mean"],
+            "within_n": dom["within_n"], "cross_n": dom["cross_n"],
+            "cosine_to_mean_arrow": to_mean["mean"],
+            "cosine_to_mean_per_item": to_mean["per_item"],
+            "mean_arrow_norm": to_mean["mean_arrow_norm"],
+            "per_item_arrow_norms": [float(x) for x in np.linalg.norm(arrows, axis=1)],
+        })
+        print(f"layer {li:>2}: mean offdiag cos={dom['mean_offdiag']:+.3f}  "
+              f"within-dom={dom['within_mean'] if dom['within_mean'] is None else round(dom['within_mean'],3)}  "
+              f"cross-dom={dom['cross_mean'] if dom['cross_mean'] is None else round(dom['cross_mean'],3)}  "
+              f"cos-to-mean={to_mean['mean']:+.3f}")
+
+    return {
+        "run": run_meta.run_block(
+            command="python -m alignment.activation_steering_run --geometry",
+            models=[model_name], schema_version=1,
+            extra={"kind": "activation_steering_geometry", "n_layers": n_layers, "layers": layers,
+                   "n_options": n_options, "primary": primary,
+                   "n_contestable": len(contest), "item_ids": item_ids, "domains": domains,
+                   "persona": f"{A.PERSONA_COUNTRY} {A.PERSONA_YEAR}"}),
+        "per_layer": per_layer,
+    }
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Phase 2: activation-steering dose-response sweep (local MLX)")
     ap.add_argument("--model", default=A.DEFAULT_MODEL)
@@ -498,8 +555,19 @@ def main(argv=None):
                     help="R3: sweep the signed alpha grid (negatives included) and report antisymmetry")
     ap.add_argument("--ci", action="store_true",
                     help="R4: rerun the grid over --seeds with mean +/- bootstrap CI and CI-based verdicts")
+    ap.add_argument("--geometry", action="store_true",
+                    help="W3: capture per-item arrows and report their cosine geometry (no alpha sweep)")
     ap.add_argument("--out", type=Path, default=OUT / "activation_steering.json")
     args = ap.parse_args(argv)
+
+    if args.geometry:
+        if args.layers is None:
+            ap.error("--geometry requires explicit --layers (e.g. --layers 7 11 14 17 21)")
+        result = run_geometry(args.model, args.layers, n_options=args.n_options, primary=args.primary)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(result, indent=2))
+        print(f"wrote {args.out}")
+        return result
 
     if args.ci:
         if args.layers is None:

@@ -44,6 +44,62 @@ def diff_of_means(default_acts: np.ndarray, persona_acts: np.ndarray) -> np.ndar
     return p.mean(axis=0) - d.mean(axis=0)
 
 
+def cosine_matrix(arrows: np.ndarray) -> np.ndarray:
+    """Pairwise cosine-similarity matrix of the row vectors in `arrows` [n, d] -> [n, n]. Zero-norm
+    rows contribute 0 similarity (not NaN). W3's core: if per-item steering arrows are one shared
+    concept the off-diagonal is uniformly high; if each item has its own direction it is near 0."""
+    a = np.asarray(arrows, float)
+    if a.ndim != 2:
+        raise ValueError(f"need a 2-D [n,d] array, got shape {a.shape}")
+    norms = np.linalg.norm(a, axis=1, keepdims=True)
+    unit = np.divide(a, norms, out=np.zeros_like(a), where=norms > 0)
+    return unit @ unit.T
+
+
+def _offdiag(C: np.ndarray) -> list[float]:
+    n = C.shape[0]
+    return [float(C[i, j]) for i in range(n) for j in range(i + 1, n)]
+
+
+def within_cross_domain_cosine(arrows: np.ndarray, domains: list) -> dict:
+    """Mean pairwise cosine among arrows that SHARE a domain (within) vs arrows in DIFFERENT domains
+    (cross), plus the overall off-diagonal mean. within >> cross => arrows are domain-specific, not a
+    single 'public agreement' axis — the mechanistic reason a global steer/logit-bias cannot fit all
+    items at once."""
+    a = np.asarray(arrows, float)
+    if a.shape[0] != len(domains):
+        raise ValueError(f"arrows/domains length mismatch: {a.shape[0]} vs {len(domains)}")
+    C = cosine_matrix(a)
+    within, cross = [], []
+    for i in range(len(domains)):
+        for j in range(i + 1, len(domains)):
+            (within if domains[i] == domains[j] else cross).append(float(C[i, j]))
+    off = _offdiag(C)
+    return {"within_mean": float(np.mean(within)) if within else None,
+            "cross_mean": float(np.mean(cross)) if cross else None,
+            "within_n": len(within), "cross_n": len(cross),
+            "mean_offdiag": float(np.mean(off)) if off else None}
+
+
+def cosine_to_mean(arrows: np.ndarray) -> dict:
+    """Each arrow's cosine to the MEAN arrow (the diff-of-means direction that steering actually uses),
+    and the average. High mean => the arrows are mutually aligned and their mean represents them all
+    (a real concept); low => the mean is a washed-out average of divergent directions and expresses
+    none of them well — exactly why injecting it helps no item much."""
+    a = np.asarray(arrows, float)
+    if a.ndim != 2:
+        raise ValueError(f"need a 2-D [n,d] array, got shape {a.shape}")
+    m = a.mean(axis=0)
+    mn = float(np.linalg.norm(m))
+    if mn == 0.0:
+        return {"per_item": [0.0] * a.shape[0], "mean": 0.0, "mean_arrow_norm": 0.0}
+    munit = m / mn
+    norms = np.linalg.norm(a, axis=1)
+    cos = np.divide(a @ munit, norms, out=np.zeros(a.shape[0]), where=norms > 0)
+    return {"per_item": [float(x) for x in cos], "mean": float(np.mean(cos)),
+            "mean_arrow_norm": mn}
+
+
 def random_direction(dim: int, norm: float, seed: int = 0) -> np.ndarray:
     """A matched-norm RANDOM steering direction: an isotropic Gaussian vector rescaled to `norm`.
     R2's control for `capture_direction` — same perturbation magnitude injected at the same layer,
@@ -205,6 +261,25 @@ def capture_direction(model, tok, tap, items: list, country: str = PERSONA_COUNT
         pers.append(tap.captured)
     tap.capture = False
     return diff_of_means(np.array(defs), np.array(pers))
+
+
+def capture_item_directions(model, tok, tap, items: list, country: str = PERSONA_COUNTRY,
+                            year=PERSONA_YEAR) -> np.ndarray:
+    """Per-ITEM steering arrows at the tap's layer: for each item the (persona − default) last-token
+    residual shift, kept separate (not averaged). Returns [n_items, d_model]. `capture_direction` is
+    exactly the mean of these rows; W3 keeps them apart to measure whether they point the same way."""
+    persona = T1.persona(country, year)
+    arrows = []
+    tap.steer_vec = None
+    tap.capture = True
+    for it in items:
+        mlx_logprob_fn(model, tok)(M.forced_choice_prompt(it, None), len(it["scale"]["labels"]))
+        d = tap.captured
+        mlx_logprob_fn(model, tok)(M.forced_choice_prompt(it, persona), len(it["scale"]["labels"]))
+        p = tap.captured
+        arrows.append(p - d)
+    tap.capture = False
+    return np.array(arrows)
 
 
 def steered_distribution(model, tok, tap, item, vector, alpha: float,

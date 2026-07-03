@@ -152,7 +152,7 @@ Reunites steering with the tracking axis. Uses the 10 significant items in
 - Question: is "public agreement" one direction or many? Explains mechanistically why the
   Phase 1 global logit-bias failed. Output `out/act_steer_domains_3b.json`.
 
-### W3 — Arrow geometry  ☐  (cheap; also the explanation path if R1 fails)
+### W3 — Arrow geometry  ☑ (see Loop log 2026-07-03 — mechanism found; note in docs/PHASE2_GEOMETRY_NOTE.md)
 
 - Capture per-item directions at layers {7, 11, 14, 17, 21}; compute pairwise cosine
   similarity matrices per layer (items × items), plus mean within-domain vs cross-domain
@@ -316,3 +316,32 @@ RESOLUTION: Phase 2 is a clean NEGATIVE, now airtight across ALL candidate layer
 17, 21 here). Activation steering with a diff-of-means direction does not move this model toward the
 UK public in a way that generalises across items, at any layer, with floors held. Cleared to proceed
 to W3 (geometry) as the mechanism section explaining WHY. R7/R8 remain optional characterisation.
+
+### 2026-07-03 — W3 arrow geometry → mechanism found (persona-style axis, not public-content)
+
+Ran: `activation_steering_run --geometry --layers 7 11 14 17 21` (per-item arrows, no sweep,
+~2 min) → `out/act_steer_geometry_3b.json`; full interpretation in `docs/PHASE2_GEOMETRY_NOTE.md`.
+Code: `capture_item_directions` (engine) + pure `cosine_matrix` / `within_cross_domain_cosine` /
+`cosine_to_mean`; driver `run_geometry` + `--geometry`. +8 tests (206 pass).
+
+Mean off-diagonal cosine of the per-item arrows by layer: L7 +0.807 · L11 +0.817 · L14 +0.707 ·
+L17 +0.602 · L21 +0.556 (min pair at L11 still +0.658). cos(arrow, mean): 0.905→0.764. within-dom
+0.90–0.98 vs cross-dom 0.50–0.79, gap widening 0.20 (L7)→0.40 (L21).
+
+Finding (INVERTS the plan's guess that mid arrows align / late don't): the arrows are strongly
+aligned at ALL layers — there IS one dominant direction — but because each arrow is a
+(persona−default) shift and it is ~0.8 shared across 16 different-target items, that direction is a
+generic PERSONA/STYLE axis ("sound like a surveyed member of the public"), NOT per-item public
+content. That single fact explains the whole battery: R1 no-transfer (no item-specific content to
+generalise), R2 in-sample-only (memorised the capture items), R3 wrong-way-at-low-α (a generic push
+has no per-item polarity), and Phase 1's global logit-bias failure (one shared shift on the output =
+one shared shift in the stream). Depth adds DOMAIN FRACTURE (within≫cross grows with depth): near the
+output the "public view" splits into NHS/welfare/tax directions no single vector can serve.
+
+This is the paper's mechanism section. Phase-2 story is complete and coherent: honest NEGATIVE with a
+geometric explanation. Remaining items are OPTIONAL confirmations that would further nail the
+"persona-generic, not public-specific" claim — R8 (irrelevant-persona direction should reproduce the
+same generic effect) and R7 (off-task coherence). W1 (steering-implements-tracking) is now expected
+to fail for the same reason but is the flagship framing; W4/W5 are moot for a negative result.
+STOP CONDITION (plan): "R1 kills AND W3 explains it → write the negative summary and stop; the human
+writes the paper section." Both are now satisfied — flag for human sign-off before any further compute.
