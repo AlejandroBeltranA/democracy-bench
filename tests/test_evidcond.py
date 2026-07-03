@@ -426,3 +426,90 @@ def test_floor_condition_summary_means_deltas_and_counts():
     # delta vs baseline is negative (hostile pressure drops floors)
     assert s["both"]["delta_vs_baseline"]["mean"] < 0
     assert s["hostile_evidence"]["n_below_floor"] == 1
+
+
+# ---- P5a: LoRA-deference data helpers (pure, numpy-only) ------------------------------
+
+def _ids_meta_50():
+    """Reconstruct the 50-item (id, n_options, domain) metadata the split stratifies over,
+    matching the real bank (29 five-opt, 16 four-opt, 5 three-opt)."""
+    from alignment.evidcond_run import load_phase3, n_options
+    bank = load_phase3("ENG")
+    return [{"id": si.item["id"], "n_options": n_options(si.item),
+             "domain": si.item.get("domain")} for si in bank["contestable"]]
+
+
+def test_stratified_split_deterministic_and_sizes():
+    meta = _ids_meta_50()
+    a = E.stratified_split(meta, n_heldout=15, min_sig_heldout=5, seed=E.P5A_SEED)
+    b = E.stratified_split(meta, n_heldout=15, min_sig_heldout=5, seed=E.P5A_SEED)
+    assert a["train"] == b["train"] and a["heldout"] == b["heldout"]     # deterministic
+    assert a["n_heldout"] == 15 and a["n_train"] == 35
+    assert len(set(a["train"]) & set(a["heldout"])) == 0                 # disjoint
+    assert len(set(a["train"]) | set(a["heldout"])) == len(meta)         # cover
+
+
+def test_stratified_split_sig_constraint_met():
+    meta = _ids_meta_50()
+    s = E.stratified_split(meta, n_heldout=15, min_sig_heldout=5, seed=E.P5A_SEED)
+    assert s["n_sig_heldout"] >= 5
+    assert set(s["sig_in_heldout"]) <= set(E.SIG_TRACKING_ITEMS)
+
+
+def test_stratified_split_stratification_spread():
+    # both option counts and multiple domains should appear in held-out (not all one bucket)
+    meta = _ids_meta_50()
+    s = E.stratified_split(meta, n_heldout=15, min_sig_heldout=5, seed=E.P5A_SEED)
+    by = {m["id"]: m for m in meta}
+    heldout_ncounts = {by[i]["n_options"] for i in s["heldout"]}
+    heldout_domains = {by[i]["domain"] for i in s["heldout"]}
+    assert len(heldout_ncounts) >= 2     # more than one option count held out
+    assert len(heldout_domains) >= 3     # spread across domains
+
+
+def test_stratified_split_rejects_impossible_sig_constraint():
+    meta = _ids_meta_50()
+    with pytest.raises(ValueError):
+        E.stratified_split(meta, n_heldout=3, min_sig_heldout=5, seed=E.P5A_SEED)
+
+
+def test_sample_option_indices_converges_to_distribution():
+    rng = np.random.default_rng(0)
+    dist = [0.1, 0.2, 0.7]
+    idxs = E.sample_option_indices(dist, 20000, rng)
+    hist = np.bincount(idxs, minlength=3) / len(idxs)
+    assert hist == pytest.approx(np.array(dist), abs=0.02)      # empirical ~ target (=> KL)
+    assert set(idxs) <= {0, 1, 2}
+
+
+def test_sample_option_indices_normalises_input():
+    rng = np.random.default_rng(1)
+    idxs = E.sample_option_indices([1.0, 3.0], 100, rng)        # unnormalised -> [0.25, 0.75]
+    assert all(i in (0, 1) for i in idxs)
+
+
+def test_chat_example_shape_and_answer():
+    ex = E.chat_example("PROMPT", 3, system="SYS")
+    msgs = ex["messages"]
+    assert [m["role"] for m in msgs] == ["system", "user", "assistant"]
+    assert msgs[0]["content"] == "SYS"
+    assert msgs[1]["content"] == "PROMPT"
+    assert msgs[2]["content"] == "3"          # bare 1-based option number string
+
+
+def test_build_examples_for_item_count_and_prompt_stable():
+    rng = np.random.default_rng(2)
+    rows = E.build_examples_for_item("Q", [0.0, 1.0, 0.0], 12, "SYS", rng)
+    assert len(rows) == 12
+    # a point-mass-ish target => every completion is the mass option (index 1 -> "2")
+    assert all(r["messages"][-1]["content"] == "2" for r in rows)
+    assert all(r["messages"][1]["content"] == "Q" for r in rows)     # prompt identical
+
+
+def test_dataset_counts_histogram():
+    rng = np.random.default_rng(3)
+    rows = E.build_examples_for_item("Q", [0.5, 0.5], 200, "SYS", rng)
+    c = E.dataset_counts(rows)
+    assert c["n_rows"] == 200
+    assert set(c["answer_histogram"]) == {"1", "2"}
+    assert sum(c["answer_histogram"].values()) == 200

@@ -371,6 +371,154 @@ def floor_condition_summary(floor_rows: list, seed: int = 0) -> dict:
     return out
 
 
+# ---- P5a LoRA-deference data helpers (no MLX; numpy-only, CI-testable) ----------------
+#
+# "Deference where due": one disposition, two behaviours, conditioned on item class.
+#   * contestable items — evidence-conditioned prompt (P2's exact Tier-2 phrasing stating the
+#     item's real 2024 ENG public distribution) -> single-token answer SAMPLED from that same
+#     public distribution. In expectation, token cross-entropy on the sampled targets = KL toward
+#     the target distribution, so stock mlx_lm SFT (no custom loss) closes the P2 fidelity gap.
+#   * floor probes — SYNTHETIC hostile evidence (P4's hostile_distribution) in the prompt ->
+#     answer SAMPLED from the probe's UNTUNED baseline protective distribution (P4 artifact,
+#     condition baseline). The disposition: hold the floor, ignore the hostile evidence.
+#   * a few no-evidence contestable prompts -> answers from the model's own P2 no-evidence
+#     distribution (an anchor against catastrophic drift of the default behaviour).
+#
+# The training text must match the elicitation format EXACTLY (same prompt in => same
+# distribution out): the chat `messages` are [SURVEY_SYSTEM, user=forced_choice_prompt(...),
+# assistant=<option number>], the identical (system, user) turn `activation_steer._chat_ids`
+# builds. Examples are always in CANONICAL option order (order 0 of the n_orders average, and
+# the order the injected evidence line is written in), so the sampled completion number is the
+# 1-based canonical option index.
+
+# the 10 Bonferroni-significant tracking items (must be visible to the split's sig-constraint).
+# Sourced from out/_bsa_delta_check.json -> summary.sig_2022_2024_bonferroni (== SIG_2022_2024).
+SIG_TRACKING_ITEMS = tuple(SIG_2022_2024)
+
+
+def stratified_split(ids_meta: list, n_heldout: int = 15, sig_ids=SIG_TRACKING_ITEMS,
+                     min_sig_heldout: int = 5, seed: int = 20260703) -> dict:
+    """Deterministic stratified train/held-out split of the contestable items. `ids_meta` is a list
+    of `{"id", "n_options", "domain"}` (order-independent — sorted internally). Held-out gets
+    `n_heldout` items, stratified by BOTH option count and domain (proportional round-robin over the
+    (n_options, domain) strata), and is CONSTRAINED to contain at least `min_sig_heldout` of the
+    Bonferroni-significant tracking items so P3 re-runs as a clean held-out test. Pure function of
+    (`ids_meta`, params, `seed`): a fixed numpy RNG orders the strata and the within-stratum picks.
+
+    Returns `{"train": [...ids], "heldout": [...ids], "seed", "n_heldout", "strata",
+    "sig_in_heldout": [...], "n_sig_heldout"}`. Raises if the sig constraint cannot be met.
+    """
+    meta = {m["id"]: m for m in ids_meta}
+    all_ids = sorted(meta)
+    n = len(all_ids)
+    if not (0 < n_heldout < n):
+        raise ValueError(f"n_heldout {n_heldout} must be in (0, {n})")
+    sig_pool = [i for i in all_ids if i in set(sig_ids)]
+    if min_sig_heldout > len(sig_pool):
+        raise ValueError(f"cannot hold out {min_sig_heldout} sig items; only {len(sig_pool)} exist")
+    if min_sig_heldout > n_heldout:
+        raise ValueError(f"min_sig_heldout {min_sig_heldout} > n_heldout {n_heldout}")
+
+    rng = np.random.default_rng(seed)
+
+    # 1) force min_sig_heldout sig items into held-out, chosen by a seeded shuffle of the sig pool.
+    sig_perm = list(rng.permutation(len(sig_pool)))
+    forced_sig = sorted(sig_pool[i] for i in sig_perm[:min_sig_heldout])
+
+    # 2) fill the remaining held-out slots by proportional round-robin over (n_options, domain)
+    #    strata, so both stratification axes are respected. Within a stratum, a seeded shuffle picks.
+    remaining_slots = n_heldout - len(forced_sig)
+    chosen = set(forced_sig)
+    strata: dict = {}
+    for i in all_ids:
+        key = (meta[i]["n_options"], meta[i]["domain"])
+        strata.setdefault(key, []).append(i)
+    # seeded within-stratum order; strata visited largest-first then by a seeded tiebreak
+    stratum_keys = sorted(strata)
+    key_order = list(rng.permutation(len(stratum_keys)))
+    ordered_keys = sorted(stratum_keys, key=lambda k: (-len(strata[k]), key_order[stratum_keys.index(k)]))
+    pools = {}
+    for k in ordered_keys:
+        idx = list(rng.permutation(len(strata[k])))
+        pools[k] = [strata[k][j] for j in idx if strata[k][j] not in chosen]
+    # round-robin draw one available candidate per stratum until the slots are full
+    while remaining_slots > 0 and any(pools.values()):
+        for k in ordered_keys:
+            if remaining_slots == 0:
+                break
+            if pools[k]:
+                pick = pools[k].pop(0)
+                if pick not in chosen:
+                    chosen.add(pick)
+                    remaining_slots -= 1
+    heldout = sorted(chosen)
+    if len(heldout) != n_heldout:
+        raise ValueError(f"split produced {len(heldout)} held-out, expected {n_heldout}")
+    train = sorted(i for i in all_ids if i not in chosen)
+    sig_in_heldout = sorted(i for i in heldout if i in set(sig_ids))
+    if len(sig_in_heldout) < min_sig_heldout:
+        raise ValueError(f"sig constraint failed: {len(sig_in_heldout)} < {min_sig_heldout}")
+    strata_summary = {f"{k[0]}opt/{k[1]}": {"n": len(v),
+                                            "heldout": sorted(i for i in v if i in chosen)}
+                      for k, v in sorted(strata.items())}
+    return {
+        "train": train,
+        "heldout": heldout,
+        "seed": seed,
+        "n_heldout": n_heldout,
+        "n_train": len(train),
+        "sig_in_heldout": sig_in_heldout,
+        "n_sig_heldout": len(sig_in_heldout),
+        "min_sig_heldout": min_sig_heldout,
+        "strata": strata_summary,
+    }
+
+
+def sample_option_indices(dist, n_samples: int, rng) -> list[int]:
+    """Draw `n_samples` 0-based option indices from a (canonical-order) target distribution using a
+    seeded numpy RNG. The empirical frequency of the draws converges to `dist`, so training on the
+    sampled single-token completions minimises cross-entropy toward `dist` in expectation (= KL).
+    `dist` is normalised first (fail-soft, same as the scorers)."""
+    d = normalise_distribution(dist)
+    return [int(x) for x in rng.choice(len(d), size=int(n_samples), p=d)]
+
+
+def chat_example(user_prompt: str, option_number: int, system: str) -> dict:
+    """One mlx_lm ChatDataset row: [system, user, assistant] messages. The assistant turn is the bare
+    option NUMBER (1-based), a single-token answer matching the elicitation's `parse_choice` target.
+    Uses the `messages` format (not prompt/completion) so the SURVEY_SYSTEM turn is present exactly as
+    the elicitation path (`activation_steer._chat_ids`) renders it — same prompt in, same distribution
+    out. Train with --mask-prompt so the loss lands only on the completion token(s)."""
+    return {"messages": [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user_prompt},
+        {"role": "assistant", "content": str(int(option_number))},
+    ]}
+
+
+def build_examples_for_item(user_prompt: str, target_dist, n_samples: int, system: str,
+                            rng) -> list[dict]:
+    """`n_samples` chat rows for ONE prompt: sample that many option indices from `target_dist`
+    (canonical order) and wrap each as a `chat_example` whose assistant answer is the 1-based option
+    number. The prompt is identical across the rows (the evidence/hostile/no-evidence conditioning is
+    already baked into `user_prompt`); only the sampled answer varies, so the trained answer
+    distribution for that prompt converges to `target_dist`."""
+    idxs = sample_option_indices(target_dist, n_samples, rng)
+    return [chat_example(user_prompt, i + 1, system) for i in idxs]
+
+
+def dataset_counts(rows: list) -> dict:
+    """Summarise a built training set: total rows and the empirical answer-number histogram (a
+    quick sanity that the sampler actually produced a spread, not a point mass). Pure over the
+    chat rows built by `chat_example`/`build_examples_for_item`."""
+    from collections import Counter
+    hist: Counter = Counter()
+    for r in rows:
+        ans = r["messages"][-1]["content"]
+        hist[ans] += 1
+    return {"n_rows": len(rows), "answer_histogram": dict(sorted(hist.items()))}
+
+
 # ---- item-loading path (reuses policy_delegate_stress loaders) -----------------------
 
 def load_phase3(primary: str = "ENG", target_path=PDS.DEFAULT_TARGETS) -> dict:
@@ -819,6 +967,174 @@ def _floors_run_block(model_name, primary, n_orders, seed, boot, n_floor, hostil
         })
 
 
+# ---- P5a LoRA-deference DATA BUILDER + TRAINING (MLX/CLI; not imported by CI) ----------
+
+# approved defaults (docs/PHASE3_PLAN.md P5 sign-off): ~35/15 split, >=5 sig held out;
+# ~64 sampled completions per item/probe; a small no-evidence anchor on train items.
+P5A_SEED = 20260703
+P5A_SAMPLES_PER_ITEM = 64
+P5A_NOEV_SAMPLES = 16          # no-evidence anchor samples per anchored train item
+P5A_NOEV_ANCHOR_ITEMS = 16     # how many train items get a no-evidence anchor block
+
+
+def _floor_baseline_targets(floors_artifact_path: str) -> dict:
+    """Per floor-probe id, its UNTUNED baseline protective distribution (canonical option order)
+    read from the P4 artifact (out/evidcond_floors_3b.json -> floor_items[*].dist_baseline). This
+    is the floor training TARGET: sample answers from the model's own baseline so LoRA teaches the
+    probe to hold that (protective) shape and ignore the injected hostile evidence. READ ONLY."""
+    import json as _json
+    art = _json.loads(open(floors_artifact_path).read())
+    return {r["id"]: {"dist_baseline": list(r["dist_baseline"]),
+                      "floor_dir": int(r["floor_dir"]),
+                      "protective_mass_baseline": float(r["protective_mass_baseline"])}
+            for r in art["floor_items"]}
+
+
+def build_lora_deference_dataset(
+        model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit",
+        primary: str = "ENG",
+        n_heldout: int = 15, min_sig_heldout: int = 5,
+        samples_per_item: int = P5A_SAMPLES_PER_ITEM,
+        noev_samples: int = P5A_NOEV_SAMPLES, noev_anchor_items: int = P5A_NOEV_ANCHOR_ITEMS,
+        floors_artifact: str = "out/evidcond_floors_3b.json",
+        hostile_mass: float = 0.75, seed: int = P5A_SEED,
+        system: str | None = None,
+        smoke: bool = False) -> dict:
+    """Assemble the P5a training set (no model forward passes — the targets are the REAL public
+    distributions and the P4 baseline distributions, both known). Returns
+    `{"split", "rows", "design"}` where `rows` is the list of chat `messages` dicts and `design`
+    is the JSON-serialisable config/count echo for out/lora_deference_design.json.
+
+    Buckets (all in CANONICAL option order, prompts identical to the P2/P4 elicitation):
+      * contestable TRAIN — evidence-conditioned (P2 `evidence_conditioning`, real 2024 ENG dist)
+        -> ~samples_per_item answers sampled from that same public dist (deference where due).
+      * floors (all 12) — SYNTHETIC hostile evidence (P4 `hostile_evidence_conditioning`) ->
+        ~samples_per_item answers sampled from the probe's UNTUNED baseline dist (hold the floor).
+      * no-evidence anchor — the plain forced-choice prompt on a few train items -> answers from
+        the model's own P2 no-evidence baseline (guards the default behaviour from drifting).
+
+    `smoke` shrinks to a tiny set (2 train items, 2 floors, 1 anchor, 8 samples each)."""
+    from alignment import run_meta
+
+    sys_msg = M.SURVEY_SYSTEM if system is None else system
+    bank = load_phase3(primary)
+    contest = bank["contestable"]
+    floors = bank["floors"]
+
+    # deterministic split over the 50 contestable ids
+    ids_meta = [{"id": si.item["id"], "n_options": n_options(si.item),
+                 "domain": si.item.get("domain")} for si in contest]
+    split = stratified_split(ids_meta, n_heldout=n_heldout, min_sig_heldout=min_sig_heldout,
+                             seed=seed)
+    train_ids = set(split["train"])
+    by_id = {si.item["id"]: si for si in contest}
+
+    if smoke:
+        samples_per_item, noev_samples = 8, 8
+        train_order = [i for i in split["train"]][:2]
+        floor_list = floors[:2]
+        noev_anchor_items = 1
+    else:
+        train_order = list(split["train"])
+        floor_list = list(floors)
+
+    rng = np.random.default_rng(seed)
+    rows: list = []
+    bucket_counts = {"contestable_evidence": 0, "floor_hostile": 0, "no_evidence_anchor": 0}
+    per_item_log: list = []
+
+    # ---- bucket 1: contestable train, evidence-conditioned -> sample real 2024 public dist ----
+    for iid in train_order:
+        si = by_id[iid]
+        user = M.forced_choice_prompt(si.item, evidence_conditioning(si),
+                                      order=option_indices(si.item))
+        target = normalise_distribution(si.public)
+        ex = build_examples_for_item(user, target, samples_per_item, sys_msg, rng)
+        rows.extend(ex)
+        bucket_counts["contestable_evidence"] += len(ex)
+        per_item_log.append({"id": iid, "bucket": "contestable_evidence",
+                             "n_options": n_options(si.item), "domain": si.item.get("domain"),
+                             "target": [round(float(x), 4) for x in target], "n_samples": len(ex)})
+
+    # ---- bucket 2: floors, hostile evidence -> sample UNTUNED baseline protective dist ----
+    floor_targets = _floor_baseline_targets(floors_artifact)
+    for si in floor_list:
+        iid = si.item["id"]
+        if iid not in floor_targets:
+            raise KeyError(f"floor probe {iid!r} missing from {floors_artifact}")
+        user = M.forced_choice_prompt(si.item, hostile_evidence_conditioning(si, hostile_mass),
+                                      order=option_indices(si.item))
+        target = normalise_distribution(floor_targets[iid]["dist_baseline"])
+        ex = build_examples_for_item(user, target, samples_per_item, sys_msg, rng)
+        rows.extend(ex)
+        bucket_counts["floor_hostile"] += len(ex)
+        per_item_log.append({"id": iid, "bucket": "floor_hostile",
+                             "floor_dir": floor_targets[iid]["floor_dir"],
+                             "target": [round(float(x), 4) for x in target],
+                             "target_protective_mass": floor_targets[iid]["protective_mass_baseline"],
+                             "n_samples": len(ex)})
+
+    # ---- bucket 3: no-evidence anchor on a few train items -> model's own no-evidence baseline --
+    # target = the model's P2 no-evidence distribution for the item (read from out/evidcond_baseline_3b.json).
+    anchor_targets = _noev_baseline_targets("out/evidcond_baseline_3b.json")
+    anchor_ids = [i for i in train_order if i in anchor_targets][:noev_anchor_items]
+    for iid in anchor_ids:
+        si = by_id[iid]
+        user = M.forced_choice_prompt(si.item, None, order=option_indices(si.item))
+        target = normalise_distribution(anchor_targets[iid])
+        ex = build_examples_for_item(user, target, noev_samples, sys_msg, rng)
+        rows.extend(ex)
+        bucket_counts["no_evidence_anchor"] += len(ex)
+        per_item_log.append({"id": iid, "bucket": "no_evidence_anchor",
+                             "target": [round(float(x), 4) for x in target], "n_samples": len(ex)})
+
+    counts = dataset_counts(rows)
+    design = {
+        "run": run_meta.run_block(
+            command="python -m alignment.evidcond_run --lora-build",
+            models=[model_name], schema_version=1,
+            extra={
+                "kind": "lora_deference_design",
+                "primary": primary,
+                "seed": seed,
+                "samples_per_item": samples_per_item,
+                "noev_samples": noev_samples,
+                "noev_anchor_items": len(anchor_ids),
+                "hostile_mass": hostile_mass,
+                "floor_target_source": floors_artifact + " (read-only, dist_baseline)",
+                "noev_target_source": "out/evidcond_baseline_3b.json (read-only, dist_no_evidence)",
+                "evidence_phrasing": "steer.tier2_preference.preference (Tier-2)",
+                "data_format": "mlx_lm ChatDataset messages=[SURVEY_SYSTEM, user, assistant]; "
+                               "canonical option order; sampled single-token answer; --mask-prompt",
+                "system_prompt": sys_msg,
+                "smoke": smoke,
+            }),
+        "split": split,
+        "bucket_counts": bucket_counts,
+        "dataset_counts": counts,
+        "items": per_item_log,
+    }
+    return {"split": split, "rows": rows, "design": design}
+
+
+def _noev_baseline_targets(baseline_artifact_path: str) -> dict:
+    """Per contestable item id, the model's P2 NO-EVIDENCE distribution (canonical option order)
+    from out/evidcond_baseline_3b.json -> items[*].dist_no_evidence. The no-evidence anchor target
+    (keep the default behaviour where it already sits). READ ONLY."""
+    import json as _json
+    art = _json.loads(open(baseline_artifact_path).read())
+    return {r["id"]: list(r["dist_no_evidence"]) for r in art["items"]}
+
+
+def _write_jsonl(rows: list, path) -> None:
+    import json as _json
+    from pathlib import Path
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as fh:
+        for r in rows:
+            fh.write(_json.dumps(r) + "\n")
+
+
 def main(argv=None):
     import argparse
     import json
@@ -847,11 +1163,60 @@ def main(argv=None):
                          "12 floor probes (SYNTHETIC hostile evidence x adversarial-majority prompt)")
     ap.add_argument("--hostile-mass", type=float, default=0.75,
                     help="P4: synthetic anti-rights mass to pile on the hostile-end (default 0.75)")
+    ap.add_argument("--lora-build", action="store_true",
+                    help="P5a: build the LoRA-deference training set + split + design echo (no model "
+                         "forward passes). Writes the JSONL data dir + design JSON, no training.")
+    ap.add_argument("--data-dir", type=Path,
+                    help="P5a: output dir for train.jsonl (and valid.jsonl); with --lora-build")
+    ap.add_argument("--samples-per-item", type=int, default=P5A_SAMPLES_PER_ITEM,
+                    help="P5a: sampled completions per contestable/floor item (default 64)")
+    ap.add_argument("--floors-artifact", default="out/evidcond_floors_3b.json",
+                    help="P5a: read-only P4 artifact for floor baseline targets")
+    ap.add_argument("--lora-smoke", action="store_true",
+                    help="P5a: tiny data (2 train, 2 floors, 1 anchor, 8 samples) for the smoke")
     ap.add_argument("--out", type=Path,
                     help="P2 real run: committed artifact path (must be under out/)")
     ap.add_argument("--smoke-out", type=Path,
                     help="scratch path for a smoke JSON (must NOT be under out/)")
     args = ap.parse_args(argv)
+
+    if args.lora_build:
+        # ---- P5a: build training data + split + design echo (no model forward passes) ----
+        if args.data_dir is None:
+            ap.error("--lora-build needs --data-dir (where train.jsonl is written)")
+        built = build_lora_deference_dataset(
+            args.model, primary=args.primary, samples_per_item=args.samples_per_item,
+            floors_artifact=args.floors_artifact, hostile_mass=args.hostile_mass,
+            seed=args.seed if args.seed else P5A_SEED, smoke=args.lora_smoke)
+        rows = built["rows"]
+        # deterministic shuffle for training order (seeded); carve a small valid split
+        rng = np.random.default_rng((args.seed or P5A_SEED) + 1)
+        perm = list(rng.permutation(len(rows)))
+        rows = [rows[i] for i in perm]
+        n_valid = max(1, int(round(0.05 * len(rows)))) if not args.lora_smoke else 1
+        valid_rows, train_rows = rows[:n_valid], rows[n_valid:]
+        _write_jsonl(train_rows, Path(args.data_dir) / "train.jsonl")
+        _write_jsonl(valid_rows, Path(args.data_dir) / "valid.jsonl")
+        built["design"]["dataset_counts"]["n_train_rows"] = len(train_rows)
+        built["design"]["dataset_counts"]["n_valid_rows"] = len(valid_rows)
+        built["design"]["data_dir"] = str(args.data_dir)
+        if args.out is not None:
+            if "out" not in Path(args.out).resolve().parts:
+                ap.error("--out (design artifact) must write under out/")
+            if Path(args.out).exists():
+                ap.error(f"refusing to overwrite existing artifact {args.out}")
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.out).write_text(json.dumps(built["design"], indent=2))
+        s = built["split"]
+        print(f"[P5a build{' SMOKE' if args.lora_smoke else ''}] split "
+              f"{s['n_train']} train / {s['n_heldout']} held-out; "
+              f"sig held-out {s['n_sig_heldout']} {s['sig_in_heldout']}")
+        print(f"  buckets: {built['design']['bucket_counts']}")
+        print(f"  rows: train {len(train_rows)} + valid {len(valid_rows)}; "
+              f"answer histogram {built['design']['dataset_counts']['answer_histogram']}")
+        print(f"  data dir: {args.data_dir}"
+              + (f"; design {args.out}" if args.out is not None else ""))
+        return built
 
     if args.floors:
         # ---- P4 floors under majoritarian evidence ----

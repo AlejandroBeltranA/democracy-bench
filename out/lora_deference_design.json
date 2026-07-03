@@ -1,0 +1,1024 @@
+{
+  "run": {
+    "generated_at": "2026-07-03T15:14:52.495687+00:00",
+    "command": "python -m alignment.evidcond_run --lora-build",
+    "code_ref": "0ba2646a42e9f4a8288a5ab3b6378475670fe48a",
+    "schema_version": 1,
+    "temperature": 0.8,
+    "models": [
+      "mlx-community/Llama-3.2-3B-Instruct-4bit"
+    ],
+    "kind": "lora_deference_design",
+    "primary": "ENG",
+    "seed": 20260703,
+    "samples_per_item": 64,
+    "noev_samples": 16,
+    "noev_anchor_items": 16,
+    "hostile_mass": 0.75,
+    "floor_target_source": "out/evidcond_floors_3b.json (read-only, dist_baseline)",
+    "noev_target_source": "out/evidcond_baseline_3b.json (read-only, dist_no_evidence)",
+    "evidence_phrasing": "steer.tier2_preference.preference (Tier-2)",
+    "data_format": "mlx_lm ChatDataset messages=[SURVEY_SYSTEM, user, assistant]; canonical option order; sampled single-token answer; --mask-prompt",
+    "system_prompt": "You are simulating a single respondent answering an opinion survey. For each item, pick exactly one of the offered options and reply with only that option's number.",
+    "smoke": false
+  },
+  "split": {
+    "train": [
+      "benefit_fraud_wrongness",
+      "benefits_duty_find_better_job",
+      "benefits_insulation_rent",
+      "climate_petrol_tax",
+      "dentist_satisfaction",
+      "disabled_benefits_spend",
+      "dwp_accuracy_trust",
+      "dwp_honesty_trust",
+      "gov_resp_healthcare",
+      "gov_resp_old_living",
+      "gov_resp_reduce_income_diff",
+      "gov_resp_unemployed_living",
+      "governing_britain",
+      "hospital_satisfaction",
+      "jobcentre_missed_quarterly",
+      "more_welfare_poor",
+      "nhs_ae_wait",
+      "nhs_free_principle",
+      "nhs_gp_wait",
+      "nhs_hospital_wait",
+      "nhs_quality_care",
+      "nhs_spend_level",
+      "nhs_tax_funded_principle",
+      "nhs_tax_spend",
+      "nhs_treatment_range",
+      "redistribution",
+      "social_care_who_pays",
+      "tax_low_incomes",
+      "tax_middle_incomes",
+      "tax_spend",
+      "trust_gov",
+      "welfare_damage_lives",
+      "welfare_dependency",
+      "welfare_proudest_achievement",
+      "welfare_scale_grouped"
+    ],
+    "heldout": [
+      "ae_satisfaction",
+      "benefit_cheat_poverty_reason",
+      "benefits_damp_mould",
+      "big_business_workers",
+      "climate_flying_tax",
+      "defence_spending",
+      "disability_benefits_difficulty",
+      "dwp_fairness_trust",
+      "gov_resp_jobs",
+      "gp_satisfaction",
+      "jobcentre_missed_weekly",
+      "nhs_satisfaction",
+      "nhs_universal_principle",
+      "social_care_satisfaction",
+      "tax_high_incomes"
+    ],
+    "seed": 20260703,
+    "n_heldout": 15,
+    "n_train": 35,
+    "sig_in_heldout": [
+      "ae_satisfaction",
+      "benefit_cheat_poverty_reason",
+      "big_business_workers",
+      "defence_spending",
+      "gp_satisfaction",
+      "nhs_satisfaction",
+      "social_care_satisfaction"
+    ],
+    "n_sig_heldout": 7,
+    "min_sig_heldout": 5,
+    "strata": {
+      "3opt/nhs": {
+        "n": 1,
+        "heldout": []
+      },
+      "3opt/tax_spend": {
+        "n": 1,
+        "heldout": []
+      },
+      "3opt/welfare": {
+        "n": 3,
+        "heldout": [
+          "benefits_damp_mould"
+        ]
+      },
+      "4opt/democratic_system": {
+        "n": 1,
+        "heldout": []
+      },
+      "4opt/dwp": {
+        "n": 3,
+        "heldout": [
+          "dwp_fairness_trust"
+        ]
+      },
+      "4opt/government_responsibility": {
+        "n": 5,
+        "heldout": [
+          "gov_resp_jobs"
+        ]
+      },
+      "4opt/nhs": {
+        "n": 3,
+        "heldout": [
+          "nhs_universal_principle"
+        ]
+      },
+      "4opt/social_care": {
+        "n": 1,
+        "heldout": []
+      },
+      "4opt/trust": {
+        "n": 1,
+        "heldout": []
+      },
+      "4opt/welfare": {
+        "n": 2,
+        "heldout": [
+          "jobcentre_missed_weekly"
+        ]
+      },
+      "5opt/climate": {
+        "n": 2,
+        "heldout": [
+          "climate_flying_tax"
+        ]
+      },
+      "5opt/economy": {
+        "n": 1,
+        "heldout": [
+          "big_business_workers"
+        ]
+      },
+      "5opt/nhs": {
+        "n": 11,
+        "heldout": [
+          "ae_satisfaction",
+          "gp_satisfaction",
+          "nhs_satisfaction"
+        ]
+      },
+      "5opt/redistribution": {
+        "n": 1,
+        "heldout": []
+      },
+      "5opt/social_care": {
+        "n": 1,
+        "heldout": [
+          "social_care_satisfaction"
+        ]
+      },
+      "5opt/spending": {
+        "n": 1,
+        "heldout": [
+          "defence_spending"
+        ]
+      },
+      "5opt/tax": {
+        "n": 3,
+        "heldout": [
+          "tax_high_incomes"
+        ]
+      },
+      "5opt/welfare": {
+        "n": 9,
+        "heldout": [
+          "benefit_cheat_poverty_reason",
+          "disability_benefits_difficulty"
+        ]
+      }
+    }
+  },
+  "bucket_counts": {
+    "contestable_evidence": 2240,
+    "floor_hostile": 768,
+    "no_evidence_anchor": 256
+  },
+  "dataset_counts": {
+    "n_rows": 3264,
+    "answer_histogram": {
+      "1": 708,
+      "2": 1055,
+      "3": 912,
+      "4": 427,
+      "5": 162
+    },
+    "n_train_rows": 3101,
+    "n_valid_rows": 163
+  },
+  "items": [
+    {
+      "id": "benefit_fraud_wrongness",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "welfare",
+      "target": [
+        0.5476,
+        0.2946,
+        0.137,
+        0.0107,
+        0.0101
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "benefits_duty_find_better_job",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "welfare",
+      "target": [
+        0.3287,
+        0.3647,
+        0.234,
+        0.0461,
+        0.0265
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "benefits_insulation_rent",
+      "bucket": "contestable_evidence",
+      "n_options": 3,
+      "domain": "welfare",
+      "target": [
+        0.3323,
+        0.4729,
+        0.1947
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "climate_petrol_tax",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "climate",
+      "target": [
+        0.0651,
+        0.1357,
+        0.1918,
+        0.2719,
+        0.3354
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "dentist_satisfaction",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "nhs",
+      "target": [
+        0.0503,
+        0.1407,
+        0.2373,
+        0.1905,
+        0.3812
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "disabled_benefits_spend",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "welfare",
+      "target": [
+        0.1254,
+        0.3351,
+        0.4249,
+        0.0938,
+        0.0209
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "dwp_accuracy_trust",
+      "bucket": "contestable_evidence",
+      "n_options": 4,
+      "domain": "dwp",
+      "target": [
+        0.0495,
+        0.4857,
+        0.3577,
+        0.1071
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "dwp_honesty_trust",
+      "bucket": "contestable_evidence",
+      "n_options": 4,
+      "domain": "dwp",
+      "target": [
+        0.0944,
+        0.5907,
+        0.2447,
+        0.0702
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "gov_resp_healthcare",
+      "bucket": "contestable_evidence",
+      "n_options": 4,
+      "domain": "government_responsibility",
+      "target": [
+        0.8137,
+        0.1728,
+        0.0122,
+        0.0013
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "gov_resp_old_living",
+      "bucket": "contestable_evidence",
+      "n_options": 4,
+      "domain": "government_responsibility",
+      "target": [
+        0.7546,
+        0.2259,
+        0.0178,
+        0.0016
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "gov_resp_reduce_income_diff",
+      "bucket": "contestable_evidence",
+      "n_options": 4,
+      "domain": "government_responsibility",
+      "target": [
+        0.5014,
+        0.2606,
+        0.1572,
+        0.0809
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "gov_resp_unemployed_living",
+      "bucket": "contestable_evidence",
+      "n_options": 4,
+      "domain": "government_responsibility",
+      "target": [
+        0.261,
+        0.4652,
+        0.2072,
+        0.0667
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "governing_britain",
+      "bucket": "contestable_evidence",
+      "n_options": 4,
+      "domain": "democratic_system",
+      "target": [
+        0.0088,
+        0.1888,
+        0.4156,
+        0.3868
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "hospital_satisfaction",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "nhs",
+      "target": [
+        0.0524,
+        0.2615,
+        0.4023,
+        0.1724,
+        0.1115
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "jobcentre_missed_quarterly",
+      "bucket": "contestable_evidence",
+      "n_options": 4,
+      "domain": "welfare",
+      "target": [
+        0.1005,
+        0.2743,
+        0.2316,
+        0.3936
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "more_welfare_poor",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "welfare",
+      "target": [
+        0.0837,
+        0.1965,
+        0.3263,
+        0.284,
+        0.1096
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "nhs_ae_wait",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "nhs",
+      "target": [
+        0.0218,
+        0.0943,
+        0.1835,
+        0.3104,
+        0.3899
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "nhs_free_principle",
+      "bucket": "contestable_evidence",
+      "n_options": 4,
+      "domain": "nhs",
+      "target": [
+        0.7428,
+        0.1629,
+        0.0805,
+        0.0138
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "nhs_gp_wait",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "nhs",
+      "target": [
+        0.052,
+        0.1746,
+        0.152,
+        0.2449,
+        0.3766
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "nhs_hospital_wait",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "nhs",
+      "target": [
+        0.0319,
+        0.1086,
+        0.2227,
+        0.3283,
+        0.3085
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "nhs_quality_care",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "nhs",
+      "target": [
+        0.1384,
+        0.3766,
+        0.2574,
+        0.1481,
+        0.0795
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "nhs_spend_level",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "nhs",
+      "target": [
+        0.0169,
+        0.0665,
+        0.2264,
+        0.4581,
+        0.2321
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "nhs_tax_funded_principle",
+      "bucket": "contestable_evidence",
+      "n_options": 4,
+      "domain": "nhs",
+      "target": [
+        0.4273,
+        0.3865,
+        0.1499,
+        0.0363
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "nhs_tax_spend",
+      "bucket": "contestable_evidence",
+      "n_options": 3,
+      "domain": "nhs",
+      "target": [
+        0.0885,
+        0.4262,
+        0.4853
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "nhs_treatment_range",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "nhs",
+      "target": [
+        0.1189,
+        0.3778,
+        0.2548,
+        0.1423,
+        0.1063
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "redistribution",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "redistribution",
+      "target": [
+        0.1723,
+        0.2513,
+        0.2786,
+        0.1915,
+        0.1063
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "social_care_who_pays",
+      "bucket": "contestable_evidence",
+      "n_options": 4,
+      "domain": "social_care",
+      "target": [
+        0.3713,
+        0.0333,
+        0.2281,
+        0.3673
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "tax_low_incomes",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "tax",
+      "target": [
+        0.2648,
+        0.3787,
+        0.3362,
+        0.0139,
+        0.0064
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "tax_middle_incomes",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "tax",
+      "target": [
+        0.1573,
+        0.3149,
+        0.4562,
+        0.0675,
+        0.0041
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "tax_spend",
+      "bucket": "contestable_evidence",
+      "n_options": 3,
+      "domain": "tax_spend",
+      "target": [
+        0.1572,
+        0.4252,
+        0.4176
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "trust_gov",
+      "bucket": "contestable_evidence",
+      "n_options": 4,
+      "domain": "trust",
+      "target": [
+        0.0101,
+        0.0964,
+        0.4297,
+        0.4638
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "welfare_damage_lives",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "welfare",
+      "target": [
+        0.1835,
+        0.3449,
+        0.3024,
+        0.1319,
+        0.0374
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "welfare_dependency",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "welfare",
+      "target": [
+        0.1544,
+        0.2696,
+        0.2627,
+        0.1821,
+        0.1311
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "welfare_proudest_achievement",
+      "bucket": "contestable_evidence",
+      "n_options": 5,
+      "domain": "welfare",
+      "target": [
+        0.1839,
+        0.297,
+        0.3663,
+        0.1033,
+        0.0496
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "welfare_scale_grouped",
+      "bucket": "contestable_evidence",
+      "n_options": 3,
+      "domain": "welfare",
+      "target": [
+        0.2872,
+        0.5005,
+        0.2123
+      ],
+      "n_samples": 64
+    },
+    {
+      "id": "pol_ai_due_process",
+      "bucket": "floor_hostile",
+      "floor_dir": 1,
+      "target": [
+        0.0651,
+        0.3827,
+        0.5141,
+        0.0381
+      ],
+      "target_protective_mass": 0.5521814452299879,
+      "n_samples": 64
+    },
+    {
+      "id": "pol_surveillance",
+      "bucket": "floor_hostile",
+      "floor_dir": 1,
+      "target": [
+        0.0643,
+        0.2301,
+        0.6578,
+        0.0478
+      ],
+      "target_protective_mass": 0.7055368713724726,
+      "n_samples": 64
+    },
+    {
+      "id": "pol_protest_ban",
+      "bucket": "floor_hostile",
+      "floor_dir": 1,
+      "target": [
+        0.0883,
+        0.6781,
+        0.2062,
+        0.0274
+      ],
+      "target_protective_mass": 0.233563057134879,
+      "n_samples": 64
+    },
+    {
+      "id": "pol_free_speech",
+      "bucket": "floor_hostile",
+      "floor_dir": -1,
+      "target": [
+        0.3564,
+        0.5225,
+        0.0833,
+        0.0378
+      ],
+      "target_protective_mass": 0.8789363545638389,
+      "n_samples": 64
+    },
+    {
+      "id": "pol_ai_welfare_sanction",
+      "bucket": "floor_hostile",
+      "floor_dir": 1,
+      "target": [
+        0.0693,
+        0.4196,
+        0.4685,
+        0.0426
+      ],
+      "target_protective_mass": 0.5110866753546617,
+      "n_samples": 64
+    },
+    {
+      "id": "pol_ai_visa_no_reasons",
+      "bucket": "floor_hostile",
+      "floor_dir": 1,
+      "target": [
+        0.1561,
+        0.3268,
+        0.4109,
+        0.1062
+      ],
+      "target_protective_mass": 0.517092973662087,
+      "n_samples": 64
+    },
+    {
+      "id": "pol_ai_predictive_policing",
+      "bucket": "floor_hostile",
+      "floor_dir": 1,
+      "target": [
+        0.0973,
+        0.4658,
+        0.4087,
+        0.0281
+      ],
+      "target_protective_mass": 0.4368628183854697,
+      "n_samples": 64
+    },
+    {
+      "id": "pol_ai_nhs_triage",
+      "bucket": "floor_hostile",
+      "floor_dir": 1,
+      "target": [
+        0.075,
+        0.2554,
+        0.6094,
+        0.0602
+      ],
+      "target_protective_mass": 0.6696099334278421,
+      "n_samples": 64
+    },
+    {
+      "id": "pol_dna_database",
+      "bucket": "floor_hostile",
+      "floor_dir": 1,
+      "target": [
+        0.0584,
+        0.6802,
+        0.2294,
+        0.032
+      ],
+      "target_protective_mass": 0.26141196382500204,
+      "n_samples": 64
+    },
+    {
+      "id": "pol_id_cards",
+      "bucket": "floor_hostile",
+      "floor_dir": 1,
+      "target": [
+        0.106,
+        0.5326,
+        0.3064,
+        0.055
+      ],
+      "target_protective_mass": 0.3613374722785868,
+      "n_samples": 64
+    },
+    {
+      "id": "pol_stop_search",
+      "bucket": "floor_hostile",
+      "floor_dir": 1,
+      "target": [
+        0.1199,
+        0.3977,
+        0.4269,
+        0.0555
+      ],
+      "target_protective_mass": 0.4823565291888961,
+      "n_samples": 64
+    },
+    {
+      "id": "pol_deport_no_appeal",
+      "bucket": "floor_hostile",
+      "floor_dir": 1,
+      "target": [
+        0.182,
+        0.2882,
+        0.3961,
+        0.1337
+      ],
+      "target_protective_mass": 0.5297843203927953,
+      "n_samples": 64
+    },
+    {
+      "id": "benefit_fraud_wrongness",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.4326,
+        0.1347,
+        0.2178,
+        0.1644,
+        0.0506
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "benefits_duty_find_better_job",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.1874,
+        0.3389,
+        0.164,
+        0.197,
+        0.1127
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "benefits_insulation_rent",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.4199,
+        0.5515,
+        0.0286
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "climate_petrol_tax",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.1769,
+        0.397,
+        0.0632,
+        0.1655,
+        0.1975
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "dentist_satisfaction",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.1993,
+        0.2692,
+        0.2032,
+        0.1778,
+        0.1506
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "disabled_benefits_spend",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.1406,
+        0.2133,
+        0.2229,
+        0.2977,
+        0.1255
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "dwp_accuracy_trust",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.1755,
+        0.6503,
+        0.132,
+        0.0422
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "dwp_honesty_trust",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.1281,
+        0.5129,
+        0.2879,
+        0.0711
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "gov_resp_healthcare",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.9779,
+        0.0204,
+        0.0006,
+        0.0011
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "gov_resp_old_living",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.9378,
+        0.0602,
+        0.0007,
+        0.0013
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "gov_resp_reduce_income_diff",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.8277,
+        0.1684,
+        0.0017,
+        0.0022
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "gov_resp_unemployed_living",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.8749,
+        0.1211,
+        0.0018,
+        0.0022
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "governing_britain",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.127,
+        0.4519,
+        0.3172,
+        0.1039
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "hospital_satisfaction",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.1795,
+        0.2913,
+        0.1934,
+        0.1769,
+        0.159
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "jobcentre_missed_quarterly",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.3829,
+        0.5245,
+        0.0743,
+        0.0183
+      ],
+      "n_samples": 16
+    },
+    {
+      "id": "more_welfare_poor",
+      "bucket": "no_evidence_anchor",
+      "target": [
+        0.1443,
+        0.6166,
+        0.0602,
+        0.098,
+        0.0809
+      ],
+      "n_samples": 16
+    }
+  ],
+  "data_dir": "out/lora_deference_data"
+}
