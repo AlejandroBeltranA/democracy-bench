@@ -287,3 +287,48 @@ def test_randctrl_flags_real_within_random_noise():
     comp = R._randctrl_comparison(real, rand)
     row = [r for r in comp if r["alpha"] == 2.0][0]
     assert row["real_exceeds_random"] is False               # within perturbation noise
+
+
+# ---- R3 negative dose: antisymmetry report -------------------------------------------
+
+def test_antisymmetry_flags_concept_like_axis():
+    # +alpha raises representation, -alpha lowers it -> concept-direction signature
+    curve = _curve([(-2, 0.50, 0.8), (0, 0.60, 0.8), (2, 0.70, 0.7)])
+    rep = R.antisymmetry_report(curve)
+    assert rep["antisymmetric"] is True
+    p = rep["pairs"][0]
+    assert p["gain_pos"] == pytest.approx(0.10)
+    assert p["gain_neg"] == pytest.approx(-0.10)
+    assert p["concept_like"] is True
+
+
+def test_antisymmetry_rejects_symmetric_perturbation():
+    # both +alpha and -alpha LOWER representation -> a norm perturbation, not an axis
+    curve = _curve([(-2, 0.55, 0.8), (0, 0.60, 0.8), (2, 0.54, 0.7)])
+    rep = R.antisymmetry_report(curve)
+    assert rep["antisymmetric"] is False
+    p = rep["pairs"][0]
+    assert p["concept_like"] is False
+    assert p["opposite_signs"] is False                      # both negative gains
+
+
+def test_antisymmetry_pairs_only_matched_magnitudes():
+    # -1 has no +1 partner; only |2| is a complete pair
+    curve = _curve([(-2, 0.5, 0.8), (-1, 0.55, 0.8), (0, 0.6, 0.8), (2, 0.7, 0.7)])
+    rep = R.antisymmetry_report(curve)
+    assert rep["n_pairs"] == 1
+    assert rep["pairs"][0]["alpha"] == 2.0
+
+
+def test_antisymmetry_requires_baseline():
+    with pytest.raises(ValueError):
+        R.antisymmetry_report(_curve([(-2, 0.5, 0.8), (2, 0.7, 0.7)]))
+
+
+def test_antisymmetry_preserves_negative_alpha_sign_no_abs():
+    # if negatives were abs()'d, -2 and +2 would collapse to one point and pairing would vanish;
+    # distinct gains on the two sides prove the sign is carried through, not folded.
+    curve = _curve([(-2, 0.40, 0.8), (0, 0.60, 0.8), (2, 0.72, 0.7)])
+    p = R.antisymmetry_report(curve)["pairs"][0]
+    assert p["gain_neg"] != p["gain_pos"]                    # sign-distinct, not abs-folded
+    assert p["gain_neg"] < 0 < p["gain_pos"]

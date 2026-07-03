@@ -296,6 +296,82 @@ def run_randctrl(model_name: str, layers: list[int], alphas: list[float], seeds:
     }
 
 
+def antisymmetry_report(curve: list[dict]) -> dict:
+    """R3: does the captured direction behave like a concept AXIS — representation UP at +alpha and
+    DOWN at -alpha (rough antisymmetry around 0)? Pairs each +a with -a and reports each side's gain
+    vs the alpha=0 baseline. `antisymmetric` = at least one pair moves representation in OPPOSITE
+    directions with the +side up (the concept-direction signature). A direction that only ever raises
+    or only ever lowers representation regardless of sign is behaving like a norm perturbation, not an
+    axis with a meaningful polarity."""
+    rows = {r["alpha"]: r["representation"] for r in curve if r["representation"] is not None}
+    if 0.0 not in rows:
+        raise ValueError("negative-dose curve needs an alpha=0 baseline")
+    base = rows[0.0]
+    pairs = []
+    for a in sorted(x for x in rows if x > 0):
+        if -a in rows:
+            gp, gn = rows[a] - base, rows[-a] - base
+            pairs.append({
+                "alpha": a, "gain_pos": gp, "gain_neg": gn,
+                "opposite_signs": bool(np.sign(gp) != np.sign(gn) and gp != 0.0 and gn != 0.0),
+                "concept_like": bool(gp > 0.0 and gn < 0.0),
+            })
+    return {"pairs": pairs, "n_pairs": len(pairs),
+            "antisymmetric": bool(any(p["concept_like"] for p in pairs))}
+
+
+def run_negdose(model_name: str, layers: list[int], alphas: list[float], n_options: int = 4,
+                n_orders: int = 2, seed: int = 0, primary: str = "ENG", floor_min: float = 0.5) -> dict:
+    """R3 driver: sweep a signed alpha grid (negatives included) and test antisymmetry. A genuine
+    concept direction should lower representation when SUBTRACTED (-alpha) as much as it raises it when
+    added (+alpha). No new steering code — negative alphas flow through `dose_response` -> the tap's
+    `out + alpha*vec` unchanged (no clamp/abs); this driver just pairs +/-alpha and reports polarity."""
+    alphas = sorted({float(a) for a in alphas} | {0.0})
+    model, tok = A.load_model(model_name)
+    n_layers = len(model.model.layers)
+
+    contest = [si for si in PDS.contestable_items(PDS.load_targets(), primary)
+               if si.public is not None and len(si.item["scale"]["labels"]) == n_options]
+    floors = [si for si in PDS.floor_items()
+              if len(si.item["scale"]["labels"]) == n_options]
+    if len(contest) < 2:
+        raise ValueError(f"need >= 2 contestable {n_options}-option items, found {len(contest)}")
+
+    per_layer = []
+    for li in layers:
+        tap, restore = A.install_tap(model, li)
+        try:
+            vec = A.capture_direction(model, tok, tap, [si.item for si in contest],
+                                      country=A.PERSONA_COUNTRY, year=A.PERSONA_YEAR)
+            curve = A.dose_response(model, tok, tap, contest, floors, vec, alphas,
+                                    n_orders=n_orders, seed=seed)
+        finally:
+            restore()
+        anti = antisymmetry_report(curve)
+        per_layer.append({"layer": li, "direction_norm": float(np.linalg.norm(vec)),
+                          "curve": curve, "antisymmetry": anti,
+                          "verdict": ("concept-like: representation rises at +alpha and falls at -alpha"
+                                      if anti["antisymmetric"] else
+                                      "not axis-like: representation does not flip sign with alpha")})
+        for p in anti["pairs"]:
+            print(f"layer {li:>2} |a|={p['alpha']:>4g}: +gain {p['gain_pos']:+.3f}  "
+                  f"-gain {p['gain_neg']:+.3f}  "
+                  f"{'CONCEPT-LIKE' if p['concept_like'] else ('opposite' if p['opposite_signs'] else 'same-side')}")
+
+    return {
+        "run": run_meta.run_block(
+            command="python -m alignment.activation_steering_run --negdose",
+            models=[model_name], schema_version=1,
+            extra={"kind": "activation_steering_negdose", "n_layers": n_layers,
+                   "layers": layers, "alphas": alphas, "n_orders": n_orders, "seed": seed,
+                   "n_options": n_options, "primary": primary, "floor_min": floor_min,
+                   "n_contestable": len(contest), "n_floor": len(floors),
+                   "persona": f"{A.PERSONA_COUNTRY} {A.PERSONA_YEAR}"}),
+        "per_layer": per_layer,
+        "any_antisymmetric": any(pl["antisymmetry"]["antisymmetric"] for pl in per_layer),
+    }
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Phase 2: activation-steering dose-response sweep (local MLX)")
     ap.add_argument("--model", default=A.DEFAULT_MODEL)
@@ -313,8 +389,22 @@ def main(argv=None):
                     help="'random' runs the R2 matched-norm random-direction control")
     ap.add_argument("--seeds", type=int, nargs="*", default=[0, 1, 2],
                     help="random-vector seeds for --direction random")
+    ap.add_argument("--negdose", action="store_true",
+                    help="R3: sweep the signed alpha grid (negatives included) and report antisymmetry")
     ap.add_argument("--out", type=Path, default=OUT / "activation_steering.json")
     args = ap.parse_args(argv)
+
+    if args.negdose:
+        if args.layers is None:
+            ap.error("--negdose requires explicit --layers (e.g. --layers 11)")
+        result = run_negdose(args.model, args.layers, args.alphas, n_options=args.n_options,
+                             n_orders=args.n_orders, seed=args.seed, primary=args.primary,
+                             floor_min=args.floor_min)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(result, indent=2))
+        print(f"\nany layer antisymmetric: {result['any_antisymmetric']}")
+        print(f"wrote {args.out}")
+        return result
 
     if args.direction == "random":
         if args.layers is None:

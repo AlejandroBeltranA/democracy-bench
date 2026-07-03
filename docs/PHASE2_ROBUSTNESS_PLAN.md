@@ -84,7 +84,7 @@ The decisive test. Add to the engine + driver:
   the "steering" is perturbation noise; record verdict accordingly.
 - Run at layer 11, α ∈ {2, 4, 6}, 3 seeds → `out/act_steer_randctrl_3b.json`.
 
-### R3 — Negative dose  ☐
+### R3 — Negative dose  ☑ (see Loop log 2026-07-03)
 
 - Extend the alpha grid to negatives: `--alphas -4 -2 -1 0 1 2 4`. A real concept
   direction should push representation DOWN at −α (rough antisymmetry around 0).
@@ -249,3 +249,27 @@ and R1 already showed it does NOT transfer to held-out items. Combined verdict: 
 is REAL BUT ITEM-LOCAL — memorisation of the 16 capture items, not a generalisable public-agreement
 concept. This is the sharper story R2 buys over R1 alone; W3 geometry should show WHY (per-item
 arrows mutually misaligned, so their mean helps only the items it was averaged over).
+
+### 2026-07-03 — R3 negative dose → NOT axis-like (baseline sits in a perturbation valley)
+
+Ran: `activation_steering_run --negdose --layers 11 --alphas -4 -2 -1 0 1 2 4 --n-orders 2`
+(in-sample) → `out/act_steer_negalpha_3b.json`. Code: `antisymmetry_report` + `run_negdose` +
+`--negdose`; +5 tests (36 in file). Confirmed negative alphas flow through the tap unclamped
+(`out + alpha*vec`), so `-alpha` genuinely SUBTRACTS the direction.
+
+Full signed representation curve at layer 11 (n_orders=2):
+  α:  -4     -2     -1      0     +1     +2     +4
+ rep: .728  .759   .730  .690   .648   .626   .749
+floor:.378  .490   .511  .512   .459   .387   .507
+No antisymmetry. Two damning features: (1) at |α|=1,2 the polarity is INVERTED — ADDING the
+"toward-median-UK-adult" direction LOWERS representation while subtracting raises it; (2) the α=0
+baseline (.690) sits near a LOCAL MINIMUM — both signs at |α|≥2 climb out of it, and the single
+best in-sample point is α=−2 (.759), i.e. SUBTRACTING the persona direction. The published +4 point
+(.749 ≈ .752) replicates but is exposed as perturbation lift off a low-representation baseline, not
+movement along a public-agreement axis. Floors crack under perturbation of EITHER sign (.378–.387).
+
+Combined R1+R2+R3 verdict: the diff-of-means "public-agreement direction" is not a concept axis. Its
+only above-random behaviour (R2, α=4) is a same-sided perturbation bump (R3), it points the wrong way
+at small doses (R3), and it does not generalise across items (R1). Phase 2 headline is a clean
+NEGATIVE. Remaining: R4 (CIs on the published grid — makes the perturbation-valley story rigorous
+with error bars across all 5 layers), then W3 geometry (the mechanism section). R7/R8 optional.
