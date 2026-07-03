@@ -44,6 +44,25 @@ def diff_of_means(default_acts: np.ndarray, persona_acts: np.ndarray) -> np.ndar
     return p.mean(axis=0) - d.mean(axis=0)
 
 
+def kfold_test_indices(n: int, k: int, seed: int = 0) -> list[np.ndarray]:
+    """Partition range(n) into k disjoint folds of *test* indices (seeded shuffle then split).
+    Deterministic under seed; folds are pairwise disjoint and together cover every index exactly
+    once, so a fold's train set is the complement. Used by R1's held-out capture: capture the
+    direction on the train items, score representation on the held-out test items only."""
+    if not (2 <= k <= n):
+        raise ValueError(f"need 2 <= k <= n, got k={k}, n={n}")
+    rng = np.random.default_rng(seed)
+    perm = rng.permutation(n)
+    return [np.sort(fold) for fold in np.array_split(perm, k)]
+
+
+def held_out_gains(baseline: dict, steered: dict) -> list[float]:
+    """Per-item held-out representation gains `steered[i] - baseline[i]`, over items present in
+    BOTH maps. An item whose elicitation broke (no option token) at either the baseline or the
+    steered dose is absent from one map and dropped — never imputed. Both maps are {item_id: rep}."""
+    return [steered[i] - baseline[i] for i in baseline if i in steered]
+
+
 def pick_operating_point(curve: list[dict], floor_min: float = 0.5) -> dict:
     """From a dose-response curve (each row: alpha, representation, floor_mass), pick the alpha with the
     highest representation whose floor protective-mass still holds (>= floor_min). The "safe operating
@@ -221,3 +240,63 @@ def dose_response(model, tok, tap, contestable: list, floors: list, vector,
             "n_floor_ok": len(masses), "n_floor_broke": broke_f,
         })
     return curve
+
+
+def holdout_dose_response(model, tok, tap, contestable: list, floors: list, alphas: list,
+                          k: int = 4, n_orders: int = 4, seed: int = 0,
+                          country: str = PERSONA_COUNTRY, year=PERSONA_YEAR) -> dict:
+    """R1's decisive test: k-fold HELD-OUT steering. For each fold, capture the direction on the
+    train contestable items only, then measure representation on the *held-out* test items and
+    protective mass on ALL floor probes (floors never enter capture) at each alpha. This breaks the
+    inject-then-score-against-the-same-items confound: a direction that only helps the items it was
+    fit on is memorisation, not a generalisable public-agreement concept.
+
+    `alphas` must include 0 (the per-item baseline the gains are computed against). Returns per-fold
+    provenance and, per alpha, {item_id: representation} over held-out items pooled across folds
+    (each contestable item lands in exactly one test fold) plus pooled floor masses. The pooling and
+    bootstrap-over-items CI live in the driver via the pure helpers so they stay CI-testable."""
+    from alignment.instrument import scorers as S
+    from alignment import drift
+
+    idx = list(range(len(contestable)))
+    folds = kfold_test_indices(len(contestable), k, seed)
+    per_alpha = {float(a): {"reps": {}, "floors": [], "broke_c": 0, "broke_f": 0} for a in alphas}
+    fold_meta = []
+
+    for fi, test_idx in enumerate(folds):
+        test_set = set(int(t) for t in test_idx)
+        train_items = [contestable[i].item for i in idx if i not in test_set]
+        test_items = [contestable[i] for i in idx if i in test_set]
+        vec = capture_direction(model, tok, tap, train_items, country=country, year=year)
+        fold_meta.append({
+            "fold": fi, "train_n": len(train_items),
+            "test_ids": [si.item["id"] for si in test_items],
+            "direction_norm": float(np.linalg.norm(vec)),
+        })
+        for a in alphas:
+            slot = per_alpha[float(a)]
+            for si in test_items:
+                try:
+                    d = steered_distribution(model, tok, tap, si.item, vec, a, n_orders, seed)
+                except M.ElicitationError:
+                    slot["broke_c"] += 1
+                    continue
+                slot["reps"][si.item["id"]] = float(S.representation_score(d, si.public))
+            for si in floors:
+                try:
+                    d = steered_distribution(model, tok, tap, si.item, vec, a, n_orders, seed)
+                except M.ElicitationError:
+                    slot["broke_f"] += 1
+                    continue
+                slot["floors"].append(float(drift.protective_mass(d, si.item["floor_dir"])))
+
+    per_alpha_out = [{
+        "alpha": a,
+        "held_out_reps": slot["reps"],
+        "floor_masses": slot["floors"],
+        "n_contestable_ok": len(slot["reps"]), "n_contestable_broke": slot["broke_c"],
+        "n_floor_ok": len(slot["floors"]), "n_floor_broke": slot["broke_f"],
+    } for a, slot in ((float(a), per_alpha[float(a)]) for a in alphas)]
+
+    return {"k": k, "n_orders": n_orders, "seed": seed, "folds": fold_meta,
+            "per_alpha": per_alpha_out}

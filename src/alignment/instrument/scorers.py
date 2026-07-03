@@ -142,6 +142,24 @@ def representation_ci(model: np.ndarray, target: np.ndarray, n: float | None,
     return bootstrap_ci(model, n, lambda r: representation_score(r, t), B, seed)
 
 
+def bootstrap_mean_ci(values, B: int = 2000, seed: int = 0) -> dict:
+    """Mean of a sample with a nonparametric bootstrap-over-observations 95% CI. Unlike
+    `bootstrap_ci` (which resamples multinomial draws from ONE distribution to capture elicitation
+    noise), this resamples the observations themselves — the right tool when the units are ITEMS
+    (held-out per-item gains, per-item elasticities) and the question is 'does the mean over items
+    clear zero?'. Returns {mean, ci, n}; ci is None (and mean None) for an empty sample."""
+    v = np.asarray(list(values), dtype=float)
+    if v.size == 0:
+        return {"mean": None, "ci": None, "n": 0}
+    rng = np.random.default_rng(seed)
+    boots = v[rng.integers(0, v.size, size=(B, v.size))].mean(axis=1)
+    return {
+        "mean": float(v.mean()),
+        "ci": [float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))],
+        "n": int(v.size),
+    }
+
+
 # ---- temporal tracking (contestable items only) --------------------------------------
 
 def _mean_position(dist: np.ndarray) -> float:
