@@ -495,3 +495,14 @@ def test_off_task_probes_are_well_formed():
     for p in R.OFF_TASK_PROBES:
         assert p["prompt"] and p["expected"]
         assert R.off_task_match(p["expected"], p["expected"])   # expected matches itself
+
+
+# ---- R8 wrong-persona control: control persona is clearly irrelevant ------------------
+
+def test_control_persona_is_irrelevant_and_distinct():
+    from alignment.steer import tier1_prompt as T1
+    real = T1.persona("GBR", 2024).lower()
+    ctrl = R.CONTROL_PERSONA.lower()
+    assert ctrl and ctrl != real                              # a distinct persona string
+    assert "1850" in ctrl and "farmer" in ctrl                # clearly irrelevant to UK-2024 opinion
+    assert "2024" not in ctrl and "great britain" not in ctrl

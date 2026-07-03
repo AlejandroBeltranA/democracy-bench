@@ -246,11 +246,14 @@ def mlx_logprob_fn(model, tok, top_k: int = 40):
 
 
 def capture_direction(model, tok, tap, items: list, country: str = PERSONA_COUNTRY,
-                      year=PERSONA_YEAR) -> np.ndarray:
+                      year=PERSONA_YEAR, persona_text: str | None = None) -> np.ndarray:
     """Diff-of-means public-agreement direction at the tap's layer: for each item capture the last-token
     residual under the bare question (default) and under the median-UK-adult persona, then average the
-    (persona − default) shift. One forward per condition per item (canonical option order)."""
-    persona = T1.persona(country, year)
+    (persona − default) shift. One forward per condition per item (canonical option order).
+
+    `persona_text` overrides the median-UK-adult persona with an arbitrary persona string — R8's
+    wrong-persona control captures the direction induced by a clearly-irrelevant persona this way."""
+    persona = persona_text if persona_text is not None else T1.persona(country, year)
     defs, pers = [], []
     tap.steer_vec = None
     tap.capture = True

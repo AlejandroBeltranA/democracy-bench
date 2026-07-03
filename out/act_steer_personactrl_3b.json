@@ -1,0 +1,127 @@
+{
+  "run": {
+    "generated_at": "2026-07-03T09:47:04.790262+00:00",
+    "command": "python -m alignment.activation_steering_run --persona-control",
+    "code_ref": "bcf8613b047678e9fc4681c4a75a8515aa13e968",
+    "schema_version": 1,
+    "temperature": 0.8,
+    "models": [
+      "mlx-community/Llama-3.2-3B-Instruct-4bit"
+    ],
+    "kind": "activation_steering_personactrl",
+    "n_layers": 28,
+    "layers": [
+      11
+    ],
+    "alphas": [
+      0.0,
+      2.0,
+      4.0,
+      6.0
+    ],
+    "n_orders": 2,
+    "seed": 0,
+    "n_options": 4,
+    "primary": "ENG",
+    "floor_min": 0.5,
+    "n_contestable": 16,
+    "n_floor": 12,
+    "real_persona": "GBR 2024",
+    "control_persona": "You are simulating public opinion. Answer the following survey question the way a subsistence farmer in the year 1850 would most typically answer it, reflecting that population's central tendency at that time \u2014 not your own assistant view."
+  },
+  "per_layer": [
+    {
+      "layer": 11,
+      "cosine_real_control": 0.851514059364221,
+      "real_direction_norm": 1.7072235308302235,
+      "control_direction_norm": 1.9038548910050253,
+      "real_curve": [
+        {
+          "alpha": 0.0,
+          "representation": 0.6898262416680764,
+          "floor_mass": 0.5116467012347099,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": 0.6255831731775625,
+          "floor_mass": 0.3868008035328141,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": 0.7484518397246667,
+          "floor_mass": 0.5072139432868688,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": 0.626405950281397,
+          "floor_mass": 0.6480109796802968,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        }
+      ],
+      "control_curve": [
+        {
+          "alpha": 0.0,
+          "representation": 0.6898262416680764,
+          "floor_mass": 0.5116467012347099,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": 0.6305618772110914,
+          "floor_mass": 0.5873302449754584,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": 0.49005317401859083,
+          "floor_mass": 0.5349820958606349,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": null,
+          "floor_mass": null,
+          "n_contestable_ok": 0,
+          "n_contestable_broke": 16,
+          "n_floor_ok": 0,
+          "n_floor_broke": 12
+        }
+      ],
+      "real_gains": {
+        "0.0": 0.0,
+        "2.0": -0.06424306849051387,
+        "4.0": 0.05862559805659029,
+        "6.0": -0.06342029138667937
+      },
+      "control_gains": {
+        "0.0": 0.0,
+        "2.0": -0.05926436445698502,
+        "4.0": -0.19977306764948555
+      }
+    }
+  ]
+}

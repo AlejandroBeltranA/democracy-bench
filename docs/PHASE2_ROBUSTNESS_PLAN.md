@@ -120,7 +120,7 @@ The decisive test. Add to the engine + driver:
   point vs α=0. Report as `off_task_accuracy` in the artifact.
 - Cheap; fold into whichever run is next after R4.
 
-### R8 — Wrong-persona specificity control  ☐
+### R8 — Wrong-persona specificity control  ☑ (see Loop log 2026-07-03)
 
 - `--persona-control "a subsistence farmer in the year 1850"` (or similar clearly
   irrelevant persona): capture its direction, evaluate UK-2024 representation gain.
@@ -360,3 +360,29 @@ Tokyo) survives longest. So: no coherence cost at α≤2 (but R4 showed no repre
 either), a 30% capability hit at α=4 (the originally-claimed operating point), and near-total collapse
 by α≥6. Adds a third damning dimension to the negative — the doses where steering does ANYTHING carry
 severe collateral damage to general capability; there is no free-lunch operating point.
+
+### 2026-07-03 — R8 wrong-persona control → the axis is 85% persona-GENERIC (confirms W3)
+
+Ran: `activation_steering_run --persona-control --layers 11 --alphas 0 2 4 6 --n-orders 2` →
+`out/act_steer_personactrl_3b.json`. Captures BOTH the real median-UK-adult-2024 direction and a
+control direction from a clearly-irrelevant persona ("a subsistence farmer in the year 1850"), runs
+each against the SAME UK-2024 targets, reports their cosine. Code: `persona_text` override on
+`capture_direction`; driver `CONTROL_PERSONA` + `run_personactrl` + `--persona-control`. +1 test
+(212 pass).
+
+cos(real, control) = **+0.852** — the wrong-persona direction is 85% PARALLEL to the real one. At
+α=2 the two are statistically indistinguishable (real −0.064 vs control −0.059); they diverge only
+at α=4 (real +0.059 vs control −0.200), where the real direction's small in-sample bump lives. Read:
+~85% of the captured "public-agreement direction" is generic PERSONA-ADOPTION shared by any persona
+instruction (an 1850 farmer reproduces it), and the ~15% persona-specific residual is exactly the
+item-memorising, non-generalising slice R1 killed. Directly confirms W3's mechanism from a second
+angle: the diff-of-means axis is persona-style, not UK-public content.
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+PHASE 2 STATUS: comprehensive, publication-ready NEGATIVE, characterised from SEVEN angles —
+held-out (R1), random control (R2), antisymmetry (R3), error bars (R4 + late-layer follow-up),
+geometry (W3), capability cost (R7), persona-genericity (R8). Done/skipped: R5/R6/W2 skipped (R1
+gate); R7/R8 done. REMAINING: W1 (flagship tracking-under-steering — large build, expected to FAIL
+for the same reason, but the strongest paper framing), W4 (moot for a negative), W5 (LoRA — stretch,
+plan requires human sign-off before compute). Paused to ask the human whether W1 is worth building.
+────────────────────────────────────────────────────────────────────────────────────────────────

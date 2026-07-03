@@ -477,6 +477,78 @@ def run_ci(model_name: str, layers: list[int], alphas: list[float], seeds: list[
     }
 
 
+CONTROL_PERSONA = (
+    "You are simulating public opinion. Answer the following survey question the way a subsistence "
+    "farmer in the year 1850 would most typically answer it, reflecting that population's central "
+    "tendency at that time — not your own assistant view."
+)
+
+
+def run_personactrl(model_name: str, layers: list[int], alphas: list[float], n_options: int = 4,
+                    n_orders: int = 2, seed: int = 0, primary: str = "ENG", floor_min: float = 0.5,
+                    control_persona: str = CONTROL_PERSONA) -> dict:
+    """R8: wrong-persona specificity control. At each layer, capture BOTH the real median-UK-adult-2024
+    direction and a direction from a clearly-irrelevant persona (an 1850 subsistence farmer), then run
+    each against the SAME UK-2024 targets. Reports the cosine between the two directions. If the wrong
+    persona reproduces the real one's (in-sample) effect and the two directions are near-parallel, the
+    captured axis is persona-GENERIC — confirming W3's mechanism. If the control does ~nothing and the
+    directions diverge, the axis is persona-specific."""
+    alphas = sorted({float(a) for a in alphas} | {0.0})
+    model, tok = A.load_model(model_name)
+    n_layers = len(model.model.layers)
+
+    contest = [si for si in PDS.contestable_items(PDS.load_targets(), primary)
+               if si.public is not None and len(si.item["scale"]["labels"]) == n_options]
+    floors = [si for si in PDS.floor_items()
+              if len(si.item["scale"]["labels"]) == n_options]
+    if len(contest) < 2:
+        raise ValueError(f"need >= 2 contestable {n_options}-option items, found {len(contest)}")
+    items = [si.item for si in contest]
+
+    per_layer = []
+    for li in layers:
+        tap, restore = A.install_tap(model, li)
+        try:
+            real_vec = A.capture_direction(model, tok, tap, items,
+                                           country=A.PERSONA_COUNTRY, year=A.PERSONA_YEAR)
+            ctrl_vec = A.capture_direction(model, tok, tap, items, persona_text=control_persona)
+            real_curve = A.dose_response(model, tok, tap, contest, floors, real_vec, alphas,
+                                         n_orders=n_orders, seed=seed)
+            ctrl_curve = A.dose_response(model, tok, tap, contest, floors, ctrl_vec, alphas,
+                                         n_orders=n_orders, seed=seed)
+        finally:
+            restore()
+        real_g = _curve_gain(real_curve)
+        ctrl_g = _curve_gain(ctrl_curve)
+        rn, cn = float(np.linalg.norm(real_vec)), float(np.linalg.norm(ctrl_vec))
+        cos = float(np.dot(real_vec, ctrl_vec) / (rn * cn)) if rn > 0 and cn > 0 else 0.0
+        per_layer.append({
+            "layer": li, "cosine_real_control": cos,
+            "real_direction_norm": rn, "control_direction_norm": cn,
+            "real_curve": real_curve, "control_curve": ctrl_curve,
+            "real_gains": {str(a): g for a, g in real_g["gains"].items()},
+            "control_gains": {str(a): g for a, g in ctrl_g["gains"].items()},
+        })
+        print(f"layer {li:>2}: cos(real, control)={cos:+.3f}")
+        for a in sorted(set(real_g["gains"]) & set(ctrl_g["gains"])):
+            if a == 0.0:
+                continue
+            print(f"        a={a:>4g}: real gain {real_g['gains'][a]:+.3f}  "
+                  f"control gain {ctrl_g['gains'][a]:+.3f}")
+
+    return {
+        "run": run_meta.run_block(
+            command="python -m alignment.activation_steering_run --persona-control",
+            models=[model_name], schema_version=1,
+            extra={"kind": "activation_steering_personactrl", "n_layers": n_layers, "layers": layers,
+                   "alphas": alphas, "n_orders": n_orders, "seed": seed, "n_options": n_options,
+                   "primary": primary, "floor_min": floor_min, "n_contestable": len(contest),
+                   "n_floor": len(floors), "real_persona": f"{A.PERSONA_COUNTRY} {A.PERSONA_YEAR}",
+                   "control_persona": control_persona}),
+        "per_layer": per_layer,
+    }
+
+
 OFF_TASK_PROBES = [
     {"prompt": "What is 17 + 28? Answer with just the number.", "expected": "45"},
     {"prompt": "What is 6 times 7? Answer with just the number.", "expected": "42"},
@@ -636,8 +708,22 @@ def main(argv=None):
                     help="W3: capture per-item arrows and report their cosine geometry (no alpha sweep)")
     ap.add_argument("--offtask", action="store_true",
                     help="R7: score a fixed off-task probe set for exact-match under steering vs alpha=0")
+    ap.add_argument("--persona-control", dest="persona_control", nargs="?", const=CONTROL_PERSONA,
+                    default=None,
+                    help="R8: capture a wrong-persona control direction (optional custom persona string)")
     ap.add_argument("--out", type=Path, default=OUT / "activation_steering.json")
     args = ap.parse_args(argv)
+
+    if args.persona_control is not None:
+        if args.layers is None:
+            ap.error("--persona-control requires explicit --layers (e.g. --layers 11)")
+        result = run_personactrl(args.model, args.layers, args.alphas, n_options=args.n_options,
+                                 n_orders=args.n_orders, seed=args.seed, primary=args.primary,
+                                 floor_min=args.floor_min, control_persona=args.persona_control)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(result, indent=2))
+        print(f"wrote {args.out}")
+        return result
 
     if args.offtask:
         if args.layers is None:
