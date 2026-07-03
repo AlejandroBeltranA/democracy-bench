@@ -24,7 +24,7 @@ flagged, never recomputed or invented.
 
 ## Work items
 
-### PS1 — Claim→evidence map (docs/PAPER_RESULTS.md) ☐
+### PS1 — Claim→evidence map (docs/PAPER_RESULTS.md) ☑
 One markdown document, the single source of truth for the results section. For each claim in
 the arc (Phase 1 logit-bias negative → Phase 2 steering negative w/ mechanism → P0 kill-check →
 P2 fidelity → P3 tracking positive → P4 hostile-evidence crack → P5 LoRA negative → G1 guard
@@ -53,3 +53,32 @@ string against the artifact's own run block programmatically. Do NOT execute the
 ### 2026-07-03 — Paper-support track opened
 Alex restarted the loop after Phase 4 close; per the standing options this is the paper-support
 track. PS1 dispatched.
+
+### 2026-07-03 — PS1 claim→evidence map ☑
+Built `scripts/extract_paper_results.py` (pure extraction, no model runs) reading all 17 arc
+artifacts and emitting one JSON (`out/paper_results_extract.json`, new path) keyed by claim, each
+number carrying its artifact path + JSON key-path. The extractor **fails loudly** (nonzero exit,
+named missing key) on any absent key — no silent defaults (`dig`/`stat`/`find_layer`/`find_alpha`
+all raise `MissingKey`). Wrote `docs/PAPER_RESULTS.md`: one section per arc claim (Phase 1
+logit-bias · Phase 2 steering + W3/R7/R8 · P0 · P2 · P3 · P4 · P5a/b · G1 · routing close-out),
+each with exact numbers, artifact + keys, verbatim caveats (SYNTHETIC hostile evidence, etc.),
+commit hashes, and scope limits — plus a **"numbers the paper must NOT claim"** subsection and a
+**Discrepancies** section.
+
+**Cross-check verdict: NO paper-level contradiction.** Every Loop-log headline matches its
+artifact to reported precision (P2 0.727/0.746/+0.019/gap 0.254/24-of-50; P3 8/10 +0.395
+CI[+0.020,+0.811]; P4 0.512→0.318 −0.194; P5b all six; G1 all four arms + exact repl. 0.5116/0.3177;
+Phase 2 R1/R4/W3/R7/R8/P0). Four **presentation** findings surfaced (not number conflicts): D1
+Phase-1 "good nudge" +0.129 is SAMPLED-only and evaporates to +0.074 n.s. on real logprobs — cite
+the logprobs number; D2 the 16-vs-50 item split (already reconciled in-log) must be stated so
+Phase-2/3 sample sizes aren't conflated; D3 P5b's −0.115 baseline degradation is a cross-variant
+paired delta (`floors.delta_baseline`), not the within-variant `delta_vs_baseline` (=0.0); D4 the
+superseded steering headline artifact is uncommitted (do-not-touch) — cite as superseded, rely on
+committed `act_steer_ci_3b.json`.
+
+Tests: 296 → **324** (+28 numpy-only in NEW `tests/test_paper_extract.py`: fail-loud `dig`/`stat`
+contract, `_ci_clears_zero` vs 200 random intervals, layer/alpha/curve lookups, and end-to-end
+build assertions on P3/P2/P5/G1 headline numbers). `python -m pytest -q` green. Files changed: NEW
+`scripts/extract_paper_results.py`, NEW `tests/test_paper_extract.py`, NEW `docs/PAPER_RESULTS.md`,
+NEW `out/paper_results_extract.json`, this log. No existing `out/*.json` touched; do-not-touch files
+untouched. No commit (supervisor reviews).
