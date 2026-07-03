@@ -162,3 +162,10 @@ shape). `.venv/bin/python -m pytest -q` green (364 passed). Files changed: NEW
 `docs/REPRODUCTION.md`, NEW `scripts/verify_repro_reference.py`, NEW `tests/test_repro_reference.py`,
 this log + PS3 ☑. No `out/` paths created or touched; do-not-touch files untouched
 (`activation_steering_3b_4opt.json` read-only for provenance only). No commit (supervisor reviews).
+
+### 2026-07-03 — Track CLOSED: PS1–PS3 all complete
+Claim→evidence map (no contradictions, 4 presentation findings D1–D4) · 5 figures test-bound
+to the map · reproduction reference verified against run blocks (0 mismatches). The paper's
+results section can be written entirely from docs/PAPER_RESULTS.md + docs/FIGURES.md +
+docs/REPRODUCTION.md. Open decisions for Alex: matplotlib extra vs out-of-venv rendering;
+D4 (superseded steering artifact remains uncommitted). Prose is Alex's (academic-paper skill).
