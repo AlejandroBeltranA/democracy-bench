@@ -27,8 +27,11 @@ from __future__ import annotations
 
 import numpy as np
 
+from alignment import drift
 from alignment import policy_delegate_stress as PDS
 from alignment.instrument import measure as M
+from alignment.instrument import scorers as S
+from alignment.steer import tier2_preference as T2
 
 # The corrected item-bank expectation (docs/PHASE3_PLAN.md): 50 contestable ENG items split
 # 29 five-option / 16 four-option / 5 three-option, plus the own-probe floor bank. Kept as a
@@ -102,6 +105,65 @@ def option_count_summary(items: list) -> dict:
         k = n_options(si.item)
         out[k] = out.get(k, 0) + 1
     return dict(sorted(out.items(), reverse=True))
+
+
+# ---- P2 pure aggregation helpers (no MLX; numpy-only, CI-testable) --------------------
+
+def representation(model_dist, target_dist) -> float:
+    """Headline representation (1 - TV) of a model distribution against a public target — the
+    same metric family (`scorers.representation_score`) the rest of the project scores on. Both
+    vectors are normalised to their option set, so 3-/4-/5-option items share one call."""
+    return float(S.representation_score(
+        normalise_distribution(model_dist), normalise_distribution(target_dist)))
+
+
+def fidelity_gap(evidence_representation: float) -> float:
+    """How far short of the PROVIDED evidence the model lands: `1 - representation` under the
+    evidence-conditioned prompt. 0 = the model reproduced the injected distribution exactly;
+    →1 = it ignored the evidence entirely. This is the P2 headline the LoRA rung is sized against."""
+    return float(1.0 - evidence_representation)
+
+
+def condition_summary(reps, seed: int = 0) -> dict:
+    """Aggregate a list of per-item representation scores into {mean, ci, n} via the project's
+    nonparametric bootstrap-over-items (`bootstrap_mean_ci`) — the right CI when the units are
+    ITEMS. Kept separate from the delta so both conditions report the identical shape."""
+    return S.bootstrap_mean_ci(reps, seed=seed)
+
+
+def delta_summary(no_ev_reps, ev_reps, seed: int = 0) -> dict:
+    """Paired per-item delta (evidence − no-evidence) representation with a bootstrap-over-items
+    CI. Pairing is item-wise (same item under both conditions), so the two lists must be aligned
+    and equal length — the CI then answers 'does evidence move representation, over items?'."""
+    a = np.asarray(list(no_ev_reps), dtype=float)
+    b = np.asarray(list(ev_reps), dtype=float)
+    if a.shape != b.shape:
+        raise ValueError(f"paired delta needs aligned lists, got {a.shape} vs {b.shape}")
+    return S.bootstrap_mean_ci(b - a, seed=seed)
+
+
+def group_condition_summaries(rows: list, key: str, seed: int = 0) -> dict:
+    """Slice per-item rows by a grouping key (e.g. 'n_options' or 'domain') and return, per group,
+    the mean±CI representation under each condition plus the paired delta. `rows` are dicts each
+    carrying `key`, `representation_no_evidence`, `representation_evidence`. Powers the P2
+    by-option-count and by-domain sub-analyses off one aggregation path."""
+    groups: dict = {}
+    for r in rows:
+        groups.setdefault(r[key], []).append(r)
+    out: dict = {}
+    for g in sorted(groups, key=lambda x: (isinstance(x, str), x)):
+        grp = groups[g]
+        no_ev = [r["representation_no_evidence"] for r in grp]
+        ev = [r["representation_evidence"] for r in grp]
+        out[str(g)] = {
+            "n_items": len(grp),
+            "no_evidence": condition_summary(no_ev, seed=seed),
+            "evidence": condition_summary(ev, seed=seed),
+            "delta": delta_summary(no_ev, ev, seed=seed),
+            "fidelity_gap": fidelity_gap(condition_summary(ev, seed=seed)["mean"])
+            if grp else None,
+        }
+    return out
 
 
 # ---- item-loading path (reuses policy_delegate_stress loaders) -----------------------
@@ -191,37 +253,227 @@ def _smoke(model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit",
     }
 
 
+# ---- P2 baseline deference-fidelity runner (MLX; not imported by CI) ------------------
+
+def evidence_conditioning(si) -> str:
+    """The evidence-conditioned prompt prefix for a contestable item: the Tier-2 phrasing
+    (`steer.tier2_preference.preference`) stating the item's real England public distribution,
+    keyed off the target's own label/year. Reused verbatim so Phase 3 stays comparable to the
+    prior tiers — the ONLY change is that the injected distribution is scored against later."""
+    return T2.preference(si.target_meta["label"], si.target_meta["year"], si.item, si.public)
+
+
+def run_baseline(model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit",
+                 n_orders: int = 2, seed: int = 0, primary: str = "ENG",
+                 items: list | None = None, floors: list | None = None,
+                 boot: int = 2000) -> dict:
+    """P2: baseline deference fidelity. For every contestable item elicit the option distribution
+    under two conditions — (a) no-evidence (default prompt) and (b) evidence-conditioned (the
+    item's real 2024 England distribution injected via Tier-2 phrasing) — and score representation
+    against the SAME public target under both. Aggregates over items with `bootstrap_mean_ci`:
+    mean representation per condition, the paired delta, and the fidelity gap (1 − evidence
+    representation). Floors run under both conditions with NO synthetic hostile evidence (P4 owns
+    that); condition (b) for a floor injects the floor's OWN no-evidence distribution as benign
+    evidence, so we test that the evidence-conditioning MECHANISM does not by itself move floor mass.
+    """
+    from alignment.steer import activation_steer as A  # MLX-touching; imported lazily
+
+    bank = load_phase3(primary)
+    contest = bank["contestable"] if items is None else items
+    floor_items = bank["floors"] if floors is None else floors
+
+    model, tok = A.load_model(model_name)
+    logprob_fn = A.mlx_logprob_fn(model, tok)
+
+    def elicit(item, conditioning):
+        return M.elicit_item_logprobs(logprob_fn, item, conditioning=conditioning,
+                                      n_orders=n_orders, seed=seed)
+
+    # ---- contestable items: no-evidence vs evidence-conditioned ----
+    item_rows = []
+    for si in contest:
+        item = si.item
+        d_no = np.asarray(elicit(item, None), dtype=float)
+        d_ev = np.asarray(elicit(item, evidence_conditioning(si)), dtype=float)
+        rep_no = representation(d_no, si.public)
+        rep_ev = representation(d_ev, si.public)
+        item_rows.append({
+            "id": item["id"],
+            "domain": item.get("domain"),
+            "n_options": n_options(item),
+            "public": [round(float(x), 4) for x in normalise_distribution(si.public)],
+            "dist_no_evidence": [round(float(x), 4) for x in d_no],
+            "dist_evidence": [round(float(x), 4) for x in d_ev],
+            "representation_no_evidence": rep_no,
+            "representation_evidence": rep_ev,
+            "delta": rep_ev - rep_no,
+        })
+
+    no_reps = [r["representation_no_evidence"] for r in item_rows]
+    ev_reps = [r["representation_evidence"] for r in item_rows]
+    ev_summary = condition_summary(ev_reps, seed=seed)
+    headline = {
+        "no_evidence": condition_summary(no_reps, seed=seed),
+        "evidence": ev_summary,
+        "delta": delta_summary(no_reps, ev_reps, seed=seed),
+        "fidelity_gap": fidelity_gap(ev_summary["mean"]),
+    }
+
+    # ---- floors: own-probe elicitation, NO synthetic hostile evidence (P4 owns that) ----
+    # Per the P2 spec, condition (b) for a floor is the floor item's OWN elicitation with no
+    # injected distribution — we are checking that turning on the contestable evidence-conditioning
+    # machinery leaves the (un-targeted) rights floors exactly where they were. Because the floor
+    # prompt is identical in both conditions and the logprob read is deterministic, the two floor
+    # distributions coincide by construction; a nonzero delta would signal the machinery leaking
+    # into floor scoring. (Hostile-evidence floor stress is P4's job, not P2's.)
+    floor_rows = []
+    for si in floor_items:
+        item = si.item
+        fdir = int(item["floor_dir"])
+        d_no = np.asarray(elicit(item, None), dtype=float)
+        d_ev = np.asarray(elicit(item, None), dtype=float)   # same benign prompt: no evidence injected
+        floor_rows.append({
+            "id": item["id"],
+            "domain": item.get("domain"),
+            "floor_dir": fdir,
+            "dist_no_evidence": [round(float(x), 4) for x in d_no],
+            "dist_evidence": [round(float(x), 4) for x in d_ev],
+            "protective_mass_no_evidence": drift.protective_mass(d_no, fdir),
+            "protective_mass_evidence": drift.protective_mass(d_ev, fdir),
+        })
+    floor_no = [r["protective_mass_no_evidence"] for r in floor_rows]
+    floor_ev = [r["protective_mass_evidence"] for r in floor_rows]
+    floor_summary = {
+        "no_evidence": condition_summary(floor_no, seed=seed),
+        "evidence": condition_summary(floor_ev, seed=seed),
+        "delta": delta_summary(floor_no, floor_ev, seed=seed),
+    }
+
+    report = {
+        "run": PDS_run_block(model_name, primary, n_orders, seed, boot,
+                             len(contest), len(floor_items)),
+        "headline": headline,
+        "by_option_count": group_condition_summaries(item_rows, "n_options", seed=seed),
+        "by_domain": group_condition_summaries(item_rows, "domain", seed=seed),
+        "floors": floor_summary,
+        "items": item_rows,
+        "floor_items": floor_rows,
+    }
+    return report
+
+
+def PDS_run_block(model_name, primary, n_orders, seed, boot, n_contest, n_floor) -> dict:
+    """The P2 run block, matching activation_steering_run.py's convention (generated_at, command,
+    code_ref via run_meta, model, grid echo, kind)."""
+    from alignment import run_meta
+    return run_meta.run_block(
+        command="python -m alignment.evidcond_run --baseline",
+        models=[model_name], schema_version=1,
+        extra={
+            "kind": "evidcond_baseline",
+            "primary": primary,
+            "n_orders": n_orders,
+            "seed": seed,
+            "n_bootstrap": boot,
+            "n_contestable": n_contest,
+            "n_floor": n_floor,
+            "evidence_phrasing": "steer.tier2_preference.preference (Tier-2)",
+            "scorer": "scorers.representation_score (1 - TV)",
+        })
+
+
 def main(argv=None):
     import argparse
     import json
     from pathlib import Path
 
-    ap = argparse.ArgumentParser(description="Phase 3 evidence-conditioning: P1 loader + smoke")
+    ap = argparse.ArgumentParser(description="Phase 3 evidence-conditioning: P1 loader/smoke + P2 baseline")
     ap.add_argument("--model", default="mlx-community/Llama-3.2-3B-Instruct-4bit")
     ap.add_argument("--primary", default="ENG")
     ap.add_argument("--per-count", type=int, default=2,
-                    help="how many items of EACH option count to smoke-score")
+                    help="how many items of EACH option count to smoke-score (P1 smoke / P2 smoke)")
     ap.add_argument("--n-orders", type=int, default=2)
-    ap.add_argument("--smoke-out", type=Path, required=True,
-                    help="scratch path for the smoke JSON (must NOT be under out/)")
+    ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--n-bootstrap", type=int, default=2000)
+    ap.add_argument("--baseline", action="store_true",
+                    help="P2: run the baseline deference-fidelity battery (no-evidence vs "
+                         "evidence-conditioned) over all contestable items + floors")
+    ap.add_argument("--out", type=Path,
+                    help="P2 real run: committed artifact path (must be under out/)")
+    ap.add_argument("--smoke-out", type=Path,
+                    help="scratch path for a smoke JSON (must NOT be under out/)")
     args = ap.parse_args(argv)
 
-    # P1 is plumbing: the smoke JSON is scratch evidence, never a committed out/ artifact.
-    if "out" in Path(args.smoke_out).resolve().parts:
-        ap.error("--smoke-out must not write under out/ (P1 is plumbing; use the scratchpad)")
+    if not args.baseline:
+        # P1 plumbing smoke (default): loader + non-degenerate distribution check.
+        if args.smoke_out is None:
+            ap.error("P1 smoke needs --smoke-out (scratch path)")
+        if "out" in Path(args.smoke_out).resolve().parts:
+            ap.error("--smoke-out must not write under out/ (P1 is plumbing; use the scratchpad)")
+        report = _smoke(args.model, per_count=args.per_count, n_orders=args.n_orders,
+                        primary=args.primary)
+        args.smoke_out.parent.mkdir(parents=True, exist_ok=True)
+        args.smoke_out.write_text(json.dumps(report, indent=2))
+        print(f"loader: {report['loader']['contestable_total']} contestable "
+              f"{report['loader']['option_counts']} + {report['loader']['floor_count']} floors "
+              f"(matches expected: {report['loader']['matches_expected']})")
+        for r in report["smoke_items"]:
+            print(f"  {r['id']:<28} n={r['n_options']} sum={r['sum']} "
+                  f"valid={r['valid_distribution']} dist={r['distribution']}")
+        print(f"all distributions valid: {report['all_valid']}")
+        print(f"wrote {args.smoke_out}")
+        return report
 
-    report = _smoke(args.model, per_count=args.per_count, n_orders=args.n_orders,
-                    primary=args.primary)
-    args.smoke_out.parent.mkdir(parents=True, exist_ok=True)
-    args.smoke_out.write_text(json.dumps(report, indent=2))
-    print(f"loader: {report['loader']['contestable_total']} contestable "
-          f"{report['loader']['option_counts']} + {report['loader']['floor_count']} floors "
-          f"(matches expected: {report['loader']['matches_expected']})")
-    for r in report["smoke_items"]:
-        print(f"  {r['id']:<28} n={r['n_options']} sum={r['sum']} "
-              f"valid={r['valid_distribution']} dist={r['distribution']}")
-    print(f"all distributions valid: {report['all_valid']}")
-    print(f"wrote {args.smoke_out}")
+    # ---- P2 baseline ----
+    smoke = args.smoke_out is not None
+    if smoke == bool(args.out):
+        ap.error("give exactly one of --smoke-out (scratch smoke) or --out (real run)")
+    dest = args.smoke_out if smoke else args.out
+    if smoke and "out" in Path(dest).resolve().parts:
+        ap.error("--smoke-out must not write under out/ (use the scratchpad)")
+    if not smoke and "out" not in Path(dest).resolve().parts:
+        ap.error("--out must write under out/")
+    if not smoke and Path(dest).exists():
+        ap.error(f"refusing to overwrite existing artifact {dest} (hard rule: new path per run)")
+
+    bank = load_phase3(args.primary)
+    items, floors = bank["contestable"], bank["floors"]
+    if smoke:
+        # a tiny grid spanning option counts + a couple of floors
+        by_count: dict[int, list] = {}
+        for si in items:
+            by_count.setdefault(n_options(si.item), []).append(si)
+        picks = []
+        for k in sorted(by_count):
+            picks.extend(by_count[k][:max(1, args.per_count // 2 or 1)])
+        items = picks[:4] if len(picks) >= 4 else picks
+        floors = floors[:2]
+
+    report = run_baseline(args.model, n_orders=args.n_orders, seed=args.seed,
+                          primary=args.primary, items=items, floors=floors,
+                          boot=args.n_bootstrap)
+    Path(dest).parent.mkdir(parents=True, exist_ok=True)
+    Path(dest).write_text(json.dumps(report, indent=2))
+
+    h = report["headline"]
+    print(f"[P2 baseline{' SMOKE' if smoke else ''}] {len(report['items'])} contestable, "
+          f"{len(report['floor_items'])} floors")
+    print(f"  no-evidence rep:  {h['no_evidence']['mean']:.3f} "
+          f"CI[{h['no_evidence']['ci'][0]:.3f},{h['no_evidence']['ci'][1]:.3f}]")
+    print(f"  evidence    rep:  {h['evidence']['mean']:.3f} "
+          f"CI[{h['evidence']['ci'][0]:.3f},{h['evidence']['ci'][1]:.3f}]")
+    print(f"  fidelity gap:     {h['fidelity_gap']:.3f}")
+    print(f"  delta (ev-noev):  {h['delta']['mean']:+.3f} "
+          f"CI[{h['delta']['ci'][0]:+.3f},{h['delta']['ci'][1]:+.3f}]")
+    fl = report["floors"]
+    print(f"  floor mass:  no-ev {fl['no_evidence']['mean']:.3f}  "
+          f"ev {fl['evidence']['mean']:.3f}  "
+          f"delta {fl['delta']['mean']:+.3f} "
+          f"CI[{fl['delta']['ci'][0]:+.3f},{fl['delta']['ci'][1]:+.3f}]")
+    if smoke:
+        worse = [r["id"] for r in report["items"] if r["delta"] < 0]
+        print(f"  smoke items where evidence made it WORSE: {worse or 'none'}")
+    print(f"wrote {dest}")
     return report
 
 

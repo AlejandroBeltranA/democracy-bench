@@ -114,3 +114,79 @@ def test_load_phase3_includes_all_option_counts_phase2_dropped():
     n5 = sum(1 for si in contest if E.n_options(si.item) == 5)
     n3 = sum(1 for si in contest if E.n_options(si.item) == 3)
     assert n5 == 29 and n3 == 5              # the items outside the 4-option filter
+
+
+# ---- P2 pure aggregation helpers -----------------------------------------------------
+
+def test_representation_matches_scorer_and_normalises():
+    """`representation` is 1 - TV against the target, normalising both vectors first — an exact
+    match scores 1.0 regardless of whether the inputs are pre-normalised."""
+    model = [2.0, 6.0, 2.0]          # un-normalised, proportional to [0.2,0.6,0.2]
+    target = [0.2, 0.6, 0.2]
+    assert E.representation(model, target) == pytest.approx(1.0)
+    # a half-shifted distribution loses exactly the shifted mass
+    assert E.representation([1.0, 0.0], [0.0, 1.0]) == pytest.approx(0.0)
+
+
+def test_fidelity_gap_is_one_minus_representation():
+    assert E.fidelity_gap(1.0) == pytest.approx(0.0)
+    assert E.fidelity_gap(0.7) == pytest.approx(0.3)
+    assert E.fidelity_gap(0.0) == pytest.approx(1.0)
+
+
+def test_condition_summary_reports_mean_ci_n():
+    reps = [0.5, 0.6, 0.7, 0.8]
+    s = E.condition_summary(reps, seed=0)
+    assert s["n"] == 4
+    assert s["mean"] == pytest.approx(0.65)
+    lo, hi = s["ci"]
+    assert lo <= s["mean"] <= hi
+
+
+def test_delta_summary_is_paired_itemwise():
+    """The delta is per-item (evidence − no-evidence), so a constant +0.1 lift gives mean +0.1
+    with a zero-width CI, not the difference of the two condition means computed separately."""
+    no_ev = [0.4, 0.5, 0.6]
+    ev = [0.5, 0.6, 0.7]
+    d = E.delta_summary(no_ev, ev, seed=0)
+    assert d["mean"] == pytest.approx(0.1)
+    assert d["ci"][0] == pytest.approx(0.1) and d["ci"][1] == pytest.approx(0.1)
+
+
+def test_delta_summary_rejects_misaligned_lists():
+    with pytest.raises(ValueError):
+        E.delta_summary([0.1, 0.2], [0.1], seed=0)
+
+
+def test_delta_summary_sign_can_be_negative():
+    """A negative delta (evidence made representation WORSE) is reported faithfully — the P2
+    surprise case must not be clamped."""
+    d = E.delta_summary([0.8, 0.7], [0.5, 0.6], seed=0)
+    assert d["mean"] == pytest.approx(-0.2)
+
+
+def test_group_condition_summaries_slices_and_summarises():
+    rows = [
+        {"n_options": 3, "domain": "tax", "representation_no_evidence": 0.5,
+         "representation_evidence": 0.7},
+        {"n_options": 3, "domain": "nhs", "representation_no_evidence": 0.6,
+         "representation_evidence": 0.8},
+        {"n_options": 4, "domain": "tax", "representation_no_evidence": 0.4,
+         "representation_evidence": 0.4},
+    ]
+    by_n = E.group_condition_summaries(rows, "n_options", seed=0)
+    assert set(by_n) == {"3", "4"}
+    assert by_n["3"]["n_items"] == 2
+    assert by_n["3"]["no_evidence"]["mean"] == pytest.approx(0.55)
+    assert by_n["3"]["evidence"]["mean"] == pytest.approx(0.75)
+    assert by_n["3"]["delta"]["mean"] == pytest.approx(0.2)
+    assert by_n["3"]["fidelity_gap"] == pytest.approx(0.25)
+    # the 4-option group has zero lift
+    assert by_n["4"]["delta"]["mean"] == pytest.approx(0.0)
+    by_dom = E.group_condition_summaries(rows, "domain", seed=0)
+    assert set(by_dom) == {"nhs", "tax"}
+    assert by_dom["nhs"]["n_items"] == 1
+
+
+def test_group_condition_summaries_empty_is_empty():
+    assert E.group_condition_summaries([], "n_options", seed=0) == {}
