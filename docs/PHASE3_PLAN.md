@@ -313,3 +313,48 @@ Tests: 257 → **266** (`tests/test_evidcond.py` +13 numpy-only P4 tests: `hosti
 helpers `hostile_distribution`/`_protective_indices`/`crack_table`/`floor_condition_summary` +
 `hostile_evidence_conditioning` + `run_floors` + `--floors`/`--hostile-mass` CLI), `tests/test_evidcond.py`,
 this log. No commit (supervisor reviews).
+
+### 2026-07-03 — P0–P4 battery COMPLETE · P5 design proposal (awaiting human sign-off)
+
+The measurement phase is done, in one day, all committed with green suites (219→266 tests):
+**P0** steering cannot track by construction (cos(d22,d24)=0.996) · **P1** full 50-item bank ·
+**P2** untuned deference is weak and heterogeneous (delta +0.019 n.s., gap 0.254, 24/50 worse) ·
+**P3** evidence-conditioning tracks real 2022→2024 shifts (8/10 direction, elasticity +0.395
+CI[+0.02,+0.81]) — the flagship positive · **P4** the same channel obeys fabricated anti-rights
+evidence (floor mass 0.512→0.318, 12/12 crack; the prompt alone is n.s.).
+
+**P5 proposal — "deference where due" LoRA.** The findings define the training target exactly:
+*increase* deference fidelity on contestable items (close the 0.254 gap, fix the 24/50 the
+evidence makes worse) while *refusing* deference on floor probes (P4's crack). One disposition,
+two behaviours, conditioned on item class.
+
+1. **Data.** Contestable: 50 items → stratified split (by option count + domain) ~35 train /
+   15 held-out; held-out MUST include ≥5 of the 10 Bonferroni-significant tracking items so P3
+   re-runs as a clean held-out test. Floors: all 12 probes with SYNTHETIC hostile evidence
+   (P4's `hostile_distribution`) in training, target = the untuned model's own baseline
+   protective distribution (hold the floor, ignore the evidence); floors are never trained
+   toward any majority.
+2. **Objective.** Distribution matching via sampled targets: for each train item build
+   evidence-conditioned prompts (P2's exact phrasing) and sample the single-token answer from
+   the target distribution (public evidence for contestable; baseline-protective for floors) —
+   in expectation, token-level cross-entropy = KL toward the target distribution, and it runs on
+   stock `mlx_lm.lora` SFT with no custom loss. ~64 sampled completions per item ≈ 3k examples.
+   (Fallback if quality is poor: custom KL-on-option-logprobs loop, more work.)
+3. **Adapter/compute.** mlx-lm LoRA on the 3B-4bit, rank 8–16, target the attention+MLP
+   projections of mid/late layers, ~300–1000 steps, batch 4. Estimated minutes-to-low-hours on
+   this machine; smoke on 2 items × 50 steps to scratch first.
+4. **Eval (all existing, all held-out where applicable), tuned vs untuned:** P2 fidelity gap on
+   the 15 held-out items (success: delta CI clears zero and >0; no item made worse by >0.05) ·
+   P3 tracking on held-out sig items (success: direction ≥ baseline 8/10-equivalent, elasticity
+   CI clears zero) · P4 2×2 floors (success: hostile-evidence floor mass ≥ 0.5 mean, no new
+   cracks vs baseline) · R7 off-task probes (success: accuracy unchanged at α=0-equivalent) ·
+   representation WITHOUT evidence on held-out items (guard: no memorisation of public targets —
+   should be ≈ baseline).
+5. **Artifacts.** `out/lora_deference_design.json` (config echo), adapter under
+   `out/lora_deference_adapter/` (new dir), eval to `out/evidcond_lora_eval_3b.json`. Never
+   overwrite; run_blocks everywhere; pytest green; loop-logged per item.
+
+**STOPPED here for human sign-off (hard rule: no LoRA compute without it).** Open questions for
+the human: (a) approve the sampled-target SFT trick vs custom KL loss? (b) is the floor training
+target (baseline-protective distribution) the right normative choice, vs an explicit refusal
+style? (c) split ratio / which sig items to hold out.
