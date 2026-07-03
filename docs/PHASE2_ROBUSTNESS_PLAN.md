@@ -76,7 +76,7 @@ The decisive test. Add to the engine + driver:
   across items either" — still write it up (mirror of Phase 1), then skip R5/R6/W2 and go
   to W3 (geometry) to explain WHY, which becomes the paper's mechanism section.
 
-### R2 — Random-direction control  ☐
+### R2 — Random-direction control  ☑ (see Loop log 2026-07-03)
 
 - Driver flag: `--direction random` — a random vector matched to the captured direction's
   norm (same layer, same α grid, seeded).
@@ -229,3 +229,23 @@ either." SKIP R5/R6/W2. Next: finish the ungated diagnostic battery (R2 random-d
 R3 negative dose, R4 CIs on the in-sample curve — these characterise the negative for the writeup),
 then W3 geometry to explain the mechanism (are per-item arrows mutually misaligned?). Full stop /
 human sign-off only once W3 has explained it (see Stop conditions).
+
+### 2026-07-03 — R2 random-direction control → real-but-item-local (refines, doesn't reverse R1)
+
+Ran: `activation_steering_run --direction random --layers 11 --alphas 2 4 6 --seeds 0 1 2
+--n-orders 2` (matched-norm Gaussian vector vs the captured diff-of-means, same layer/α grid,
+in-sample) → `out/act_steer_randctrl_3b.json`. Code: `random_direction` (engine), `run_randctrl`
++ `_curve_gain` / `_randctrl_comparison` + `--direction random`/`--seeds`; +8 tests (187 pass).
+
+Layer 11, real in-sample representation gain vs 3 matched-norm random draws [min,max]:
+- α2 real −0.064 vs random [−0.015,+0.057]  → within noise (real WORSE than random)
+- α4 real +0.059 vs random [−0.022,+0.041]  → REAL>RANDOM (beats every draw)
+- α6 real −0.063 vs random [−0.072,−0.022]  → within noise
+
+Interpretation: NOT pure perturbation noise — at α=4 (the published operating point) the captured
+direction beats every matched-norm random vector, so the diff-of-means carries genuine directional
+content. But that content is narrow (only α=4; α2/α6 are within noise — the non-monotonic wobble)
+and R1 already showed it does NOT transfer to held-out items. Combined verdict: the steering effect
+is REAL BUT ITEM-LOCAL — memorisation of the 16 capture items, not a generalisable public-agreement
+concept. This is the sharper story R2 buys over R1 alone; W3 geometry should show WHY (per-item
+arrows mutually misaligned, so their mean helps only the items it was averaged over).

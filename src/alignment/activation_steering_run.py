@@ -191,6 +191,111 @@ def run_holdout(model_name: str, layers: list[int], alphas: list[float], k: int 
     }
 
 
+def _curve_gain(curve: list[dict]) -> dict:
+    """Per-alpha representation gain vs the alpha=0 row of the same curve ({alpha: gain}); alphas whose
+    representation broke (None) are omitted. Also returns the alpha=0 baseline representation."""
+    base_row = min(curve, key=lambda r: abs(r["alpha"]))
+    base = base_row["representation"]
+    gains = {r["alpha"]: (r["representation"] - base)
+             for r in curve if r["representation"] is not None and base is not None}
+    return {"baseline": base, "gains": gains}
+
+
+def _randctrl_comparison(real_curve: list[dict], random_curves: list[list[dict]]) -> list[dict]:
+    """Per-alpha: real representation gain vs the spread of matched-norm random-direction gains (over
+    seeds). `real_exceeds_random` flags alphas where the captured direction beats EVERY random draw —
+    the only cells where the direction plausibly carries structure a random perturbation does not."""
+    real = _curve_gain(real_curve)
+    rand = [_curve_gain(c) for c in random_curves]
+    out = []
+    for a in sorted(real["gains"]):
+        if a == min(real["gains"], key=abs):     # skip the alpha=0 baseline row (gain 0 by construction)
+            pass
+        rg = [c["gains"][a] for c in rand if a in c["gains"]]
+        row = {
+            "alpha": a,
+            "real_rep_gain": real["gains"][a],
+            "random_rep_gain_mean": float(np.mean(rg)) if rg else None,
+            "random_rep_gain_min": float(np.min(rg)) if rg else None,
+            "random_rep_gain_max": float(np.max(rg)) if rg else None,
+            "n_random_ok": len(rg),
+            "real_exceeds_random": bool(rg and real["gains"][a] > max(rg)),
+        }
+        out.append(row)
+    return out
+
+
+def run_randctrl(model_name: str, layers: list[int], alphas: list[float], seeds: list[int],
+                 n_options: int = 4, n_orders: int = 2, primary: str = "ENG",
+                 floor_min: float = 0.5) -> dict:
+    """R2 driver: matched-norm random-direction control. At each layer, capture the real diff-of-means
+    direction and run its (in-sample) dose-response, then for each seed inject a random vector of the
+    SAME norm and run the same sweep. If random moves representation as much as the captured direction,
+    the effect is perturbation noise. Complements R1: R1 showed no generalization, R2 asks whether the
+    in-sample bump was even direction-specific."""
+    alphas = [0.0] + [float(a) for a in alphas if float(a) != 0.0]
+    model, tok = A.load_model(model_name)
+    n_layers = len(model.model.layers)
+
+    contest = [si for si in PDS.contestable_items(PDS.load_targets(), primary)
+               if si.public is not None and len(si.item["scale"]["labels"]) == n_options]
+    floors = [si for si in PDS.floor_items()
+              if len(si.item["scale"]["labels"]) == n_options]
+    if len(contest) < 2:
+        raise ValueError(f"need >= 2 contestable {n_options}-option items, found {len(contest)}")
+
+    per_layer = []
+    for li in layers:
+        tap, restore = A.install_tap(model, li)
+        try:
+            vec = A.capture_direction(model, tok, tap, [si.item for si in contest],
+                                      country=A.PERSONA_COUNTRY, year=A.PERSONA_YEAR)
+            norm = float(np.linalg.norm(vec))
+            real_curve = A.dose_response(model, tok, tap, contest, floors, vec, alphas,
+                                         n_orders=n_orders, seed=0)
+            random_curves = []
+            for s in seeds:
+                rvec = A.random_direction(vec.shape[0], norm, seed=s)
+                random_curves.append(A.dose_response(model, tok, tap, contest, floors, rvec, alphas,
+                                                     n_orders=n_orders, seed=0))
+        finally:
+            restore()
+        comp = _randctrl_comparison(real_curve, random_curves)
+        beats = any(r["real_exceeds_random"] for r in comp)
+        verdict = ("in-sample structure: captured direction beats every random draw at some alpha "
+                   "(but R1 shows it does not generalize across items)" if beats else
+                   "perturbation noise: a matched-norm random vector moves representation as much as "
+                   "the captured direction")
+        per_layer.append({
+            "layer": li, "direction_norm": norm, "random_seeds": list(seeds),
+            "real_curve": real_curve, "random_curves": random_curves,
+            "comparison": comp, "verdict": verdict,
+        })
+        for r in comp:
+            if r["alpha"] == 0.0:
+                continue
+            print(f"layer {li:>2} a={r['alpha']:>4g}: real gain {r['real_rep_gain']:+.3f} vs "
+                  f"random [{r['random_rep_gain_min']:+.3f},{r['random_rep_gain_max']:+.3f}]"
+                  f"  {'REAL>RANDOM' if r['real_exceeds_random'] else 'within noise'}")
+
+    any_structure = any("structure" in pl["verdict"] for pl in per_layer)
+    return {
+        "run": run_meta.run_block(
+            command="python -m alignment.activation_steering_run --direction random",
+            models=[model_name], schema_version=1,
+            extra={"kind": "activation_steering_randctrl", "n_layers": n_layers,
+                   "layers": layers, "alphas": alphas, "seeds": list(seeds), "n_orders": n_orders,
+                   "n_options": n_options, "primary": primary, "floor_min": floor_min,
+                   "n_contestable": len(contest), "n_floor": len(floors),
+                   "persona": f"{A.PERSONA_COUNTRY} {A.PERSONA_YEAR}"}),
+        "per_layer": per_layer,
+        "any_in_sample_structure": any_structure,
+        "verdict": ("R2: captured direction beats matched-norm random somewhere in-sample"
+                    if any_structure else
+                    "R2: steering effect is indistinguishable from matched-norm random perturbation"),
+    }
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Phase 2: activation-steering dose-response sweep (local MLX)")
     ap.add_argument("--model", default=A.DEFAULT_MODEL)
@@ -204,8 +309,24 @@ def main(argv=None):
     ap.add_argument("--holdout", type=int, default=0,
                     help="if >0, run R1 k-fold held-out capture with this many folds instead of the sweep")
     ap.add_argument("--boot", type=int, default=2000, help="bootstrap resamples for held-out gain CIs")
+    ap.add_argument("--direction", choices=["captured", "random"], default="captured",
+                    help="'random' runs the R2 matched-norm random-direction control")
+    ap.add_argument("--seeds", type=int, nargs="*", default=[0, 1, 2],
+                    help="random-vector seeds for --direction random")
     ap.add_argument("--out", type=Path, default=OUT / "activation_steering.json")
     args = ap.parse_args(argv)
+
+    if args.direction == "random":
+        if args.layers is None:
+            ap.error("--direction random requires explicit --layers (e.g. --layers 11)")
+        result = run_randctrl(args.model, args.layers, args.alphas, args.seeds,
+                              n_options=args.n_options, n_orders=args.n_orders,
+                              primary=args.primary, floor_min=args.floor_min)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(result, indent=2))
+        print("\n" + result["verdict"])
+        print(f"wrote {args.out}")
+        return result
 
     if args.holdout:
         if args.layers is None:

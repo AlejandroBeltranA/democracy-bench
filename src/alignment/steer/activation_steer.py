@@ -44,6 +44,21 @@ def diff_of_means(default_acts: np.ndarray, persona_acts: np.ndarray) -> np.ndar
     return p.mean(axis=0) - d.mean(axis=0)
 
 
+def random_direction(dim: int, norm: float, seed: int = 0) -> np.ndarray:
+    """A matched-norm RANDOM steering direction: an isotropic Gaussian vector rescaled to `norm`.
+    R2's control for `capture_direction` — same perturbation magnitude injected at the same layer,
+    but with no public-agreement structure. If a random vector moves representation as much as the
+    captured direction does, the 'steering' is just perturbation noise, not a learned concept."""
+    if norm < 0:
+        raise ValueError(f"norm must be >= 0, got {norm}")
+    rng = np.random.default_rng(seed)
+    v = rng.standard_normal(int(dim))
+    n = float(np.linalg.norm(v))
+    if n == 0.0:
+        raise ValueError("degenerate random vector (zero norm)")
+    return v * (norm / n)
+
+
 def kfold_test_indices(n: int, k: int, seed: int = 0) -> list[np.ndarray]:
     """Partition range(n) into k disjoint folds of *test* indices (seeded shuffle then split).
     Deterministic under seed; folds are pairwise disjoint and together cover every index exactly

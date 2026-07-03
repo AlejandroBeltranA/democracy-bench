@@ -223,3 +223,67 @@ def test_summarize_holdout_requires_baseline_alpha():
                          "n_floor_ok": 1, "n_floor_broke": 0}]}
     with pytest.raises(ValueError):
         R._summarize_holdout_layer(ho, floor_min=0.5, B=100, seed=0)
+
+
+# ---- R2 random-direction control: matched-norm random vector --------------------------
+
+def test_random_direction_matches_requested_norm():
+    v = A.random_direction(320, norm=2.5, seed=0)
+    assert v.shape == (320,)
+    assert np.linalg.norm(v) == pytest.approx(2.5, rel=1e-6)
+
+
+def test_random_direction_deterministic_under_seed():
+    assert np.allclose(A.random_direction(64, 1.0, seed=4), A.random_direction(64, 1.0, seed=4))
+    assert not np.allclose(A.random_direction(64, 1.0, seed=4), A.random_direction(64, 1.0, seed=5))
+
+
+def test_random_direction_rejects_negative_norm():
+    with pytest.raises(ValueError):
+        A.random_direction(8, norm=-1.0, seed=0)
+
+
+def test_random_direction_zero_norm_is_zero_vector():
+    v = A.random_direction(16, norm=0.0, seed=1)
+    assert np.linalg.norm(v) == pytest.approx(0.0)
+
+
+# ---- R2 random-direction control: curve gain + comparison -----------------------------
+
+def _curve(alpha_rep_floor):
+    return [{"alpha": a, "representation": r, "floor_mass": f} for a, r, f in alpha_rep_floor]
+
+
+def test_curve_gain_is_relative_to_alpha_zero():
+    c = _curve([(0, 0.60, 0.8), (2, 0.70, 0.7), (4, 0.55, 0.6)])
+    g = R._curve_gain(c)
+    assert g["baseline"] == 0.60
+    assert g["gains"][2.0] == pytest.approx(0.10)
+    assert g["gains"][4.0] == pytest.approx(-0.05)
+
+
+def test_curve_gain_omits_broken_alphas():
+    c = _curve([(0, 0.60, 0.8), (2, 0.70, 0.7)]) + [{"alpha": 8, "representation": None, "floor_mass": None}]
+    g = R._curve_gain(c)
+    assert 8.0 not in g["gains"]
+    assert set(g["gains"]) == {0.0, 2.0}
+
+
+def test_randctrl_flags_real_above_every_random_draw():
+    real = _curve([(0, 0.60, 0.8), (2, 0.80, 0.7)])          # real gain +0.20
+    rand = [_curve([(0, 0.60, 0.8), (2, 0.63, 0.75)]),       # random gains +0.03, +0.05
+            _curve([(0, 0.60, 0.8), (2, 0.65, 0.75)])]
+    comp = R._randctrl_comparison(real, rand)
+    row = [r for r in comp if r["alpha"] == 2.0][0]
+    assert row["real_rep_gain"] == pytest.approx(0.20)
+    assert row["random_rep_gain_max"] == pytest.approx(0.05)
+    assert row["real_exceeds_random"] is True
+
+
+def test_randctrl_flags_real_within_random_noise():
+    real = _curve([(0, 0.60, 0.8), (2, 0.64, 0.7)])          # real gain +0.04
+    rand = [_curve([(0, 0.60, 0.8), (2, 0.66, 0.75)]),       # a random draw does better (+0.06)
+            _curve([(0, 0.60, 0.8), (2, 0.62, 0.75)])]
+    comp = R._randctrl_comparison(real, rand)
+    row = [r for r in comp if r["alpha"] == 2.0][0]
+    assert row["real_exceeds_random"] is False               # within perturbation noise

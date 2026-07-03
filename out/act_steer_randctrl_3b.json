@@ -1,0 +1,241 @@
+{
+  "run": {
+    "generated_at": "2026-07-03T07:46:04.112581+00:00",
+    "command": "python -m alignment.activation_steering_run --direction random",
+    "code_ref": "204a830bdafc31e1324387d88509d6d0694addef",
+    "schema_version": 1,
+    "temperature": 0.8,
+    "models": [
+      "mlx-community/Llama-3.2-3B-Instruct-4bit"
+    ],
+    "kind": "activation_steering_randctrl",
+    "n_layers": 28,
+    "layers": [
+      11
+    ],
+    "alphas": [
+      0.0,
+      2.0,
+      4.0,
+      6.0
+    ],
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "n_orders": 2,
+    "n_options": 4,
+    "primary": "ENG",
+    "floor_min": 0.5,
+    "n_contestable": 16,
+    "n_floor": 12,
+    "persona": "GBR 2024"
+  },
+  "per_layer": [
+    {
+      "layer": 11,
+      "direction_norm": 1.7072235308302235,
+      "random_seeds": [
+        0,
+        1,
+        2
+      ],
+      "real_curve": [
+        {
+          "alpha": 0.0,
+          "representation": 0.6898262416680764,
+          "floor_mass": 0.5116467012347099,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": 0.6255831731775625,
+          "floor_mass": 0.3868008035328141,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": 0.7484518397246667,
+          "floor_mass": 0.5072139432868688,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": 0.626405950281397,
+          "floor_mass": 0.6480109796802968,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        }
+      ],
+      "random_curves": [
+        [
+          {
+            "alpha": 0.0,
+            "representation": 0.6898262416680764,
+            "floor_mass": 0.5116467012347099,
+            "n_contestable_ok": 16,
+            "n_contestable_broke": 0,
+            "n_floor_ok": 12,
+            "n_floor_broke": 0
+          },
+          {
+            "alpha": 2.0,
+            "representation": 0.7468191764376049,
+            "floor_mass": 0.30871213637048917,
+            "n_contestable_ok": 16,
+            "n_contestable_broke": 0,
+            "n_floor_ok": 12,
+            "n_floor_broke": 0
+          },
+          {
+            "alpha": 4.0,
+            "representation": 0.7304725810557784,
+            "floor_mass": 0.3812017473375648,
+            "n_contestable_ok": 16,
+            "n_contestable_broke": 0,
+            "n_floor_ok": 12,
+            "n_floor_broke": 0
+          },
+          {
+            "alpha": 6.0,
+            "representation": 0.6683201501842545,
+            "floor_mass": 0.33662263223469546,
+            "n_contestable_ok": 16,
+            "n_contestable_broke": 0,
+            "n_floor_ok": 12,
+            "n_floor_broke": 0
+          }
+        ],
+        [
+          {
+            "alpha": 0.0,
+            "representation": 0.6898262416680764,
+            "floor_mass": 0.5116467012347099,
+            "n_contestable_ok": 16,
+            "n_contestable_broke": 0,
+            "n_floor_ok": 12,
+            "n_floor_broke": 0
+          },
+          {
+            "alpha": 2.0,
+            "representation": 0.675267831021547,
+            "floor_mass": 0.4970579571746648,
+            "n_contestable_ok": 16,
+            "n_contestable_broke": 0,
+            "n_floor_ok": 12,
+            "n_floor_broke": 0
+          },
+          {
+            "alpha": 4.0,
+            "representation": 0.6677117142146285,
+            "floor_mass": 0.42233555301753495,
+            "n_contestable_ok": 16,
+            "n_contestable_broke": 0,
+            "n_floor_ok": 12,
+            "n_floor_broke": 0
+          },
+          {
+            "alpha": 6.0,
+            "representation": 0.61823836236079,
+            "floor_mass": 0.45241418551096285,
+            "n_contestable_ok": 16,
+            "n_contestable_broke": 0,
+            "n_floor_ok": 12,
+            "n_floor_broke": 0
+          }
+        ],
+        [
+          {
+            "alpha": 0.0,
+            "representation": 0.6898262416680764,
+            "floor_mass": 0.5116467012347099,
+            "n_contestable_ok": 16,
+            "n_contestable_broke": 0,
+            "n_floor_ok": 12,
+            "n_floor_broke": 0
+          },
+          {
+            "alpha": 2.0,
+            "representation": 0.7125434000189459,
+            "floor_mass": 0.3377967662570069,
+            "n_contestable_ok": 16,
+            "n_contestable_broke": 0,
+            "n_floor_ok": 12,
+            "n_floor_broke": 0
+          },
+          {
+            "alpha": 4.0,
+            "representation": 0.7010174927885316,
+            "floor_mass": 0.4273018736494368,
+            "n_contestable_ok": 16,
+            "n_contestable_broke": 0,
+            "n_floor_ok": 12,
+            "n_floor_broke": 0
+          },
+          {
+            "alpha": 6.0,
+            "representation": 0.632547370891732,
+            "floor_mass": 0.47718250161373627,
+            "n_contestable_ok": 16,
+            "n_contestable_broke": 0,
+            "n_floor_ok": 12,
+            "n_floor_broke": 0
+          }
+        ]
+      ],
+      "comparison": [
+        {
+          "alpha": 0.0,
+          "real_rep_gain": 0.0,
+          "random_rep_gain_mean": 0.0,
+          "random_rep_gain_min": 0.0,
+          "random_rep_gain_max": 0.0,
+          "n_random_ok": 3,
+          "real_exceeds_random": false
+        },
+        {
+          "alpha": 2.0,
+          "real_rep_gain": -0.06424306849051387,
+          "random_rep_gain_mean": 0.021717227491289532,
+          "random_rep_gain_min": -0.014558410646529407,
+          "random_rep_gain_max": 0.05699293476952849,
+          "n_random_ok": 3,
+          "real_exceeds_random": false
+        },
+        {
+          "alpha": 4.0,
+          "real_rep_gain": 0.05862559805659029,
+          "random_rep_gain_mean": 0.009907687684903133,
+          "random_rep_gain_min": -0.022114527453447885,
+          "random_rep_gain_max": 0.04064633938770201,
+          "n_random_ok": 3,
+          "real_exceeds_random": true
+        },
+        {
+          "alpha": 6.0,
+          "real_rep_gain": -0.06342029138667937,
+          "random_rep_gain_mean": -0.05012428052248422,
+          "random_rep_gain_min": -0.07158787930728638,
+          "random_rep_gain_max": -0.021506091483821876,
+          "n_random_ok": 3,
+          "real_exceeds_random": false
+        }
+      ],
+      "verdict": "in-sample structure: captured direction beats every random draw at some alpha (but R1 shows it does not generalize across items)"
+    }
+  ],
+  "any_in_sample_structure": true,
+  "verdict": "R2: captured direction beats matched-norm random somewhere in-sample"
+}
