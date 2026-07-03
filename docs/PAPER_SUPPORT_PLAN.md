@@ -43,7 +43,7 @@ defenses) · F4 W3 geometry (cosine by layer, within/cross domain) · F5 P2 fide
 heterogeneity (per-item delta, 24/50 worse). PDF + PNG, colorblind-safe, no title text baked in
 (captions live in the paper). Numbers must match PS1 exactly.
 
-### PS3 — Reproduction reference (docs/REPRODUCTION.md) ☐
+### PS3 — Reproduction reference (docs/REPRODUCTION.md) ☑
 Every artifact in the arc: the exact CLI that produced it (from its run block `command` field),
 its code_ref commit, expected runtime, and dependency notes (venv/MLX). Verify each command
 string against the artifact's own run block programmatically. Do NOT execute the commands.
@@ -120,3 +120,45 @@ build assertions on P3/P2/P5/G1 headline numbers). `python -m pytest -q` green. 
 `scripts/extract_paper_results.py`, NEW `tests/test_paper_extract.py`, NEW `docs/PAPER_RESULTS.md`,
 NEW `out/paper_results_extract.json`, this log. No existing `out/*.json` touched; do-not-touch files
 untouched. No commit (supervisor reviews).
+
+### 2026-07-03 — PS3 reproduction reference ☑
+Wrote `docs/REPRODUCTION.md`: one entry per arc artifact (22 documented commands over 23 arc
+artifacts + 2 support scripts) with the **verbatim** run-block `command`, the `code_ref` commit
+(what the run executed at) *and* the added-in commit (when the JSON landed — offset by one for
+the Phase-2 robustness family, recorded distinctly), runtime (from the PHASE2/3/4 Loop logs where
+present), env notes (`.venv` + MLX/Apple-Silicon for the model runs; provider-budget/no-Apple-
+Silicon for Phase 1; matplotlib-out-of-venv for figures), and the order-dependency graph (P5a
+needs P2+P4; P5b needs the P5a adapter+design; G1 needs only the base model; extractor+figures
+need every artifact). Did **NOT** execute any reproduction command.
+
+Built `scripts/verify_repro_reference.py` (reads files only): parses the fenced command blocks
+and, for every artifact carrying a run-block `command`, asserts byte-equality against the JSON;
+fails loudly on any mismatch/missing artifact. Pure parsing/matching helpers
+(`parse_fenced_commands`/`normalise_command`/`match_commands`/`compare_to_runblock`) are
+numpy-only unit-tested in NEW `tests/test_repro_reference.py`.
+
+**Verifier output (ran once, read-only):** `fenced commands parsed: 22 · run-block-verified: 15 ·
+asserted-by-doc: 7 · OK — every run-block command matches the doc`. The **15 run-block-verified**
+are the 8 Phase-2 `act_steer_*`, P0 `w1_cosine`, P2 baseline, P3 tracking, P4 floors, P5a
+`lora-build`, P5b `lora-eval`, G1 `guard-grid`. The **7 asserted-by-doc** (no run-block `command`
+to check against) are the 3 Phase-1 logit-bias JSONs, the uncommitted superseded
+`activation_steering_3b_4opt.json`, the `mlx_lm lora` training call (checked against
+`adapter_config.json` params), the extractor, and the figures.
+
+**No flag drift:** every run-block command's mode flag (`--holdout/--ci/--direction/--negdose/
+--geometry/--offtask/--persona-control/--w1-cosine/--baseline/--tracking/--floors/--lora-build/
+--lora-eval/--guard-grid`) still exists in the current `activation_steering_run`/`evidcond_run`
+argparse at HEAD — reproduction from HEAD is not broken by a removed flag.
+
+**Known irreproducibilities** (documented, not resolved): temperature-field runs that actually
+sample (off-task free generation) vs the deterministic logprob path; mlx/mlx-lm version (P5a on
+v0.31.3); 4-bit quantisation determinism across Apple-Silicon hardware; the uncommitted
+do-not-touch superseded artifact D4; matplotlib version for byte-identical figures; Phase-1
+hosted-provider elicitation with no pinned snapshot.
+
+Tests: 350 → **364** (+14 numpy-only in NEW `tests/test_repro_reference.py`; fence parsing,
+whitespace normalisation, order/count-sensitive matching, run-block compare, EXPECTED-table
+shape). `.venv/bin/python -m pytest -q` green (364 passed). Files changed: NEW
+`docs/REPRODUCTION.md`, NEW `scripts/verify_repro_reference.py`, NEW `tests/test_repro_reference.py`,
+this log + PS3 ☑. No `out/` paths created or touched; do-not-touch files untouched
+(`activation_steering_3b_4opt.json` read-only for provenance only). No commit (supervisor reviews).
