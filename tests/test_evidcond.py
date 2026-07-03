@@ -513,3 +513,68 @@ def test_dataset_counts_histogram():
     assert c["n_rows"] == 200
     assert set(c["answer_histogram"]) == {"1", "2"}
     assert sum(c["answer_histogram"].values()) == 200
+
+
+# ---- P5b LoRA-eval pure helpers (tuned vs untuned; numpy-only) ------------------------
+
+def test_paired_delta_summary_shapes_and_sign():
+    untuned = [0.5, 0.6, 0.7]
+    tuned = [0.6, 0.7, 0.8]                # +0.1 each
+    s = E.paired_delta_summary(untuned, tuned, seed=0)
+    assert set(s) == {"untuned", "tuned", "delta"}
+    assert abs(s["untuned"]["mean"] - 0.6) < 1e-9
+    assert abs(s["tuned"]["mean"] - 0.7) < 1e-9
+    assert abs(s["delta"]["mean"] - 0.1) < 1e-9
+    lo, hi = s["delta"]["ci"]
+    assert lo <= 0.1 <= hi
+
+
+def test_paired_delta_summary_misaligned_raises():
+    with pytest.raises(ValueError):
+        E.paired_delta_summary([0.1, 0.2], [0.1], seed=0)
+
+
+def test_count_worse_counts_only_beyond_threshold():
+    untuned = [0.80, 0.80, 0.80, 0.80]
+    tuned = [0.90, 0.79, 0.70, 0.74]       # +0.10, -0.01, -0.10, -0.06
+    # worse-by->0.05: the -0.10 and the -0.06 (2); the -0.01 is within threshold
+    assert E.count_worse(untuned, tuned, thresh=0.05) == 2
+    assert E.count_worse(untuned, tuned, thresh=0.20) == 0
+
+
+def test_count_worse_misaligned_raises():
+    with pytest.raises(ValueError):
+        E.count_worse([0.1], [0.1, 0.2])
+
+
+def test_mean_pairwise_tv_identical_is_zero():
+    d = [0.25, 0.25, 0.25, 0.25]
+    assert E.mean_pairwise_tv([d, d, d]) == 0.0
+
+
+def test_mean_pairwise_tv_disjoint_point_masses_is_one():
+    a = [1.0, 0.0, 0.0]
+    b = [0.0, 1.0, 0.0]
+    assert abs(E.mean_pairwise_tv([a, b]) - 1.0) < 1e-9
+
+
+def test_mean_pairwise_tv_normalises_and_single_returns_none():
+    assert E.mean_pairwise_tv([[2.0, 2.0, 4.0]]) is None          # one dist -> no pair
+    # unnormalised inputs are normalised before comparison
+    tv = E.mean_pairwise_tv([[2.0, 0.0], [0.0, 2.0]])
+    assert abs(tv - 1.0) < 1e-9
+
+
+def test_mean_pairwise_tv_ragged_raises():
+    with pytest.raises(ValueError):
+        E.mean_pairwise_tv([[0.5, 0.5], [0.3, 0.3, 0.4]])
+
+
+def test_homogenisation_report_drop_direction():
+    # untuned: spread-out floor answers (high pairwise TV); tuned: near-identical (low TV, homogenised)
+    untuned = [[0.9, 0.1, 0.0, 0.0], [0.0, 0.0, 0.1, 0.9], [0.1, 0.8, 0.1, 0.0]]
+    tuned = [[0.3, 0.3, 0.3, 0.1], [0.31, 0.29, 0.3, 0.1], [0.3, 0.31, 0.29, 0.1]]
+    rep = E.homogenisation_report(untuned, tuned)
+    assert rep["mean_pairwise_tv_untuned"] > rep["mean_pairwise_tv_tuned"]
+    assert rep["drop"] > 0                       # positive drop = homogenisation cost
+    assert rep["n_probes"] == 3
