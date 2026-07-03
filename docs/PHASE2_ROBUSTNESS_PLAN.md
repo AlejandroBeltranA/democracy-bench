@@ -386,3 +386,12 @@ gate); R7/R8 done. REMAINING: W1 (flagship tracking-under-steering — large bui
 for the same reason, but the strongest paper framing), W4 (moot for a negative), W5 (LoRA — stretch,
 plan requires human sign-off before compute). Paused to ask the human whether W1 is worth building.
 ────────────────────────────────────────────────────────────────────────────────────────────────
+
+### 2026-07-03 — LOOP STOPPED by human · handoff written
+
+Human decision: stop here (needs the computer back), write a full handoff + a plan for the next agent
+to carry W1–W5. No further MLX runs this session. → `docs/PHASE2_HANDOFF.md` records everything done
+(R1–R4 + follow-up, W3, R7, R8), where it succeeded/failed, the code + CLI added, the artifact index,
+and an actionable plan for W1 (flagship; includes a cheap cosine kill-check first), W4 (optional,
+mostly moot), W5 (needs sign-off), R5/R6/W2 (keep skipped). Phase 2 = publication-ready NEGATIVE with
+a geometric mechanism; the human writes the paper section. Next agent: start at `docs/PHASE2_HANDOFF.md`.
