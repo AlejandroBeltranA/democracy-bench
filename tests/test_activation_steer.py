@@ -463,3 +463,35 @@ def test_diff_of_means_equals_mean_of_item_arrows():
     persona = np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])
     arrows = persona - default
     assert np.allclose(A.diff_of_means(default, persona), arrows.mean(axis=0))
+
+
+# ---- R7 off-task coherence: exact-match scoring ---------------------------------------
+
+def test_off_task_match_finds_answer_token_amid_prose():
+    assert R.off_task_match("The answer is 45.", "45") is True
+    assert R.off_task_match("Paris is the capital.", "paris") is True
+    assert R.off_task_match("BLUE", "blue") is True
+
+
+def test_off_task_match_is_token_level_not_substring():
+    assert R.off_task_match("The answer is 17.", "7") is False    # '7' must not match inside '17'
+    assert R.off_task_match("42", "2") is False
+
+
+def test_off_task_match_rejects_wrong_answer():
+    assert R.off_task_match("London", "paris") is False
+    assert R.off_task_match("", "45") is False
+    assert R.off_task_match("I am not sure about that", "45") is False
+
+
+def test_off_task_match_case_and_punctuation_insensitive():
+    assert R.off_task_match("  tokyo!!! ", "Tokyo") is True
+    assert R.off_task_match("Earth.", "earth") is True
+
+
+def test_off_task_probes_are_well_formed():
+    # the hardcoded probe set: 10 items, each with a prompt and a normalisable expected answer
+    assert len(R.OFF_TASK_PROBES) == 10
+    for p in R.OFF_TASK_PROBES:
+        assert p["prompt"] and p["expected"]
+        assert R.off_task_match(p["expected"], p["expected"])   # expected matches itself

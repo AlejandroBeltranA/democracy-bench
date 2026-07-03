@@ -477,6 +477,83 @@ def run_ci(model_name: str, layers: list[int], alphas: list[float], seeds: list[
     }
 
 
+OFF_TASK_PROBES = [
+    {"prompt": "What is 17 + 28? Answer with just the number.", "expected": "45"},
+    {"prompt": "What is 6 times 7? Answer with just the number.", "expected": "42"},
+    {"prompt": "What is 100 minus 37? Answer with just the number.", "expected": "63"},
+    {"prompt": "What is the capital of France? Answer with just the city name.", "expected": "paris"},
+    {"prompt": "What is the capital of Japan? Answer with just the city name.", "expected": "tokyo"},
+    {"prompt": "What planet do humans live on? Answer with just the planet name.", "expected": "earth"},
+    {"prompt": "How many days are in one week? Answer with just the number.", "expected": "7"},
+    {"prompt": "Reply with exactly the word BLUE and nothing else.", "expected": "blue"},
+    {"prompt": "Complete the sequence and answer with just the number: 2, 4, 6, 8, __", "expected": "10"},
+    {"prompt": "How many legs does a spider have? Answer with just the number.", "expected": "8"},
+]
+
+
+def off_task_match(generated: str, expected: str) -> bool:
+    """Exact-match on the answer TOKEN: `expected` (normalised) must appear as one of the alphanumeric
+    tokens of `generated`. Token-level (not substring) so '7' does not spuriously match '17'. Powers
+    R7's off_task_accuracy — a coherence proxy read as steered-vs-baseline degradation, not absolute."""
+    import re
+    toks = re.findall(r"[a-z0-9]+", generated.lower())
+    e = re.sub(r"[^a-z0-9]+", "", expected.lower())
+    return bool(e) and e in toks
+
+
+def run_offtask(model_name: str, layers: list[int], alphas: list[float], n_options: int = 4,
+                primary: str = "ENG", max_tokens: int = 12) -> dict:
+    """R7: does steering wreck GENERAL capability? At each layer, capture the diff-of-means direction,
+    then greedy-decode a fixed 10-probe off-task set (arithmetic / factual recall / instructions) at
+    each alpha and score exact-match. Reports off_task_accuracy per (layer, alpha) vs the alpha=0
+    baseline — the collateral-coherence cost of the intervention, independent of the survey axis."""
+    alphas = sorted({float(a) for a in alphas} | {0.0})
+    model, tok = A.load_model(model_name)
+    n_layers = len(model.model.layers)
+
+    contest = [si for si in PDS.contestable_items(PDS.load_targets(), primary)
+               if si.public is not None and len(si.item["scale"]["labels"]) == n_options]
+    if len(contest) < 2:
+        raise ValueError(f"need >= 2 contestable {n_options}-option items, found {len(contest)}")
+
+    per_layer = []
+    for li in layers:
+        tap, restore = A.install_tap(model, li)
+        try:
+            vec = A.capture_direction(model, tok, tap, [si.item for si in contest],
+                                      country=A.PERSONA_COUNTRY, year=A.PERSONA_YEAR)
+            rows = []
+            for a in alphas:
+                results = []
+                for pr in OFF_TASK_PROBES:
+                    gen = A.generate_under_tap(model, tok, tap, pr["prompt"], vec, a,
+                                               max_tokens=max_tokens)
+                    results.append({"expected": pr["expected"], "generated": gen,
+                                    "match": off_task_match(gen, pr["expected"])})
+                acc = float(np.mean([r["match"] for r in results]))
+                rows.append({"alpha": a, "off_task_accuracy": acc, "results": results})
+        finally:
+            restore()
+        base_acc = next(r["off_task_accuracy"] for r in rows if r["alpha"] == 0.0)
+        per_layer.append({"layer": li, "direction_norm": float(np.linalg.norm(vec)),
+                          "baseline_accuracy": base_acc, "per_alpha": rows})
+        for r in rows:
+            drop = r["off_task_accuracy"] - base_acc
+            print(f"layer {li:>2} a={r['alpha']:>4g}: off-task acc {r['off_task_accuracy']:.2f} "
+                  f"({drop:+.2f} vs baseline)")
+
+    return {
+        "run": run_meta.run_block(
+            command="python -m alignment.activation_steering_run --offtask",
+            models=[model_name], schema_version=1,
+            extra={"kind": "activation_steering_offtask", "n_layers": n_layers, "layers": layers,
+                   "alphas": alphas, "n_probes": len(OFF_TASK_PROBES), "max_tokens": max_tokens,
+                   "n_options": n_options, "primary": primary,
+                   "persona": f"{A.PERSONA_COUNTRY} {A.PERSONA_YEAR}"}),
+        "per_layer": per_layer,
+    }
+
+
 def run_geometry(model_name: str, layers: list[int], n_options: int = 4,
                  primary: str = "ENG") -> dict:
     """W3 driver: capture PER-ITEM steering arrows at each layer and measure their geometry — pairwise
@@ -557,8 +634,20 @@ def main(argv=None):
                     help="R4: rerun the grid over --seeds with mean +/- bootstrap CI and CI-based verdicts")
     ap.add_argument("--geometry", action="store_true",
                     help="W3: capture per-item arrows and report their cosine geometry (no alpha sweep)")
+    ap.add_argument("--offtask", action="store_true",
+                    help="R7: score a fixed off-task probe set for exact-match under steering vs alpha=0")
     ap.add_argument("--out", type=Path, default=OUT / "activation_steering.json")
     args = ap.parse_args(argv)
+
+    if args.offtask:
+        if args.layers is None:
+            ap.error("--offtask requires explicit --layers (e.g. --layers 11)")
+        result = run_offtask(args.model, args.layers, args.alphas, n_options=args.n_options,
+                             primary=args.primary)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(result, indent=2))
+        print(f"wrote {args.out}")
+        return result
 
     if args.geometry:
         if args.layers is None:

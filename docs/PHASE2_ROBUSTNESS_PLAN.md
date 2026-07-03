@@ -113,7 +113,7 @@ The decisive test. Add to the engine + driver:
   `out/act_steer_{qwen7b,llama8b}.json`. Question: does the layer pattern replicate
   across families?
 
-### R7 — Off-task coherence check  ☐
+### R7 — Off-task coherence check  ☑ (see Loop log 2026-07-03)
 
 - Add a tiny fixed probe set (10 items: arithmetic, factual recall, simple instructions —
   hardcode them; they are not survey items) scored for exact-match under the operating
@@ -345,3 +345,18 @@ same generic effect) and R7 (off-task coherence). W1 (steering-implements-tracki
 to fail for the same reason but is the flagship framing; W4/W5 are moot for a negative result.
 STOP CONDITION (plan): "R1 kills AND W3 explains it → write the negative summary and stop; the human
 writes the paper section." Both are now satisfied — flag for human sign-off before any further compute.
+
+### 2026-07-03 — (loop re-launched by human) R7 off-task coherence → steering has a real capability cost
+
+Ran: `activation_steering_run --offtask --layers 11 --alphas 0 2 4 6 8` → `out/act_steer_offtask_3b
+.json`. Fixed 10-probe off-task set (arithmetic / factual recall / instructions), greedy-decoded
+under the tap, exact-match (token-level) scored vs α=0. Code: `generate_under_tap` (engine, manual
+argmax decode through the tap), driver `OFF_TASK_PROBES` + `off_task_match` + `run_offtask` +
+`--offtask`. +5 tests (211 pass).
+
+off_task_accuracy by dose (layer 11): α0 1.00 · α2 1.00 · α4 0.70 · α6 0.20 · α8 0.00. Baseline is
+perfect (10/10). Arithmetic corrupts first (α4: 17+28→"85", 100−37→"83") while factual recall (Paris,
+Tokyo) survives longest. So: no coherence cost at α≤2 (but R4 showed no representation gain there
+either), a 30% capability hit at α=4 (the originally-claimed operating point), and near-total collapse
+by α≥6. Adds a third damning dimension to the negative — the doses where steering does ANYTHING carry
+severe collateral damage to general capability; there is no free-lunch operating point.

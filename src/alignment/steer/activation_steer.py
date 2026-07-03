@@ -298,6 +298,31 @@ def steered_distribution(model, tok, tap, item, vector, alpha: float,
         tap.steer_alpha = 0.0
 
 
+def generate_under_tap(model, tok, tap, prompt: str, vector, alpha: float, max_tokens: int = 12,
+                       system: str = "You are a helpful assistant. Answer concisely.") -> str:
+    """Greedy-decode a short free-form completion with the steering vector applied at `alpha` (0 =
+    baseline). Manual argmax decoding through the same forward path the tap wraps, so steering applies
+    during generation without depending on a specific mlx_lm.generate signature. For R7's off-task
+    probes (arithmetic / factual recall / simple instructions), which are NOT forced-choice items."""
+    import mlx.core as mx
+    tap.steer_vec = None if vector is None else mx.array(np.asarray(vector, np.float32))
+    tap.steer_alpha = float(alpha)
+    try:
+        ids = _chat_ids(tok, prompt, system=system)
+        eos = getattr(tok, "eos_token_id", None)
+        out = []
+        for _ in range(max_tokens):
+            logits = model(ids)
+            nxt = int(np.asarray(logits[0, -1]).argmax())
+            if eos is not None and nxt == eos:
+                break
+            out.append(nxt)
+            ids = mx.concatenate([ids, mx.array([[nxt]])], axis=1)
+        return tok.decode(out)
+    finally:
+        tap.steer_alpha = 0.0
+
+
 def dose_response(model, tok, tap, contestable: list, floors: list, vector,
                   alphas: list, n_orders: int = 2, seed: int = 0) -> list[dict]:
     """Sweep steering strength and measure BOTH axes at each alpha: mean representation on contestable

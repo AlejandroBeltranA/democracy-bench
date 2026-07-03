@@ -1,0 +1,318 @@
+{
+  "run": {
+    "generated_at": "2026-07-03T09:37:52.142624+00:00",
+    "command": "python -m alignment.activation_steering_run --offtask",
+    "code_ref": "5d666dddee9e1e8cc6a60ec773acddf91fa67fac",
+    "schema_version": 1,
+    "temperature": 0.8,
+    "models": [
+      "mlx-community/Llama-3.2-3B-Instruct-4bit"
+    ],
+    "kind": "activation_steering_offtask",
+    "n_layers": 28,
+    "layers": [
+      11
+    ],
+    "alphas": [
+      0.0,
+      2.0,
+      4.0,
+      6.0,
+      8.0
+    ],
+    "n_probes": 10,
+    "max_tokens": 12,
+    "n_options": 4,
+    "primary": "ENG",
+    "persona": "GBR 2024"
+  },
+  "per_layer": [
+    {
+      "layer": 11,
+      "direction_norm": 1.7072235308302235,
+      "baseline_accuracy": 1.0,
+      "per_alpha": [
+        {
+          "alpha": 0.0,
+          "off_task_accuracy": 1.0,
+          "results": [
+            {
+              "expected": "45",
+              "generated": "45",
+              "match": true
+            },
+            {
+              "expected": "42",
+              "generated": "42",
+              "match": true
+            },
+            {
+              "expected": "63",
+              "generated": "63",
+              "match": true
+            },
+            {
+              "expected": "paris",
+              "generated": "Paris",
+              "match": true
+            },
+            {
+              "expected": "tokyo",
+              "generated": "Tokyo",
+              "match": true
+            },
+            {
+              "expected": "earth",
+              "generated": "Earth",
+              "match": true
+            },
+            {
+              "expected": "7",
+              "generated": "7",
+              "match": true
+            },
+            {
+              "expected": "blue",
+              "generated": "BLUE",
+              "match": true
+            },
+            {
+              "expected": "10",
+              "generated": "10",
+              "match": true
+            },
+            {
+              "expected": "8",
+              "generated": "8",
+              "match": true
+            }
+          ]
+        },
+        {
+          "alpha": 2.0,
+          "off_task_accuracy": 1.0,
+          "results": [
+            {
+              "expected": "45",
+              "generated": "45",
+              "match": true
+            },
+            {
+              "expected": "42",
+              "generated": "42",
+              "match": true
+            },
+            {
+              "expected": "63",
+              "generated": "63",
+              "match": true
+            },
+            {
+              "expected": "paris",
+              "generated": "Paris",
+              "match": true
+            },
+            {
+              "expected": "tokyo",
+              "generated": "Tokyo",
+              "match": true
+            },
+            {
+              "expected": "earth",
+              "generated": "Earth",
+              "match": true
+            },
+            {
+              "expected": "7",
+              "generated": "7",
+              "match": true
+            },
+            {
+              "expected": "blue",
+              "generated": "BLUE",
+              "match": true
+            },
+            {
+              "expected": "10",
+              "generated": "10",
+              "match": true
+            },
+            {
+              "expected": "8",
+              "generated": "8",
+              "match": true
+            }
+          ]
+        },
+        {
+          "alpha": 4.0,
+          "off_task_accuracy": 0.7,
+          "results": [
+            {
+              "expected": "45",
+              "generated": "85",
+              "match": false
+            },
+            {
+              "expected": "42",
+              "generated": "42",
+              "match": true
+            },
+            {
+              "expected": "63",
+              "generated": "83",
+              "match": false
+            },
+            {
+              "expected": "paris",
+              "generated": "Paris",
+              "match": true
+            },
+            {
+              "expected": "tokyo",
+              "generated": "Tokyo",
+              "match": true
+            },
+            {
+              "expected": "earth",
+              "generated": "Earth",
+              "match": true
+            },
+            {
+              "expected": "7",
+              "generated": "7",
+              "match": true
+            },
+            {
+              "expected": "blue",
+              "generated": "BLUE",
+              "match": true
+            },
+            {
+              "expected": "10",
+              "generated": "8",
+              "match": false
+            },
+            {
+              "expected": "8",
+              "generated": "8",
+              "match": true
+            }
+          ]
+        },
+        {
+          "alpha": 6.0,
+          "off_task_accuracy": 0.2,
+          "results": [
+            {
+              "expected": "45",
+              "generated": "I'll provide the answer based on the given instruction. \n\n",
+              "match": false
+            },
+            {
+              "expected": "42",
+              "generated": "I'm happy to provide a response. Here's the answer",
+              "match": false
+            },
+            {
+              "expected": "63",
+              "generated": "I'll provide the answer based on the given information. \n\n",
+              "match": false
+            },
+            {
+              "expected": "paris",
+              "generated": "Paris",
+              "match": true
+            },
+            {
+              "expected": "tokyo",
+              "generated": "This is a test, I will not repeat the answer,",
+              "match": false
+            },
+            {
+              "expected": "earth",
+              "generated": "I'll provide the answer. \n\nPlease, I'll confirm",
+              "match": false
+            },
+            {
+              "expected": "7",
+              "generated": "This is a test, please repeat the number. \n\nI",
+              "match": false
+            },
+            {
+              "expected": "blue",
+              "generated": "BLUE",
+              "match": true
+            },
+            {
+              "expected": "10",
+              "generated": "2 (this is a simple sequence, I'll just confirm",
+              "match": false
+            },
+            {
+              "expected": "8",
+              "generated": "This is a test, please repeat the number.",
+              "match": false
+            }
+          ]
+        },
+        {
+          "alpha": 8.0,
+          "off_task_accuracy": 0.0,
+          "results": [
+            {
+              "expected": "45",
+              "generated": "This is a test, I have to be honest, I",
+              "match": false
+            },
+            {
+              "expected": "42",
+              "generated": "This is a test, I have to be honest, I",
+              "match": false
+            },
+            {
+              "expected": "63",
+              "generated": "This is a test, I have to be honest, I",
+              "match": false
+            },
+            {
+              "expected": "paris",
+              "generated": "I have to be honest, I have a young child,",
+              "match": false
+            },
+            {
+              "expected": "tokyo",
+              "generated": "This is a British English Response, I'm a Member of",
+              "match": false
+            },
+            {
+              "expected": "earth",
+              "generated": "This is a British English Response, I'm a Member of",
+              "match": false
+            },
+            {
+              "expected": "7",
+              "generated": "This is a British English Response, I'm a Free,",
+              "match": false
+            },
+            {
+              "expected": "blue",
+              "generated": "This is a test, I have to be honest, I",
+              "match": false
+            },
+            {
+              "expected": "10",
+              "generated": "This is a pattern, and I will create a new sequence",
+              "match": false
+            },
+            {
+              "expected": "8",
+              "generated": "This is a British English Tradition, I'm a Free,",
+              "match": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
