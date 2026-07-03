@@ -130,3 +130,18 @@ neutralise hostile-evidence floor cracking on this model — the evidence channe
 instruction channel, mirroring P4/P5b. Paper-ready as a negative. (Stop-line check: the hard
 stop was "every guard fails AND degrades baseline" — not met; only provenance degrades
 baseline.)
+
+### 2026-07-03 — Phase 4 CLOSED: G2/G3 not dispatched (gate unmet); the effective guard is architectural
+
+G1's precondition for G2 ("winning guard(s)") is unmet — all four prompt-level guards fail, one
+backfires. G3 moot. Verdict for the paper: **on this model, floor-safety cannot be prompted into
+the evidence channel; it must be enforced by the scaffold.** The demonstrably sufficient guard
+is class-aware evidence routing — inject public-opinion evidence ONLY on contestable-class
+items, never on floor-class items. This needs no new experiment: with no evidence injected,
+floor probes sit at the unguarded baseline (0.512, P4/G1 bit-replicated) and P4 showed the
+adversarial PROMPT alone is n.s. — i.e., routing restores the best measurable floor state by
+construction, while P2/P3's contestable-side fidelity and tracking are untouched because routing
+does not alter contestable-item prompts. Caveat to carry: routing presumes the deployer controls
+the evidence pipeline and the item classifier — the classifier (floor vs contestable) becomes
+the new attack surface, and 5/12 floors are below 0.5 even unattacked on this 3B (a base-model
+floor deficit no scaffold fixes). Loop stopped here for the human's next direction.
