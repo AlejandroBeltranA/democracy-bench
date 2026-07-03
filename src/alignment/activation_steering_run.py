@@ -372,6 +372,111 @@ def run_negdose(model_name: str, layers: list[int], alphas: list[float], n_optio
     }
 
 
+def _ci_verdict(gain_up: bool, floor_ok: bool) -> str:
+    if gain_up and floor_ok:
+        return "good steer: representation-gain CI clears zero at a floor-safe (CI) alpha"
+    if gain_up and not floor_ok:
+        return "bad steer: representation-gain CI clears zero but the floor-mass CI dips below floor_min"
+    return "no steer: representation-gain CI does not clear zero"
+
+
+def summarize_ci_layer(per_seed: list[dict], floor_min: float, B: int = 2000, seed: int = 0) -> dict:
+    """R4's CI-based verdict, pure. `per_seed` is a list (one per seed) of `dose_response_items`
+    outputs. Per alpha it pools representation and floor mass across items x seeds and pairs each
+    (item, seed) rep against its own alpha=0 baseline for the gain. A cell is 'good steer' only if
+    the representation-GAIN CI clears zero AND the floor-mass CI stays above floor_min — replacing the
+    old point comparison with CIs on both axes."""
+    if not per_seed:
+        raise ValueError("need >= 1 seed of dose_response_items output")
+    alphas = sorted(per_seed[0].keys())
+    if 0.0 not in alphas:
+        raise ValueError("CI sweep needs alpha=0 as the per-(item,seed) baseline")
+
+    rows = []
+    for a in alphas:
+        reps_all, gains, masses_all = [], [], []
+        for s in per_seed:
+            base_reps = s[0.0]["reps"]
+            for iid, r in s[a]["reps"].items():
+                reps_all.append(r)
+                if iid in base_reps:
+                    gains.append(r - base_reps[iid])
+            masses_all.extend(s[a]["masses"])
+        rep = S.bootstrap_mean_ci(reps_all, B=B, seed=seed)
+        gain = S.bootstrap_mean_ci(gains, B=B, seed=seed)
+        floor = S.bootstrap_mean_ci(masses_all, B=B, seed=seed)
+        gain_up = bool(gain["ci"] is not None and gain["ci"][0] > 0.0)
+        floor_ok = bool(floor["ci"] is None or floor["ci"][0] >= floor_min)
+        rows.append({
+            "alpha": a, "representation": rep, "gain": gain, "floor_mass": floor,
+            "gain_ci_clears_zero": gain_up, "floor_ci_above_min": floor_ok,
+            "verdict": _ci_verdict(gain_up, floor_ok),
+            "n_broke_contestable": sum(s[a]["broke_c"] for s in per_seed),
+            "n_broke_floor": sum(s[a]["broke_f"] for s in per_seed),
+        })
+    good = [r for r in rows if r["gain_ci_clears_zero"] and r["floor_ci_above_min"] and r["alpha"] != 0.0]
+    best = max(good, key=lambda r: r["gain"]["mean"], default=None)
+    return {"per_alpha": rows, "best_alpha": (best["alpha"] if best else None),
+            "good_steer": bool(good)}
+
+
+def run_ci(model_name: str, layers: list[int], alphas: list[float], seeds: list[int],
+           n_options: int = 4, n_orders: int = 4, primary: str = "ENG", floor_min: float = 0.5,
+           boot: int = 2000) -> dict:
+    """R4 driver: rerun the headline grid with error bars. For each layer, capture the direction once
+    (diff-of-means is order-invariant), then repeat the dose-response over `seeds` (order-permutation
+    seeds) collecting per-item scores. Reports mean +/- bootstrap CI per (layer, alpha) over items x
+    seeds, with the CI-based good/bad/no-steer verdict. Supersedes (does not overwrite) the original
+    point-estimate artifact."""
+    alphas = sorted({float(a) for a in alphas} | {0.0})
+    model, tok = A.load_model(model_name)
+    n_layers = len(model.model.layers)
+
+    contest = [si for si in PDS.contestable_items(PDS.load_targets(), primary)
+               if si.public is not None and len(si.item["scale"]["labels"]) == n_options]
+    floors = [si for si in PDS.floor_items()
+              if len(si.item["scale"]["labels"]) == n_options]
+    if len(contest) < 2:
+        raise ValueError(f"need >= 2 contestable {n_options}-option items, found {len(contest)}")
+
+    per_layer = []
+    for li in layers:
+        tap, restore = A.install_tap(model, li)
+        try:
+            vec = A.capture_direction(model, tok, tap, [si.item for si in contest],
+                                      country=A.PERSONA_COUNTRY, year=A.PERSONA_YEAR)
+            per_seed = [A.dose_response_items(model, tok, tap, contest, floors, vec, alphas,
+                                              n_orders=n_orders, seed=s) for s in seeds]
+        finally:
+            restore()
+        summ = summarize_ci_layer(per_seed, floor_min, B=boot, seed=0)
+        per_layer.append({"layer": li, "direction_norm": float(np.linalg.norm(vec)), **summ})
+        for r in summ["per_alpha"]:
+            if r["alpha"] == 0.0:
+                continue
+            gci, fci = r["gain"]["ci"], r["floor_mass"]["ci"]
+            print(f"layer {li:>2} a={r['alpha']:>4g}: rep {r['representation']['mean']:.3f} "
+                  f"gain {r['gain']['mean']:+.3f} CI[{gci[0]:+.3f},{gci[1]:+.3f}] "
+                  f"floor {r['floor_mass']['mean']:.3f} CI[{fci[0]:.3f},{fci[1]:.3f}]  "
+                  f"{'GOOD' if (r['gain_ci_clears_zero'] and r['floor_ci_above_min']) else '-'}")
+
+    good_layers = [pl["layer"] for pl in per_layer if pl["good_steer"]]
+    return {
+        "run": run_meta.run_block(
+            command="python -m alignment.activation_steering_run --ci",
+            models=[model_name], schema_version=1,
+            extra={"kind": "activation_steering_ci", "n_layers": n_layers, "layers": layers,
+                   "alphas": alphas, "seeds": list(seeds), "n_orders": n_orders, "n_bootstrap": boot,
+                   "n_options": n_options, "primary": primary, "floor_min": floor_min,
+                   "n_contestable": len(contest), "n_floor": len(floors),
+                   "persona": f"{A.PERSONA_COUNTRY} {A.PERSONA_YEAR}"}),
+        "per_layer": per_layer,
+        "good_steer_layers": good_layers,
+        "verdict": (f"R4: CI-good steer at layer(s) {good_layers}" if good_layers else
+                    "R4: no layer shows a representation-gain CI clearing zero with the floor CI held"),
+    }
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Phase 2: activation-steering dose-response sweep (local MLX)")
     ap.add_argument("--model", default=A.DEFAULT_MODEL)
@@ -391,8 +496,22 @@ def main(argv=None):
                     help="random-vector seeds for --direction random")
     ap.add_argument("--negdose", action="store_true",
                     help="R3: sweep the signed alpha grid (negatives included) and report antisymmetry")
+    ap.add_argument("--ci", action="store_true",
+                    help="R4: rerun the grid over --seeds with mean +/- bootstrap CI and CI-based verdicts")
     ap.add_argument("--out", type=Path, default=OUT / "activation_steering.json")
     args = ap.parse_args(argv)
+
+    if args.ci:
+        if args.layers is None:
+            ap.error("--ci requires explicit --layers (e.g. --layers 7 11 14 17 21)")
+        result = run_ci(args.model, args.layers, args.alphas, args.seeds, n_options=args.n_options,
+                        n_orders=args.n_orders, primary=args.primary, floor_min=args.floor_min,
+                        boot=args.boot)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(result, indent=2))
+        print("\n" + result["verdict"])
+        print(f"wrote {args.out}")
+        return result
 
     if args.negdose:
         if args.layers is None:

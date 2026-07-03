@@ -91,7 +91,7 @@ The decisive test. Add to the engine + driver:
 - Run at layer 11 → `out/act_steer_negalpha_3b.json`. No code change beyond accepting
   negative alphas (verify `dose_response` doesn't clamp or abs() them; add a test).
 
-### R4 — Error bars on the headline curve  ☐
+### R4 — Error bars on the headline curve  ☑ (see Loop log 2026-07-03 — CONTRADICTION flagged)
 
 - Add `--seeds N` (repeat capture+eval with different order/permutation seeds) and report
   mean ± bootstrap CI per (layer, α) cell over items × seeds.
@@ -273,3 +273,29 @@ only above-random behaviour (R2, α=4) is a same-sided perturbation bump (R3), i
 at small doses (R3), and it does not generalise across items (R1). Phase 2 headline is a clean
 NEGATIVE. Remaining: R4 (CIs on the published grid — makes the perturbation-valley story rigorous
 with error bars across all 5 layers), then W3 geometry (the mechanism section). R7/R8 optional.
+
+### 2026-07-03 — R4 error bars → **CONTRADICTION: the in-sample signal moved to layers 17/21**
+
+Ran: `activation_steering_run --ci --layers 7 11 14 17 21 --alphas 0 1 2 4 6 8 --seeds 0 1 2
+--n-orders 4` (in-sample, ~57 min, 2000-boot CIs over items×seeds) → `out/act_steer_ci_3b.json`.
+Code: `dose_response_items` (engine, per-item scores), `summarize_ci_layer` + `run_ci` + `--ci`;
+CI-based verdict (gain CI clears zero AND floor CI ≥ floor_min). +6 tests (198 pass).
+
+In-sample representation GAIN vs α=0 (mean, CI), floor mass (mean, CI):
+- L7:  all cells gain ≤0 or straddling; floors crack at α4/6. no good cell.
+- L11: α4 gain −0.001 CI[−0.044,+0.042] — **the published 0.692→0.752 headline EVAPORATES under
+       error bars**; every L11 cell straddles or is negative. no good cell.
+- L14: α4 gain +0.046 CI[+0.013,+0.080] clears zero BUT floor CI[0.483,0.568] dips <0.5 → bad steer.
+- L17: α1/2/4 GOOD — small gains (~+0.03) that clear zero WITH floors held (α2: +0.030
+       CI[+0.007,+0.052], floor CI[0.538,0.664]).
+- L21: α1 GOOD — +0.032 CI[+0.008,+0.056], floor CI[0.537,0.665].
+
+CONTRADICTION vs the plan's premises: (1) the original headline layer 11 shows NO effect under
+proper error bars; (2) late layers 17/21 — described in the Context as "bad steer, floors eroded" —
+are the ONLY layers with a floor-safe in-sample gain at low α. So the in-sample signal LIVES AT
+17/21, exactly the layers R1's held-out test NEVER covered (R1 ran only 11/14). Per the per-iteration
+protocol I am NOT proceeding to W3 yet: the decisive held-out test has not been run where the
+(revised) in-sample signal actually is. NEXT (uses existing --holdout machinery, no new features):
+held-out capture at layers 17/21, α ∈ {1,2,4}. If held-out gain CIs still fail → clean negative is
+airtight across all candidate layers. If they clear zero → Phase 2 has a small, late-layer, floor-
+safe REAL result and the headline changes. Do not write the negative summary until this is resolved.

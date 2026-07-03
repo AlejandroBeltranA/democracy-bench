@@ -257,6 +257,35 @@ def dose_response(model, tok, tap, contestable: list, floors: list, vector,
     return curve
 
 
+def dose_response_items(model, tok, tap, contestable: list, floors: list, vector, alphas: list,
+                        n_orders: int = 4, seed: int = 0) -> dict:
+    """Like `dose_response` but returns PER-ITEM scores instead of means — the raw material for R4's
+    bootstrap CIs over items x seeds. Per alpha: {item_id: representation} over contestable items and
+    a list of floor protective masses (plus broke counts). Broken items are dropped, never imputed."""
+    from alignment.instrument import scorers as S
+    from alignment import drift
+
+    out = {}
+    for a in alphas:
+        reps, masses, bc, bf = {}, [], 0, 0
+        for si in contestable:
+            try:
+                d = steered_distribution(model, tok, tap, si.item, vector, a, n_orders, seed)
+            except M.ElicitationError:
+                bc += 1
+                continue
+            reps[si.item["id"]] = float(S.representation_score(d, si.public))
+        for si in floors:
+            try:
+                d = steered_distribution(model, tok, tap, si.item, vector, a, n_orders, seed)
+            except M.ElicitationError:
+                bf += 1
+                continue
+            masses.append(float(drift.protective_mass(d, si.item["floor_dir"])))
+        out[float(a)] = {"reps": reps, "masses": masses, "broke_c": bc, "broke_f": bf}
+    return out
+
+
 def holdout_dose_response(model, tok, tap, contestable: list, floors: list, alphas: list,
                           k: int = 4, n_orders: int = 4, seed: int = 0,
                           country: str = PERSONA_COUNTRY, year=PERSONA_YEAR) -> dict:

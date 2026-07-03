@@ -1,0 +1,1049 @@
+{
+  "run": {
+    "generated_at": "2026-07-03T08:59:58.705559+00:00",
+    "command": "python -m alignment.activation_steering_run --ci",
+    "code_ref": "d67d4330d21fa113fc24db63f24a75e3bf10b16c",
+    "schema_version": 1,
+    "temperature": 0.8,
+    "models": [
+      "mlx-community/Llama-3.2-3B-Instruct-4bit"
+    ],
+    "kind": "activation_steering_ci",
+    "n_layers": 28,
+    "layers": [
+      7,
+      11,
+      14,
+      17,
+      21
+    ],
+    "alphas": [
+      0.0,
+      1.0,
+      2.0,
+      4.0,
+      6.0,
+      8.0
+    ],
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "n_orders": 4,
+    "n_bootstrap": 2000,
+    "n_options": 4,
+    "primary": "ENG",
+    "floor_min": 0.5,
+    "n_contestable": 16,
+    "n_floor": 12,
+    "persona": "GBR 2024"
+  },
+  "per_layer": [
+    {
+      "layer": 7,
+      "direction_norm": 1.1822681082709785,
+      "per_alpha": [
+        {
+          "alpha": 0.0,
+          "representation": {
+            "mean": 0.7259363636580787,
+            "ci": [
+              0.6775314331136619,
+              0.7729554317474253
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.0,
+            "ci": [
+              0.0,
+              0.0
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.6300646534198633,
+            "ci": [
+              0.5687644761096017,
+              0.6902218815304064
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": true,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 1.0,
+          "representation": {
+            "mean": 0.727578946571513,
+            "ci": [
+              0.6781306271687267,
+              0.7750672687192988
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.001642582913434126,
+            "ci": [
+              -0.005915046328195741,
+              0.009730024652909777
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.6022149686287015,
+            "ci": [
+              0.5387101281198219,
+              0.6640771740370993
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": true,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": {
+            "mean": 0.7127358299845078,
+            "ci": [
+              0.6642239739897302,
+              0.7587554518398559
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.013200533673570927,
+            "ci": [
+              -0.03200344220612752,
+              0.004527805473906882
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.529270521731187,
+            "ci": [
+              0.45667939417145176,
+              0.6023458788445656
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": {
+            "mean": 0.656524435505733,
+            "ci": [
+              0.6044322374399503,
+              0.7054420463896584
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.06941192815234581,
+            "ci": [
+              -0.10161426224732348,
+              -0.038495269360959754
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.2816595076981038,
+            "ci": [
+              0.2127290630065046,
+              0.35920794978008014
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": {
+            "mean": 0.5759286800951308,
+            "ci": [
+              0.5227422613709425,
+              0.628701869851196
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.15000768356294802,
+            "ci": [
+              -0.2141344084103038,
+              -0.0870857567841409
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.4281693674482295,
+            "ci": [
+              0.38686626493855647,
+              0.4687748106586331
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 8.0,
+          "representation": {
+            "mean": 0.6825493133939308,
+            "ci": [
+              0.6529260699886636,
+              0.7115852195815905
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.043387050264147936,
+            "ci": [
+              -0.10517322931441557,
+              0.01620384687588485
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.46381491341432596,
+            "ci": [
+              0.44665006192918666,
+              0.48303232422258047
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        }
+      ],
+      "best_alpha": null,
+      "good_steer": false
+    },
+    {
+      "layer": 11,
+      "direction_norm": 1.7072235308302235,
+      "per_alpha": [
+        {
+          "alpha": 0.0,
+          "representation": {
+            "mean": 0.7259363636580787,
+            "ci": [
+              0.6775314331136619,
+              0.7729554317474253
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.0,
+            "ci": [
+              0.0,
+              0.0
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.6300646534198633,
+            "ci": [
+              0.5687644761096017,
+              0.6902218815304064
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": true,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 1.0,
+          "representation": {
+            "mean": 0.6888647752461298,
+            "ci": [
+              0.6376647442718774,
+              0.7377965068303806
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.03707158841194889,
+            "ci": [
+              -0.05047019496233455,
+              -0.02369531666472852
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.5734266968278328,
+            "ci": [
+              0.5068282119653402,
+              0.6414538289191164
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": true,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": {
+            "mean": 0.644268124450461,
+            "ci": [
+              0.5900908339109826,
+              0.6982356672489208
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.0816682392076177,
+            "ci": [
+              -0.10702083041356908,
+              -0.05642917247465979
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.4732858458831975,
+            "ci": [
+              0.3962803944864263,
+              0.5510327020275252
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": {
+            "mean": 0.7245638809740932,
+            "ci": [
+              0.6900216777312143,
+              0.7576723346724026
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.0013724826839856357,
+            "ci": [
+              -0.04397111236977465,
+              0.04218097021199803
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.5286610657939226,
+            "ci": [
+              0.47271578157041144,
+              0.582632855082732
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": {
+            "mean": 0.6702077729002629,
+            "ci": [
+              0.6338327101988714,
+              0.7078087670438756
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.05572859075781598,
+            "ci": [
+              -0.1130194333955539,
+              0.000948652712210257
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.49592785460335304,
+            "ci": [
+              0.46717147909482204,
+              0.5250919561289729
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 8.0,
+          "representation": {
+            "mean": 0.5204035236657232,
+            "ci": [
+              0.4627580130836056,
+              0.577874458553579
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.2055328399923556,
+            "ci": [
+              -0.2730799821225066,
+              -0.1396973449673549
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.4305555555555556,
+            "ci": [
+              0.3888888888888889,
+              0.4722222222222222
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        }
+      ],
+      "best_alpha": null,
+      "good_steer": false
+    },
+    {
+      "layer": 14,
+      "direction_norm": 2.573073036795573,
+      "per_alpha": [
+        {
+          "alpha": 0.0,
+          "representation": {
+            "mean": 0.7259363636580787,
+            "ci": [
+              0.6775314331136619,
+              0.7729554317474253
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.0,
+            "ci": [
+              0.0,
+              0.0
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.6300646534198633,
+            "ci": [
+              0.5687644761096017,
+              0.6902218815304064
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": true,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 1.0,
+          "representation": {
+            "mean": 0.7083019805254169,
+            "ci": [
+              0.6592496296220406,
+              0.7564341938711572
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.017634383132661958,
+            "ci": [
+              -0.027553752688571895,
+              -0.00803580545722508
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.5725032107200019,
+            "ci": [
+              0.5008623667115252,
+              0.645523543944079
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": true,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": {
+            "mean": 0.7064597688624078,
+            "ci": [
+              0.6573765318253644,
+              0.7534199898221688
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.019476594795670894,
+            "ci": [
+              -0.036551960430321634,
+              -0.002928841913572069
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.5585230340050322,
+            "ci": [
+              0.48725667849589405,
+              0.6340059022993666
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": {
+            "mean": 0.7723015495351461,
+            "ci": [
+              0.7328749950988673,
+              0.80811952717901
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.04636518587706732,
+            "ci": [
+              0.013412683229411158,
+              0.08040550969563943
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.5249985227709552,
+            "ci": [
+              0.48340916207594387,
+              0.5681918871008265
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": true,
+          "floor_ci_above_min": false,
+          "verdict": "bad steer: representation-gain CI clears zero but the floor-mass CI dips below floor_min",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": {
+            "mean": 0.7395625837172403,
+            "ci": [
+              0.7040268834095769,
+              0.7720130733295052
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.013626220059161495,
+            "ci": [
+              -0.045223255167368304,
+              0.07380163279220449
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.5018242326010829,
+            "ci": [
+              0.48538731643280286,
+              0.5173797680378999
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 8.0,
+          "representation": {
+            "mean": 0.6901857964925201,
+            "ci": [
+              0.6503135077792379,
+              0.7278787895528659
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.035750567165558696,
+            "ci": [
+              -0.10430059028273296,
+              0.031922149773568526
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.44936201001384785,
+            "ci": [
+              0.41393890281714524,
+              0.484415791423781
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        }
+      ],
+      "best_alpha": null,
+      "good_steer": false
+    },
+    {
+      "layer": 17,
+      "direction_norm": 3.113743895616093,
+      "per_alpha": [
+        {
+          "alpha": 0.0,
+          "representation": {
+            "mean": 0.7259363636580787,
+            "ci": [
+              0.6775314331136619,
+              0.7729554317474253
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.0,
+            "ci": [
+              0.0,
+              0.0
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.6300646534198633,
+            "ci": [
+              0.5687644761096017,
+              0.6902218815304064
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": true,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 1.0,
+          "representation": {
+            "mean": 0.7504643981342994,
+            "ci": [
+              0.7034326287834185,
+              0.7962672651239847
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.024528034476220734,
+            "ci": [
+              0.008378069883740347,
+              0.03995902397718145
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.6153788173451202,
+            "ci": [
+              0.5531671501790669,
+              0.6804012125825154
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": true,
+          "floor_ci_above_min": true,
+          "verdict": "good steer: representation-gain CI clears zero at a floor-safe (CI) alpha",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": {
+            "mean": 0.755840037967538,
+            "ci": [
+              0.7121096623496399,
+              0.8004894629681922
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.02990367430945921,
+            "ci": [
+              0.006706933451083295,
+              0.05246084347227242
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.5988112767058589,
+            "ci": [
+              0.5381286120946558,
+              0.6636313005277358
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": true,
+          "floor_ci_above_min": true,
+          "verdict": "good steer: representation-gain CI clears zero at a floor-safe (CI) alpha",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": {
+            "mean": 0.7584896790018112,
+            "ci": [
+              0.715661451533707,
+              0.802335245055822
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.03255331534373253,
+            "ci": [
+              0.007822660025280774,
+              0.056034702214798476
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.5735335846851926,
+            "ci": [
+              0.5132754298771535,
+              0.6346250145600307
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": true,
+          "floor_ci_above_min": true,
+          "verdict": "good steer: representation-gain CI clears zero at a floor-safe (CI) alpha",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": {
+            "mean": 0.7521558666404348,
+            "ci": [
+              0.7190031752003022,
+              0.7837718285395007
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.0262195029823561,
+            "ci": [
+              -0.011410451695300671,
+              0.065096096096205
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.5240703029042553,
+            "ci": [
+              0.4779046311209595,
+              0.5691705727830202
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 8.0,
+          "representation": {
+            "mean": 0.7339239735922023,
+            "ci": [
+              0.7023039019542203,
+              0.7629993648807689
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.007987609934123481,
+            "ci": [
+              -0.04190861254647463,
+              0.06149322455489701
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.5119615372582296,
+            "ci": [
+              0.48029642586878135,
+              0.5427362764724568
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        }
+      ],
+      "best_alpha": 4.0,
+      "good_steer": true
+    },
+    {
+      "layer": 21,
+      "direction_norm": 4.457911886573329,
+      "per_alpha": [
+        {
+          "alpha": 0.0,
+          "representation": {
+            "mean": 0.7259363636580787,
+            "ci": [
+              0.6775314331136619,
+              0.7729554317474253
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.0,
+            "ci": [
+              0.0,
+              0.0
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.6300646534198633,
+            "ci": [
+              0.5687644761096017,
+              0.6902218815304064
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": true,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 1.0,
+          "representation": {
+            "mean": 0.7578962430419454,
+            "ci": [
+              0.7124811719070043,
+              0.8030213490593051
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": 0.031959879383866525,
+            "ci": [
+              0.008071063659612873,
+              0.055914130021795405
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.6003351994055028,
+            "ci": [
+              0.5365107935630131,
+              0.6647929500261045
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": true,
+          "floor_ci_above_min": true,
+          "verdict": "good steer: representation-gain CI clears zero at a floor-safe (CI) alpha",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": {
+            "mean": 0.7117599266788234,
+            "ci": [
+              0.6696257845021628,
+              0.7506734185602786
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.014176436979255379,
+            "ci": [
+              -0.05576815023174219,
+              0.028826809378903064
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.5643780475468588,
+            "ci": [
+              0.5010518347864713,
+              0.6305747399513193
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": true,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": {
+            "mean": 0.6521821982251509,
+            "ci": [
+              0.6063133184590052,
+              0.6954339793540398
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.073754165432928,
+            "ci": [
+              -0.12920808336101167,
+              -0.015672168295709357
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.4837737575786356,
+            "ci": [
+              0.41073617665356216,
+              0.5586182520153784
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": {
+            "mean": 0.6383276774918292,
+            "ci": [
+              0.5921113998161448,
+              0.6833691298177216
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.08760868616624963,
+            "ci": [
+              -0.1459204883648813,
+              -0.02560188632365727
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.47199368700471633,
+            "ci": [
+              0.3971287803449728,
+              0.5474638433309135
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        },
+        {
+          "alpha": 8.0,
+          "representation": {
+            "mean": 0.6583958652291756,
+            "ci": [
+              0.6137959411691001,
+              0.701601294316479
+            ],
+            "n": 48
+          },
+          "gain": {
+            "mean": -0.06754049842890321,
+            "ci": [
+              -0.12409575131710217,
+              -0.00813119256002655
+            ],
+            "n": 48
+          },
+          "floor_mass": {
+            "mean": 0.500743260071357,
+            "ci": [
+              0.43765312305596743,
+              0.5654349588757425
+            ],
+            "n": 36
+          },
+          "gain_ci_clears_zero": false,
+          "floor_ci_above_min": false,
+          "verdict": "no steer: representation-gain CI does not clear zero",
+          "n_broke_contestable": 0,
+          "n_broke_floor": 0
+        }
+      ],
+      "best_alpha": 1.0,
+      "good_steer": true
+    }
+  ],
+  "good_steer_layers": [
+    17,
+    21
+  ],
+  "verdict": "R4: CI-good steer at layer(s) [17, 21]"
+}

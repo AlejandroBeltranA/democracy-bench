@@ -332,3 +332,72 @@ def test_antisymmetry_preserves_negative_alpha_sign_no_abs():
     p = R.antisymmetry_report(curve)["pairs"][0]
     assert p["gain_neg"] != p["gain_pos"]                    # sign-distinct, not abs-folded
     assert p["gain_neg"] < 0 < p["gain_pos"]
+
+
+# ---- R4 error bars: CI-based per-(layer, alpha) verdict --------------------------------
+
+def _seed_items(alpha_to_reps, alpha_to_masses):
+    """A dose_response_items-shaped dict for one seed."""
+    return {float(a): {"reps": dict(reps), "masses": list(alpha_to_masses[a]),
+                       "broke_c": 0, "broke_f": 0}
+            for a, reps in alpha_to_reps.items()}
+
+
+def test_ci_layer_good_steer_when_gain_and_floor_cis_hold():
+    base = {f"i{j}": 0.50 for j in range(8)}
+    up = {f"i{j}": 0.66 for j in range(8)}                    # +0.16 every item, tight -> gain CI>0
+    seed = _seed_items({0.0: base, 4.0: up},
+                       {0.0: [0.8] * 6, 4.0: [0.75] * 6})       # floor CI well above 0.5
+    summ = R.summarize_ci_layer([seed, seed], floor_min=0.5, B=2000, seed=0)
+    row = [r for r in summ["per_alpha"] if r["alpha"] == 4.0][0]
+    assert row["gain_ci_clears_zero"] is True
+    assert row["floor_ci_above_min"] is True
+    assert "good steer" in row["verdict"]
+    assert summ["good_steer"] is True
+    assert summ["best_alpha"] == 4.0
+
+
+def test_ci_layer_bad_steer_when_floor_ci_dips():
+    base = {f"i{j}": 0.50 for j in range(8)}
+    up = {f"i{j}": 0.70 for j in range(8)}
+    seed = _seed_items({0.0: base, 4.0: up},
+                       {0.0: [0.8] * 6, 4.0: [0.30] * 6})       # floor CI below 0.5
+    summ = R.summarize_ci_layer([seed], floor_min=0.5, B=2000, seed=0)
+    row = [r for r in summ["per_alpha"] if r["alpha"] == 4.0][0]
+    assert row["gain_ci_clears_zero"] is True
+    assert row["floor_ci_above_min"] is False
+    assert "bad steer" in row["verdict"]
+    assert summ["good_steer"] is False
+
+
+def test_ci_layer_no_steer_when_gain_straddles_zero():
+    base = {f"i{j}": 0.50 for j in range(8)}
+    noisy = {f"i{j}": 0.50 + (0.2 if j % 2 else -0.2) for j in range(8)}   # mean ~0
+    seed = _seed_items({0.0: base, 4.0: noisy}, {0.0: [0.8] * 6, 4.0: [0.8] * 6})
+    summ = R.summarize_ci_layer([seed], floor_min=0.5, B=2000, seed=0)
+    row = [r for r in summ["per_alpha"] if r["alpha"] == 4.0][0]
+    assert row["gain_ci_clears_zero"] is False
+    assert "no steer" in row["verdict"]
+
+
+def test_ci_layer_pools_gain_over_items_and_seeds_paired_to_baseline():
+    # two seeds, gain is +0.10 for every (item, seed) -> pooled gain mean 0.10, n = items*seeds
+    base = {"a": 0.40, "b": 0.60}
+    up = {"a": 0.50, "b": 0.70}
+    s1 = _seed_items({0.0: base, 2.0: up}, {0.0: [0.8], 2.0: [0.8]})
+    s2 = _seed_items({0.0: base, 2.0: up}, {0.0: [0.8], 2.0: [0.8]})
+    summ = R.summarize_ci_layer([s1, s2], floor_min=0.5, B=1000, seed=0)
+    row = [r for r in summ["per_alpha"] if r["alpha"] == 2.0][0]
+    assert row["gain"]["mean"] == pytest.approx(0.10)
+    assert row["gain"]["n"] == 4                              # 2 items x 2 seeds, paired to baseline
+
+
+def test_ci_layer_requires_baseline_alpha():
+    seed = _seed_items({2.0: {"a": 0.6}}, {2.0: [0.8]})
+    with pytest.raises(ValueError):
+        R.summarize_ci_layer([seed], floor_min=0.5, B=100, seed=0)
+
+
+def test_ci_layer_requires_at_least_one_seed():
+    with pytest.raises(ValueError):
+        R.summarize_ci_layer([], floor_min=0.5, B=100, seed=0)
