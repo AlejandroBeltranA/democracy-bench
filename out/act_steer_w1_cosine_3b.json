@@ -1,0 +1,62 @@
+{
+  "run": {
+    "generated_at": "2026-07-03T13:13:48.999582+00:00",
+    "command": "python -m alignment.activation_steering_run --w1-cosine",
+    "code_ref": "af32f356b614706bbf28e7285248bc81ab6bf849",
+    "schema_version": 1,
+    "temperature": 0.8,
+    "models": [
+      "mlx-community/Llama-3.2-3B-Instruct-4bit"
+    ],
+    "kind": "activation_steering_w1_cosine",
+    "n_layers": 28,
+    "layers": [
+      11,
+      7,
+      14
+    ],
+    "n_options": 4,
+    "primary": "ENG",
+    "year_a": 2022,
+    "year_b": 2024,
+    "n_contestable": 16,
+    "persona_2022": "You are simulating public opinion. Answer the following survey question the way the median adult in England in 2022 would most typically answer it, reflecting that population's central tendency at that time \u2014 not your own assistant view.",
+    "persona_2024": "You are simulating public opinion. Answer the following survey question the way the median adult in England in 2024 would most typically answer it, reflecting that population's central tendency at that time \u2014 not your own assistant view.",
+    "default_persona": "GBR 2024",
+    "cosine_kill_threshold": 0.95
+  },
+  "per_layer": [
+    {
+      "layer": 11,
+      "cosine_2022_2024": 0.9956277477543146,
+      "norm_2022": 1.7024364588449956,
+      "norm_2024": 1.706056843004138,
+      "norm_default_uk2024": 1.7072235308302235,
+      "cosine_2022_to_default": 0.9935463908015721,
+      "cosine_2024_to_default": 0.9981167054180196,
+      "kills_tracking": true
+    },
+    {
+      "layer": 7,
+      "cosine_2022_2024": 0.9942966426718278,
+      "norm_2022": 1.1787349820963835,
+      "norm_2024": 1.184986126961233,
+      "norm_default_uk2024": 1.1822681082709785,
+      "cosine_2022_to_default": 0.9920151489021743,
+      "cosine_2024_to_default": 0.9979079332782526,
+      "kills_tracking": true
+    },
+    {
+      "layer": 14,
+      "cosine_2022_2024": 0.9899204590702098,
+      "norm_2022": 2.559208630287128,
+      "norm_2024": 2.542623799566338,
+      "norm_default_uk2024": 2.573073036795573,
+      "cosine_2022_to_default": 0.9856916603051619,
+      "cosine_2024_to_default": 0.9953120654985429,
+      "kills_tracking": true
+    }
+  ],
+  "all_layers_kill_tracking": true,
+  "verdict": "W1 KILL: 2022 and 2024 persona directions are cos >= 0.95 at every layer -> steering cannot implement 2022->2024 tracking by construction (steered@2022 ~ steered@2024)"
+}

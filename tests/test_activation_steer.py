@@ -506,3 +506,50 @@ def test_control_persona_is_irrelevant_and_distinct():
     assert ctrl and ctrl != real                              # a distinct persona string
     assert "1850" in ctrl and "farmer" in ctrl                # clearly irrelevant to UK-2024 opinion
     assert "2024" not in ctrl and "great britain" not in ctrl
+
+
+# ---- P0 / W1 cosine kill-check: cosine helper -----------------------------------------
+
+def test_cosine_identical_vectors_is_one():
+    v = np.array([1.0, 2.0, 3.0])
+    assert R.cosine(v, v) == pytest.approx(1.0)
+    assert R.cosine(v, 5.0 * v) == pytest.approx(1.0)         # scale-invariant
+
+
+def test_cosine_orthogonal_and_antiparallel():
+    assert R.cosine(np.array([1.0, 0.0]), np.array([0.0, 1.0])) == pytest.approx(0.0)
+    assert R.cosine(np.array([1.0, 0.0]), np.array([-1.0, 0.0])) == pytest.approx(-1.0)
+
+
+def test_cosine_zero_vector_is_zero_not_nan():
+    c = R.cosine(np.array([0.0, 0.0]), np.array([1.0, 1.0]))
+    assert c == pytest.approx(0.0)
+    assert not np.isnan(c)
+
+
+def test_cosine_matches_manual_value():
+    u, v = np.array([1.0, 0.0]), np.array([1.0, 1.0])
+    assert R.cosine(u, v) == pytest.approx(1.0 / np.sqrt(2))
+
+
+def test_cosine_rejects_mismatched_shapes():
+    with pytest.raises(ValueError):
+        R.cosine(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0]))
+
+
+# ---- P0 / W1 cosine kill-check: year-variant persona ----------------------------------
+
+def test_w1_persona_differs_only_in_year_token():
+    p22, p24 = R.w1_persona(2022), R.w1_persona(2024)
+    assert "2022" in p22 and "2024" not in p22
+    assert "2024" in p24 and "2022" not in p24
+    assert p22.replace("2022", "YEAR") == p24.replace("2024", "YEAR")   # identical but for the year
+
+
+def test_w1_persona_on_house_template():
+    from alignment.steer import tier1_prompt as T1
+    p = R.w1_persona(2024)
+    # same opening as tier1_prompt.persona / CONTROL_PERSONA, England-scoped to match the ENG primary
+    assert p.startswith("You are simulating public opinion.")
+    assert "median adult in England" in p
+    assert T1.persona("GBR", 2024).startswith("You are simulating public opinion.")

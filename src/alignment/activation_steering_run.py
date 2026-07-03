@@ -683,6 +683,103 @@ def run_geometry(model_name: str, layers: list[int], n_options: int = 4,
     }
 
 
+def cosine(u: np.ndarray, v: np.ndarray) -> float:
+    """Cosine similarity of two 1-D vectors; 0.0 if either is the zero vector (not NaN). W1's core
+    number: if the 2022-persona and 2024-persona steering directions are near-parallel (cos ~ 1),
+    then steered@2022 ~ steered@2024 by construction, so a constant activation tap cannot move the
+    model along the real 2022->2024 public shift regardless of dose — tracking elasticity ~ 0."""
+    u = np.asarray(u, float).ravel()
+    v = np.asarray(v, float).ravel()
+    if u.shape != v.shape:
+        raise ValueError(f"need matching 1-D vectors, got {u.shape} vs {v.shape}")
+    nu, nv = float(np.linalg.norm(u)), float(np.linalg.norm(v))
+    if nu == 0.0 or nv == 0.0:
+        return 0.0
+    return float(np.dot(u, v) / (nu * nv))
+
+
+def w1_persona(year: int | str) -> str:
+    """Year-variant of the median-England-respondent persona, on the exact `tier1_prompt.persona`
+    template (and R8's CONTROL_PERSONA template) so the 2022 and 2024 directions differ ONLY in the
+    year token. 'England' matches the ENG primary the whole steering battery scores against."""
+    return (
+        f"You are simulating public opinion. Answer the following survey question the way "
+        f"the median adult in England in {year} would most typically answer it, reflecting "
+        f"that population's central tendency at that time — not your own assistant view."
+    )
+
+
+def run_w1_cosine(model_name: str, layers: list[int], n_options: int = 4, primary: str = "ENG",
+                  year_a: int = 2022, year_b: int = 2024) -> dict:
+    """P0 / W1 kill-check: capture the median-England-respondent steering direction for `year_a` and
+    `year_b` (via `capture_direction(persona_text=...)`) at each layer and report their cosine, each
+    direction's norm, and each direction's cosine to the EXISTING UK-2024 default-persona direction
+    (`tier1_prompt.persona('GBR', 2024)` — the arrow every prior steering run used). Given R8 (an
+    1850 farmer already sits 0.852 cos-parallel to the real direction), two near-identical year
+    personas are expected at cos ~ 1.0, i.e. steering cannot implement 2022->2024 tracking by
+    construction. Cheap: two forward passes per item per (layer, persona), no alpha sweep."""
+    model, tok = A.load_model(model_name)
+    n_layers = len(model.model.layers)
+
+    contest = [si for si in PDS.contestable_items(PDS.load_targets(), primary)
+               if si.public is not None and len(si.item["scale"]["labels"]) == n_options]
+    if len(contest) < 2:
+        raise ValueError(f"need >= 2 contestable {n_options}-option items, found {len(contest)}")
+    items = [si.item for si in contest]
+
+    persona_a, persona_b = w1_persona(year_a), w1_persona(year_b)
+
+    per_layer = []
+    for li in layers:
+        tap, restore = A.install_tap(model, li)
+        try:
+            vec_a = A.capture_direction(model, tok, tap, items, persona_text=persona_a)
+            vec_b = A.capture_direction(model, tok, tap, items, persona_text=persona_b)
+            # the arrow every prior steering run used: default vs median-Great-Britain-2024 persona
+            vec_default = A.capture_direction(model, tok, tap, items,
+                                              country=A.PERSONA_COUNTRY, year=A.PERSONA_YEAR)
+        finally:
+            restore()
+        na, nb, nd = (float(np.linalg.norm(vec_a)), float(np.linalg.norm(vec_b)),
+                      float(np.linalg.norm(vec_default)))
+        cos_ab = cosine(vec_a, vec_b)
+        per_layer.append({
+            "layer": li,
+            "cosine_2022_2024": cos_ab,
+            "norm_2022": na, "norm_2024": nb, "norm_default_uk2024": nd,
+            "cosine_2022_to_default": cosine(vec_a, vec_default),
+            "cosine_2024_to_default": cosine(vec_b, vec_default),
+            "kills_tracking": bool(cos_ab >= 0.95),
+        })
+        pl = per_layer[-1]
+        print(f"layer {li:>2}: cos(2022,2024)={cos_ab:+.4f}  "
+              f"norms 2022={na:.3f} 2024={nb:.3f}  "
+              f"cos->default 2022={pl['cosine_2022_to_default']:+.4f} "
+              f"2024={pl['cosine_2024_to_default']:+.4f}  "
+              f"{'KILLS TRACKING' if pl['kills_tracking'] else 'FLAG: cos<0.95'}")
+
+    all_kill = all(pl["kills_tracking"] for pl in per_layer)
+    return {
+        "run": run_meta.run_block(
+            command="python -m alignment.activation_steering_run --w1-cosine",
+            models=[model_name], schema_version=1,
+            extra={"kind": "activation_steering_w1_cosine", "n_layers": n_layers, "layers": layers,
+                   "n_options": n_options, "primary": primary,
+                   "year_a": year_a, "year_b": year_b, "n_contestable": len(contest),
+                   "persona_2022": persona_a, "persona_2024": persona_b,
+                   "default_persona": f"{A.PERSONA_COUNTRY} {A.PERSONA_YEAR}",
+                   "cosine_kill_threshold": 0.95}),
+        "per_layer": per_layer,
+        "all_layers_kill_tracking": all_kill,
+        "verdict": (
+            "W1 KILL: 2022 and 2024 persona directions are cos >= 0.95 at every layer -> steering "
+            "cannot implement 2022->2024 tracking by construction (steered@2022 ~ steered@2024)"
+            if all_kill else
+            "W1 FLAG: cosine < 0.95 at some layer -> directions are NOT parallel; do not improvise a "
+            "dose sweep, escalate to supervisor"),
+    }
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Phase 2: activation-steering dose-response sweep (local MLX)")
     ap.add_argument("--model", default=A.DEFAULT_MODEL)
@@ -711,8 +808,21 @@ def main(argv=None):
     ap.add_argument("--persona-control", dest="persona_control", nargs="?", const=CONTROL_PERSONA,
                     default=None,
                     help="R8: capture a wrong-persona control direction (optional custom persona string)")
+    ap.add_argument("--w1-cosine", dest="w1_cosine", action="store_true",
+                    help="P0/W1: capture 2022 vs 2024 median-England-respondent directions and report "
+                         "their cosine (the tracking-by-construction kill-check)")
     ap.add_argument("--out", type=Path, default=OUT / "activation_steering.json")
     args = ap.parse_args(argv)
+
+    if args.w1_cosine:
+        if args.layers is None:
+            ap.error("--w1-cosine requires explicit --layers (e.g. --layers 11 7 14)")
+        result = run_w1_cosine(args.model, args.layers, n_options=args.n_options, primary=args.primary)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(result, indent=2))
+        print("\n" + result["verdict"])
+        print(f"wrote {args.out}")
+        return result
 
     if args.persona_control is not None:
         if args.layers is None:
