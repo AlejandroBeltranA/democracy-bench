@@ -34,7 +34,7 @@ Verification requirement: every number is programmatically extracted (small scri
 `scripts/extract_paper_results.py`, tested pure logic) — no hand-copying from Loop logs.
 Cross-check against the Loop logs in PHASE2/3/4 plans; discrepancies are findings to report.
 
-### PS2 — Figures (out/figures/) ☐
+### PS2 — Figures (out/figures/) ☑
 Matplotlib (already a dev dep? verify; if absent, propose before adding), reading only from
 artifacts, one script `scripts/make_paper_figures.py`. Target set:
 F1 ladder summary (all rungs, one visual verdict each) · F2 P3 tracking per-item (real vs
@@ -75,6 +75,44 @@ Phase-2/3 sample sizes aren't conflated; D3 P5b's −0.115 baseline degradation 
 paired delta (`floors.delta_baseline`), not the within-variant `delta_vs_baseline` (=0.0); D4 the
 superseded steering headline artifact is uncommitted (do-not-touch) — cite as superseded, rely on
 committed `act_steer_ci_3b.json`.
+
+### 2026-07-03 — PS2 figures ☑
+Built `scripts/make_paper_figures.py`: five publication figures to the NEW dir `out/figures/`
+(vector PDF + 200 dpi PNG each), read-only on `out/`, reusing PS1's fail-loud `dig`/`load`/
+`find_layer` for extraction. Data transforms live in **pure** helpers (`prep_f1..prep_f5`,
+`_domain_family`); rendering is separate. No titles baked in (captions live in `docs/FIGURES.md`
+as bullets); Wong colorblind-safe palette; deterministic (byte-identical PDF+PNG on re-render,
+verified via `cmp`).
+
+- **F1 ladder** — five rungs, one verdict + number each: context PARTIAL (8/10, elast +0.395),
+  prompt-guards/logit-bias/steering/LoRA all FAIL.
+- **F2 tracking** — per-item real vs model 2022→2024 shift, 10 items, sorted; annotates 8/10 and
+  +0.395 CI[+0.020,+0.811]; both mismatches (`welfare_dependency`, `big_business_workers`) shown
+  with real/model on opposite sides of zero.
+- **F3 floors** — floor mass by condition × 5 arms (no_guard + 4 guards), 0.5 line; provenance
+  backfire (hostile below no_guard + baseline 0.512→0.460) and constitution partial (0.402, still
+  <0.5) both visible. no_guard hostile 0.318 matches P4 bit-for-bit.
+- **F4 geometry** — per-layer within/cross/off-diag cosine (7/11/14/21…), R8 farmer-control 0.852
+  reference line; L11 off-diag 0.817 → L21 0.556, L21 within 0.903 ≫ cross 0.499.
+- **F5 fidelity** — 50-item evidence-minus-no-evidence delta waterfall, 24/50 worse visible,
+  domain-family colouring.
+
+**Every plotted number is bound to PS1's extract in tests** (F2 direction-count/elasticity,
+F3 no_guard+guard masses, F4 L11/L21 cosines + R8 0.852, F5 24/50) — a figure cannot drift from
+`docs/PAPER_RESULTS.md`. **No contradiction with PS1 surfaced.**
+
+**matplotlib caveat (flagged, not resolved):** the project `.venv` (324→350 tests, the canonical
+env `run_all.sh` sources) does **NOT** have matplotlib; `pyproject.toml` lists only numpy +
+inspect-ai + pytest. Per the PS2 hard rule I did **not** pip-install. Data prep + all 26 new tests
+are numpy-only and pass in `.venv`; the figures were rendered with a separate matplotlib-equipped
+interpreter (matplotlib 3.5.1) with nothing installed into `.venv`. **Supervisor decision needed:**
+add matplotlib as a `figures`/dev extra so `.venv` can render, or keep rendering out-of-venv.
+
+Tests: 324 → **350** (+26 numpy-only in NEW `tests/test_paper_figures.py`; prep helpers + PS1
+number-binding). `.venv/bin/python -m pytest -q` green (350 passed). Files changed: NEW
+`scripts/make_paper_figures.py`, NEW `tests/test_paper_figures.py`, NEW `docs/FIGURES.md`, NEW
+`out/figures/{f1_ladder,f2_tracking,f3_floors,f4_geometry,f5_fidelity}.{pdf,png}`, this log +
+PS2 ☑. No existing `out/*.json` touched; do-not-touch files untouched. No commit (supervisor reviews).
 
 Tests: 296 → **324** (+28 numpy-only in NEW `tests/test_paper_extract.py`: fail-loud `dig`/`stat`
 contract, `_ci_clears_zero` vs 200 random intervals, layer/alpha/curve lookups, and end-to-end
