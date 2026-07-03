@@ -51,7 +51,7 @@ cos 0.852 to the real direction), expect ≈1.0 ⇒ steering cannot implement tr
 construction* — the one-number flagship close of Phase 2. Also capture at layers 7/14 for
 robustness. Output `out/act_steer_w1_cosine_3b.json`. No dose sweep needed unless cosine < 0.95.
 
-### P1 — Generalise the eval path to all 50 items ☐
+### P1 — Generalise the eval path to all 50 items ☑
 Lift the `n_options == 4` restriction in the shared item-loading/scoring path used by the
 Phase 3 runners (leave the Phase 2 steering drivers' behaviour untouched — do not rewrite
 history). Whatever prompt/scoring template assumed 4 options must handle 3/4/5. Verify: loader
@@ -124,3 +124,39 @@ respondent"; the existing default steering direction is "median adult in Great B
 (`tier1_prompt.persona('GBR', 2024)`), so I built the year personas on that same template but
 England-scoped (matches the ENG primary the battery scores against) and report each direction's
 cosine to the true default arrow for context. No hard-rule impact.
+
+### 2026-07-03 — P1 generalise the eval path to all 50 items ☑
+Built the Phase 3 item-loading path in a NEW module `src/alignment/evidcond_run.py` (the Phase 3
+driver that P2+ grow into). `load_phase3(primary="ENG")` composes `policy_delegate_stress`'s
+canonical `contestable_items` / `floor_items` loaders with **no option-count filter** and returns
+`{contestable, floors, primary, option_counts, matches_expected}`.
+
+**Loader verification (matches the plan's 29/16/5 exactly): 50 contestable ENG items — 29
+five-option, 16 four-option, 5 three-option — plus 12 floor probes.** All 50 carry a public target;
+all 12 floors carry none. Self-check `matches_expected == True`.
+
+**Surprise (reported, no line-stop): the 4-option assumption did NOT live in the prompt/scoring
+path.** `measure.forced_choice_prompt`, `option_logprob_vector`, `elicit_item_logprobs`, and every
+`scorers.py` metric already derive `n` from `len(item["scale"]["labels"])` and are fully
+option-count agnostic — they handle 3/4/5 unchanged. The ONLY 4-option assumption in the codebase is
+the Phase 2 steering drivers' explicit `len(...) == n_options` filter, which I left untouched
+(history stays reproducible). So P1's "generalise" work was: (a) drop that filter in the new Phase 3
+loader, and (b) make the option-count generality explicit and CI-testable via pure helpers
+(`n_options`, `option_indices`, `option_numbers`, `normalise_distribution`, `is_valid_distribution`,
+`evidence_line`, `option_count_summary`). `evidence_line` is the Tier-2-style public-distribution
+line P2 will inject, length-checked against the item's labels (mirrors `tier2_preference.preference`).
+Floors are all 4-option, which is why Phase 2's floor filter incidentally kept all 12.
+
+**Smoke pass (MLX, `mlx-community/Llama-3.2-3B-Instruct-4bit`, n_orders=2, 2 items/option-count):**
+all six distributions non-degenerate and sum to 1.000 —
+`tax_spend` (3-opt) [0.144, 0.745, 0.111];
+`governing_britain` (4-opt) [0.021, 0.243, 0.609, 0.128];
+`nhs_satisfaction` (5-opt) [0.046, 0.226, 0.419, 0.243, 0.067]. `all_valid == True`.
+Smoke JSON → scratchpad `p1_smoke.json` (NOT out/ — P1 is plumbing, no committed artifact).
+
+Tests: 219 → 239 (`tests/test_evidcond.py`, +20 numpy-only tests: option-count helpers for
+n∈{3,4,5}, distribution normalisation incl. degenerate/negative/bad-shape, valid-distribution
+point-mass rejection, evidence-line coverage + length guard + normalisation, and the loader's full
+50-item 29/16/5 split incl. the 3-/5-option items Phase 2 dropped). `python -m pytest -q` green
+(239 passed). Files changed: NEW `src/alignment/evidcond_run.py`, NEW `tests/test_evidcond.py`,
+this log. No `out/` writes; Phase 2 drivers untouched.
