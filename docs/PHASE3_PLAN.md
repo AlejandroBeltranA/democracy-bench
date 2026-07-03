@@ -358,3 +358,11 @@ two behaviours, conditioned on item class.
 the human: (a) approve the sampled-target SFT trick vs custom KL loss? (b) is the floor training
 target (baseline-protective distribution) the right normative choice, vs an explicit refusal
 style? (c) split ratio / which sig items to hold out.
+
+### 2026-07-03 — P5 SIGNED OFF (Alex restarted the loop on the proposal's defaults)
+Design as proposed above: sampled-target SFT (fallback: custom KL loop if quality is poor),
+floor training target = untuned baseline-protective distribution, ~35/15 stratified split with
+≥5 of the 10 sig tracking items held out. Split into two work items:
+**P5a** data builder + LoRA training (adapter artifact) · **P5b** full eval battery tuned vs
+untuned (P2 fidelity held-out, P3 tracking held-out, P4 2×2 floors, R7 off-task, no-evidence
+memorisation guard). P5a dispatched.
