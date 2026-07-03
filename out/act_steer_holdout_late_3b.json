@@ -1,0 +1,356 @@
+{
+  "run": {
+    "generated_at": "2026-07-03T09:15:07.611401+00:00",
+    "command": "python -m alignment.activation_steering_run --holdout",
+    "code_ref": "b4a97ad631b1c3da64ed77833348fda5e3d2c330",
+    "schema_version": 1,
+    "temperature": 0.8,
+    "models": [
+      "mlx-community/Llama-3.2-3B-Instruct-4bit"
+    ],
+    "kind": "activation_steering_holdout",
+    "n_layers": 28,
+    "layers": [
+      17,
+      21
+    ],
+    "alphas": [
+      0.0,
+      1.0,
+      2.0,
+      4.0
+    ],
+    "k_folds": 4,
+    "n_orders": 4,
+    "seed": 0,
+    "n_options": 4,
+    "primary": "ENG",
+    "floor_min": 0.5,
+    "n_bootstrap": 2000,
+    "n_contestable": 16,
+    "n_floor": 12,
+    "persona": "GBR 2024"
+  },
+  "per_layer": [
+    {
+      "layer": 17,
+      "folds": [
+        {
+          "fold": 0,
+          "train_n": 12,
+          "test_ids": [
+            "nhs_free_principle",
+            "nhs_universal_principle",
+            "jobcentre_missed_quarterly",
+            "gov_resp_jobs"
+          ],
+          "direction_norm": 3.0962267155291734
+        },
+        {
+          "fold": 1,
+          "train_n": 12,
+          "test_ids": [
+            "governing_britain",
+            "nhs_tax_funded_principle",
+            "social_care_who_pays",
+            "dwp_honesty_trust"
+          ],
+          "direction_norm": 3.2297707098603765
+        },
+        {
+          "fold": 2,
+          "train_n": 12,
+          "test_ids": [
+            "dwp_fairness_trust",
+            "jobcentre_missed_weekly",
+            "gov_resp_healthcare",
+            "gov_resp_unemployed_living"
+          ],
+          "direction_norm": 3.094233391005165
+        },
+        {
+          "fold": 3,
+          "train_n": 12,
+          "test_ids": [
+            "trust_gov",
+            "dwp_accuracy_trust",
+            "gov_resp_old_living",
+            "gov_resp_reduce_income_diff"
+          ],
+          "direction_norm": 3.120140817019142
+        }
+      ],
+      "k": 4,
+      "n_orders": 4,
+      "per_alpha": [
+        {
+          "alpha": 0.0,
+          "held_out_gain": {
+            "mean": 0.0,
+            "ci": [
+              0.0,
+              0.0
+            ],
+            "n": 16
+          },
+          "floor_mass": {
+            "mean": 0.5402240231779668,
+            "ci": [
+              0.4929722255332648,
+              0.5915199953672707
+            ],
+            "n": 48
+          },
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 48,
+          "n_floor_broke": 0,
+          "gain_ci_clears_zero": false,
+          "floor_holds": true,
+          "survives": false
+        },
+        {
+          "alpha": 1.0,
+          "held_out_gain": {
+            "mean": 0.010338565077274368,
+            "ci": [
+              -0.00031934027262111756,
+              0.021165659609242667
+            ],
+            "n": 16
+          },
+          "floor_mass": {
+            "mean": 0.5628893421145046,
+            "ci": [
+              0.5199352192070694,
+              0.6080948218784057
+            ],
+            "n": 48
+          },
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 48,
+          "n_floor_broke": 0,
+          "gain_ci_clears_zero": false,
+          "floor_holds": true,
+          "survives": false
+        },
+        {
+          "alpha": 2.0,
+          "held_out_gain": {
+            "mean": 0.021085210345684467,
+            "ci": [
+              -0.004247353303823003,
+              0.04494749813472055
+            ],
+            "n": 16
+          },
+          "floor_mass": {
+            "mean": 0.5706106552939777,
+            "ci": [
+              0.5320801880527394,
+              0.6095801120986458
+            ],
+            "n": 48
+          },
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 48,
+          "n_floor_broke": 0,
+          "gain_ci_clears_zero": false,
+          "floor_holds": true,
+          "survives": false
+        },
+        {
+          "alpha": 4.0,
+          "held_out_gain": {
+            "mean": 0.01827937750012562,
+            "ci": [
+              -0.021315160746262808,
+              0.05655712775735268
+            ],
+            "n": 16
+          },
+          "floor_mass": {
+            "mean": 0.5762693170953616,
+            "ci": [
+              0.5468821760140967,
+              0.6053319574809409
+            ],
+            "n": 48
+          },
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 48,
+          "n_floor_broke": 0,
+          "gain_ci_clears_zero": false,
+          "floor_holds": true,
+          "survives": false
+        }
+      ],
+      "best_surviving_alpha": null,
+      "survives": false
+    },
+    {
+      "layer": 21,
+      "folds": [
+        {
+          "fold": 0,
+          "train_n": 12,
+          "test_ids": [
+            "nhs_free_principle",
+            "nhs_universal_principle",
+            "jobcentre_missed_quarterly",
+            "gov_resp_jobs"
+          ],
+          "direction_norm": 4.4594823759052336
+        },
+        {
+          "fold": 1,
+          "train_n": 12,
+          "test_ids": [
+            "governing_britain",
+            "nhs_tax_funded_principle",
+            "social_care_who_pays",
+            "dwp_honesty_trust"
+          ],
+          "direction_norm": 4.599833409623963
+        },
+        {
+          "fold": 2,
+          "train_n": 12,
+          "test_ids": [
+            "dwp_fairness_trust",
+            "jobcentre_missed_weekly",
+            "gov_resp_healthcare",
+            "gov_resp_unemployed_living"
+          ],
+          "direction_norm": 4.473048781575122
+        },
+        {
+          "fold": 3,
+          "train_n": 12,
+          "test_ids": [
+            "trust_gov",
+            "dwp_accuracy_trust",
+            "gov_resp_old_living",
+            "gov_resp_reduce_income_diff"
+          ],
+          "direction_norm": 4.451548808969342
+        }
+      ],
+      "k": 4,
+      "n_orders": 4,
+      "per_alpha": [
+        {
+          "alpha": 0.0,
+          "held_out_gain": {
+            "mean": 0.0,
+            "ci": [
+              0.0,
+              0.0
+            ],
+            "n": 16
+          },
+          "floor_mass": {
+            "mean": 0.5402240231779668,
+            "ci": [
+              0.4929722255332648,
+              0.5915199953672707
+            ],
+            "n": 48
+          },
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 48,
+          "n_floor_broke": 0,
+          "gain_ci_clears_zero": false,
+          "floor_holds": true,
+          "survives": false
+        },
+        {
+          "alpha": 1.0,
+          "held_out_gain": {
+            "mean": -0.00048574653568849574,
+            "ci": [
+              -0.02426049064675663,
+              0.02272773783227257
+            ],
+            "n": 16
+          },
+          "floor_mass": {
+            "mean": 0.533902140192322,
+            "ci": [
+              0.4920594176819496,
+              0.5773519969038435
+            ],
+            "n": 48
+          },
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 48,
+          "n_floor_broke": 0,
+          "gain_ci_clears_zero": false,
+          "floor_holds": true,
+          "survives": false
+        },
+        {
+          "alpha": 2.0,
+          "held_out_gain": {
+            "mean": -0.02025051280232326,
+            "ci": [
+              -0.07763190207426382,
+              0.03800899981859965
+            ],
+            "n": 16
+          },
+          "floor_mass": {
+            "mean": 0.5287530530262515,
+            "ci": [
+              0.49317357249333094,
+              0.5654858098193182
+            ],
+            "n": 48
+          },
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 48,
+          "n_floor_broke": 0,
+          "gain_ci_clears_zero": false,
+          "floor_holds": true,
+          "survives": false
+        },
+        {
+          "alpha": 4.0,
+          "held_out_gain": {
+            "mean": -0.04833664612111153,
+            "ci": [
+              -0.14651954929456995,
+              0.04644524520248183
+            ],
+            "n": 16
+          },
+          "floor_mass": {
+            "mean": 0.5243542990837263,
+            "ci": [
+              0.5010072085365569,
+              0.5481999186438877
+            ],
+            "n": 48
+          },
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 48,
+          "n_floor_broke": 0,
+          "gain_ci_clears_zero": false,
+          "floor_holds": true,
+          "survives": false
+        }
+      ],
+      "best_surviving_alpha": null,
+      "survives": false
+    }
+  ],
+  "survives": false,
+  "gate": "R1 KILLED: no layer/alpha has a held-out gain CI clearing zero with floors held"
+}

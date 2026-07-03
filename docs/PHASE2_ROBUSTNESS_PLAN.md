@@ -299,3 +299,20 @@ protocol I am NOT proceeding to W3 yet: the decisive held-out test has not been 
 held-out capture at layers 17/21, α ∈ {1,2,4}. If held-out gain CIs still fail → clean negative is
 airtight across all candidate layers. If they clear zero → Phase 2 has a small, late-layer, floor-
 safe REAL result and the headline changes. Do not write the negative summary until this is resolved.
+
+### 2026-07-03 — R4 contradiction RESOLVED → held-out fails at 17/21 too; negative is airtight
+
+Ran (existing `--holdout` machinery, no new code): `--holdout 4 --layers 17 21 --alphas 1 2 4
+--n-orders 4` → `out/act_steer_holdout_late_3b.json`. Held-out gain (steered − α0, on items NOT
+used for capture):
+- L17: α1 +0.010 CI[−0.000,+0.021] · α2 +0.021 CI[−0.004,+0.045] · α4 +0.018 CI[−0.021,+0.057]
+- L21: α1 −0.000 CI[−0.024,+0.023] · α2 −0.020 CI[−0.078,+0.038] · α4 −0.048 CI[−0.147,+0.046]
+No cell clears zero (L17 α1 lower bound rounds to −0.000, i.e. touches zero; floors ~0.53–0.58 hold).
+The R4 in-sample CI-good cells at 17/21 were the SAME inject-then-score-against-the-same-items
+confound as layer 11 — they vanish under held-out capture. Layer 17 shows a faint positive hint
+(≈+0.01–0.02, floors intact) but not statistically distinguishable from zero on 16 items × 4 folds.
+
+RESOLUTION: Phase 2 is a clean NEGATIVE, now airtight across ALL candidate layers (11, 14 from R1;
+17, 21 here). Activation steering with a diff-of-means direction does not move this model toward the
+UK public in a way that generalises across items, at any layer, with floors held. Cleared to proceed
+to W3 (geometry) as the mechanism section explaining WHY. R7/R8 remain optional characterisation.
