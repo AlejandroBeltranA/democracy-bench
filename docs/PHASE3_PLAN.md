@@ -67,7 +67,7 @@ floor probes under both conditions. Headline: the **fidelity gap** — how far s
 provided evidence does the model land? Sub-analysis: fidelity by n_options and by domain.
 Output `out/evidcond_baseline_3b.json`. This number decides how ambitious the LoRA rung must be.
 
-### P3 — Evidence tracking (flagship positive candidate) ☐
+### P3 — Evidence tracking (flagship positive candidate) ☑
 On the 10 Bonferroni-significant harmonised items: condition on 2022 evidence vs 2024 evidence,
 feed the two model distributions to `scorers.tracking(...)` (already returns direction-match +
 elasticity with CIs). Question: does changing the evidence year move the model along the REAL
@@ -214,3 +214,48 @@ fidelity_gap, condition_summary shape, paired itemwise delta incl. negative-sign
 guard, group summaries by option-count/domain incl. empty). `python -m pytest -q` green.
 Files changed: `src/alignment/evidcond_run.py` (P2 helpers + `run_baseline` + CLI), `tests/test_evidcond.py`,
 this log. No commit (supervisor reviews).
+
+### 2026-07-03 — P3 evidence tracking ☑ (the flagship POSITIVE — the question steering could not pose)
+Built `run_tracking` + `--tracking` CLI in `src/alignment/evidcond_run.py` (run block:
+`kind="evidcond_tracking"`, sig-item ids, read-only delta-check source echoed). On the 10
+Bonferroni-significant harmonised items, elicited the option distribution (logprob path,
+`n_orders=2`) under evidence-conditioned prompts where the evidence is (a) the item's REAL 2022
+England distribution and (b) the REAL 2024 England distribution — same Tier-2 phrasing as P2
+(`steer.tier2_preference.preference`), keyed to the evidence YEAR — plus a no-evidence baseline per
+item for context. Fed the two evidence-steered distributions to `scorers.tracking(model_t=by-2022,
+model_t1=by-2024, target_t=real2022, target_t1=real2024)`. Year distributions read (never written)
+from `out/_bsa_delta_check.json`; all 10 sig ids mapped cleanly onto the 50-item bank and all
+2022/2024/bank labels aligned (no line-stop surprises).
+
+**Headline (all 10 items): direction match 8/10 (0.80); mean elasticity +0.395, CI[+0.020, +0.811]
+— the CI clears zero. All 10 items moved (nonzero shift).** This is the flagship contrast with
+Phase 2: P0's kill-check showed the 2022/2024 *steering* directions are the same vector (cos 0.996)
+⇒ elasticity ≈ 0 by construction. Evidence-in-context, by contrast, DOES carry the item-specific
+year signal — changing only the evidence year moves the model ~0.4× of the real public shift, in the
+right direction 80% of the time. The architecture that can pose the tracking question answers it
+positively.
+
+**Per-item table (real 2022→2024 mean-position shift vs model's evidence-induced shift):**
+nhs_satisfaction +0.215/+0.073 (E 0.34 ✓), ae_satisfaction +0.331/+0.021 (0.06 ✓),
+dentist_satisfaction +0.339/+0.144 (0.42 ✓), gp_satisfaction +0.152/+0.095 (0.63 ✓),
+social_care_satisfaction −0.054/−0.111 (2.06 ✓, tracks the rare DOWN shift), redistribution
++0.225/+0.135 (0.60 ✓), benefit_cheat_poverty_reason +0.398/+0.161 (0.41 ✓), defence_spending
++0.098/+0.024 (0.25 ✓) — 8 matches. **The 2 misses are the two items whose real shift is against
+the "obvious" prior direction:** welfare_dependency real −0.215 (public got LESS harsh) but model
++0.028; big_business_workers real +0.099 but model −0.068. Both are consistent with P2's
+heterogeneity finding — the untuned model under-defers exactly where the shift contradicts its
+prior. Context: no-evidence prior representation is 0.781 vs real-2022 and 0.748 vs real-2024, so the
+model already sits closer to 2022 and the evidence has to drag it toward 2024 — which it does, just
+incompletely (elasticity < 1).
+
+Smoke: 3-item grid to scratch first (`p3_smoke.json`; 3/3 match, E +0.276) — clean, proceeded to full.
+Artifact: **`out/evidcond_tracking_3b.json`** (new path; no existing out/*.json touched;
+`out/_bsa_delta_check.json` read-only). Runtime: full run 48 s wall (~4 s user compute; 30 forward
+passes = 10 items × 3 conditions × 1, ×2 orders), far under the 15-min budget.
+Tests: 247 → **257** (`tests/test_evidcond.py` +10 numpy-only P3 tests: `sig_year_data` mapping +
+harmonisation/missing-id/missing-2022 guards, `mean_position` vs scorer, `tracking_row`
+match/mismatch/frozen-model cases, `tracking_summary` rate+moved-count and empty-trackable).
+`python -m pytest -q` green (257 passed). Files changed: `src/alignment/evidcond_run.py` (P3 pure
+helpers `sig_year_data`/`mean_position`/`tracking_row`/`tracking_summary` + `run_tracking` +
+`--tracking`/`--delta-check`/`--no-baseline-context` CLI), `tests/test_evidcond.py`, this log. No
+commit (supervisor reviews).

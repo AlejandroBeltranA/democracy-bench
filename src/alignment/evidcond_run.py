@@ -166,6 +166,109 @@ def group_condition_summaries(rows: list, key: str, seed: int = 0) -> dict:
     return out
 
 
+# ---- P3 pure aggregation helpers (evidence tracking; no MLX; numpy-only, CI-testable) -
+
+# The 10 Bonferroni-significant harmonised items on the 2022->2024 shift
+# (out/_bsa_delta_check.json -> summary.sig_2022_2024_bonferroni). All 5-option, all
+# harmonised, all carry a real 2022 AND 2024 England distribution. Kept as a named constant
+# so the runner and tests assert against one source and a bank/delta-check drift surfaces.
+SIG_2022_2024 = (
+    "nhs_satisfaction", "ae_satisfaction", "dentist_satisfaction", "gp_satisfaction",
+    "social_care_satisfaction", "redistribution", "welfare_dependency",
+    "benefit_cheat_poverty_reason", "defence_spending", "big_business_workers",
+)
+
+
+def mean_position(dist) -> float:
+    """Expected (0-based) option index of a distribution — the ordinal 'stance' scalar the
+    tracking scorer moves along. Thin, normalising wrapper over `scorers._mean_position` so the
+    per-item delta table and the scorer agree on one definition of 'shift'."""
+    return float(S._mean_position(normalise_distribution(dist)))
+
+
+def sig_year_data(delta_check: dict, ids=SIG_2022_2024) -> dict:
+    """Pull, per significant item id, the REAL 2022 and 2024 England distributions, their survey
+    bases, harmonised labels, and the published 2022->2024 per-option delta out of the delta-check
+    JSON (out/_bsa_delta_check.json — READ ONLY). Returns `{id: {dist2022, dist2024, labels,
+    n2022, n2024, real_delta, real_pop_shift}}`. Fails LOUD if an id is missing, isn't harmonised,
+    or lacks a 2022->2024 pair — the P3 spec's line-stop conditions made mechanical."""
+    by_id = {it["id"]: it for it in delta_check["items"]}
+    out: dict = {}
+    for sid in ids:
+        if sid not in by_id:
+            raise KeyError(f"sig item {sid!r} not found in delta-check items")
+        it = by_id[sid]
+        if not it.get("harmonised_labels", False):
+            raise ValueError(f"sig item {sid!r} is not harmonised — cannot track")
+        dists = it["distributions"]
+        if "2022" not in dists or "2024" not in dists:
+            raise ValueError(f"sig item {sid!r} lacks a 2022 and 2024 distribution")
+        pair = next((p for p in it["pairs"] if p["pair"] == "2022->2024"), None)
+        if pair is None:
+            raise ValueError(f"sig item {sid!r} has no 2022->2024 pair")
+        out[sid] = {
+            "dist2022": list(dists["2022"]["distribution"]),
+            "dist2024": list(dists["2024"]["distribution"]),
+            "labels": list(dists["2024"]["labels"]),
+            "n2022": dists["2022"].get("n_unweighted"),
+            "n2024": dists["2024"].get("n_unweighted"),
+            "real_delta": list(pair["delta"]),
+            "real_pop_shift": pair.get("mean_position_shift"),
+        }
+    return out
+
+
+def tracking_row(item_id: str, domain: str, model_2022, model_2024,
+                 target_2022, target_2024, n_model=None, n_t2022=None, n_t2024=None) -> dict:
+    """Assemble ONE per-item tracking row: feed the item's steered-by-2022-evidence and
+    steered-by-2024-evidence model distributions plus the REAL 2022/2024 targets to
+    `scorers.tracking`, then flatten to a JSON-serialisable row with the real vs model
+    mean-position shift, per-option deltas, direction match, and elasticity (+CI). This is the
+    per-item table the P3 headline aggregates over — one call per significant item."""
+    m22 = normalise_distribution(model_2022)
+    m24 = normalise_distribution(model_2024)
+    t22 = normalise_distribution(target_2022)
+    t24 = normalise_distribution(target_2024)
+    tr = S.tracking(m22, m24, t22, t24,
+                    n_model=n_model, n_target_t=n_t2022, n_target_t1=n_t2024)
+    return {
+        "id": item_id,
+        "domain": domain,
+        "real_shift": tr["population_delta"],
+        "model_shift": tr["model_delta"],
+        "real_delta": [round(float(x), 4) for x in (t24 - t22)],
+        "model_delta": [round(float(x), 4) for x in (m24 - m22)],
+        "direction_match": tr["direction_match"],
+        "elasticity": tr["elasticity"],
+        "elasticity_ci": tr["elasticity_ci"],
+        "population_delta_significant": tr["population_delta_significant"],
+        "dist_2022_evidence": [round(float(x), 4) for x in m22],
+        "dist_2024_evidence": [round(float(x), 4) for x in m24],
+        "target_2022": [round(float(x), 4) for x in t22],
+        "target_2024": [round(float(x), 4) for x in t24],
+    }
+
+
+def tracking_summary(rows: list, seed: int = 0) -> dict:
+    """Aggregate per-item tracking rows into the P3 headline: direction-match RATE (share of items
+    whose evidence-induced shift matches the real 2022->2024 direction) and mean elasticity with a
+    bootstrap-over-items CI (`bootstrap_mean_ci`) — the right CI when the units are items. Rows with
+    a null direction_match/elasticity (no real shift to track) are excluded from the respective
+    aggregate. Also reports how many items moved AT ALL (nonzero model shift)."""
+    matches = [bool(r["direction_match"]) for r in rows if r["direction_match"] is not None]
+    elasticities = [float(r["elasticity"]) for r in rows if r["elasticity"] is not None]
+    n_track = len(matches)
+    return {
+        "n_items": len(rows),
+        "n_trackable": n_track,
+        "direction_match_count": int(sum(matches)),
+        "direction_match_rate": (float(sum(matches)) / n_track) if n_track else None,
+        "elasticity": condition_summary(elasticities, seed=seed) if elasticities else
+        {"mean": None, "ci": None, "n": 0},
+        "n_model_moved": int(sum(1 for r in rows if abs(float(r["model_shift"])) > 1e-6)),
+    }
+
+
 # ---- item-loading path (reuses policy_delegate_stress loaders) -----------------------
 
 def load_phase3(primary: str = "ENG", target_path=PDS.DEFAULT_TARGETS) -> dict:
@@ -382,12 +485,122 @@ def PDS_run_block(model_name, primary, n_orders, seed, boot, n_contest, n_floor)
         })
 
 
+# ---- P3 evidence-tracking runner (MLX; not imported by CI) ----------------------------
+
+def run_tracking(model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit",
+                 n_orders: int = 2, seed: int = 0, primary: str = "ENG",
+                 delta_check_path: str = "out/_bsa_delta_check.json",
+                 ids=SIG_2022_2024, with_baseline: bool = True,
+                 items: list | None = None, boot: int = 2000) -> dict:
+    """P3: evidence tracking. On the 10 Bonferroni-significant harmonised items, elicit the model's
+    option distribution under evidence-conditioned prompts where the evidence is (a) the item's REAL
+    2022 England distribution and (b) the REAL 2024 England distribution (Tier-2 phrasing, keyed to
+    the evidence YEAR), plus optionally a no-evidence baseline for context. Feed the two
+    evidence-steered distributions to `scorers.tracking(model_t=by-2022, model_t1=by-2024,
+    target_t=real2022, target_t1=real2024)`. Headline: direction-match rate + elasticity with CIs;
+    a per-item table of real vs model 2022->2024 shift. Evidence distributions come from the
+    READ-ONLY out/_bsa_delta_check.json.
+    """
+    import json as _json
+
+    from alignment.steer import activation_steer as A  # MLX-touching; imported lazily
+
+    delta_check = _json.loads(open(delta_check_path).read())
+    year_data = sig_year_data(delta_check, ids)
+
+    bank = load_phase3(primary)
+    by_id = {si.item["id"]: si for si in bank["contestable"]}
+    sig_ids = list(ids) if items is None else items
+    # line-stop check: every requested id must map onto the 50-item bank
+    missing = [sid for sid in sig_ids if sid not in by_id]
+    if missing:
+        raise KeyError(f"sig items not in the {len(by_id)}-item bank: {missing}")
+
+    model, tok = A.load_model(model_name)
+    logprob_fn = A.mlx_logprob_fn(model, tok)
+
+    def elicit(item, conditioning):
+        return M.elicit_item_logprobs(logprob_fn, item, conditioning=conditioning,
+                                      n_orders=n_orders, seed=seed)
+
+    # n_orders forward passes per condition per item -> a per-wave elicitation "sample size"
+    # for the tracking scorer's sampling-error CIs (mirrors how the survey base n feeds targets).
+    n_model = n_orders
+
+    rows = []
+    for sid in sig_ids:
+        si = by_id[sid]
+        item = si.item
+        yd = year_data[sid]
+        # label alignment is a line-stop condition — assert the bank scale matches the evidence.
+        if item["scale"]["labels"] != yd["labels"]:
+            raise ValueError(f"label harmonisation mismatch for {sid!r} between bank and delta-check")
+
+        cond_2022 = T2.preference(si.target_meta["label"], 2022, item, yd["dist2022"])
+        cond_2024 = T2.preference(si.target_meta["label"], 2024, item, yd["dist2024"])
+        d_2022 = np.asarray(elicit(item, cond_2022), dtype=float)
+        d_2024 = np.asarray(elicit(item, cond_2024), dtype=float)
+
+        row = tracking_row(sid, item.get("domain"), d_2022, d_2024,
+                           yd["dist2022"], yd["dist2024"],
+                           n_model=n_model, n_t2022=yd["n2022"], n_t2024=yd["n2024"])
+        row["real_pop_shift_published"] = yd["real_pop_shift"]
+        if with_baseline:
+            d_none = np.asarray(elicit(item, None), dtype=float)
+            row["dist_no_evidence"] = [round(float(x), 4) for x in normalise_distribution(d_none)]
+            # for context: representation of the no-evidence prior against each year's real dist
+            row["rep_no_evidence_vs_2022"] = representation(d_none, yd["dist2022"])
+            row["rep_no_evidence_vs_2024"] = representation(d_none, yd["dist2024"])
+        rows.append(row)
+
+    headline = tracking_summary(rows, seed=seed)
+
+    report = {
+        "run": _tracking_run_block(model_name, primary, n_orders, seed, boot, len(rows),
+                                   with_baseline, delta_check_path),
+        "headline": headline,
+        "items": rows,
+        "caveats": [
+            "Harmonised-label items only: all 10 Bonferroni-significant items carry harmonised "
+            "2022 and 2024 England labels (delta-check summary.not_harmonised excludes 6 others).",
+            "Evidence distributions are the REAL BSA 2022/2024 England distributions read from "
+            "out/_bsa_delta_check.json (read-only input; never written).",
+            "Elasticity CIs are sampling-error only (elicitation n_orders per wave for the model, "
+            "survey base for the targets); they do not capture prompt/order or house effects.",
+            "P2 found evidence-conditioning is heterogeneous (24/50 items got worse); items that "
+            "fail P2 representation may also fail to track here.",
+        ],
+    }
+    return report
+
+
+def _tracking_run_block(model_name, primary, n_orders, seed, boot, n_items,
+                        with_baseline, delta_check_path) -> dict:
+    from alignment import run_meta
+    return run_meta.run_block(
+        command="python -m alignment.evidcond_run --tracking",
+        models=[model_name], schema_version=1,
+        extra={
+            "kind": "evidcond_tracking",
+            "primary": primary,
+            "n_orders": n_orders,
+            "seed": seed,
+            "n_bootstrap": boot,
+            "n_sig_items": n_items,
+            "with_baseline": with_baseline,
+            "sig_item_ids": list(SIG_2022_2024),
+            "year_evidence_source": delta_check_path + " (read-only)",
+            "evidence_phrasing": "steer.tier2_preference.preference (Tier-2, keyed to evidence year)",
+            "tracking_scorer": "scorers.tracking (direction-match + elasticity, sampling-error CIs)",
+        })
+
+
 def main(argv=None):
     import argparse
     import json
     from pathlib import Path
 
-    ap = argparse.ArgumentParser(description="Phase 3 evidence-conditioning: P1 loader/smoke + P2 baseline")
+    ap = argparse.ArgumentParser(description="Phase 3 evidence-conditioning: P1 loader/smoke + P2 baseline + P3 tracking")
     ap.add_argument("--model", default="mlx-community/Llama-3.2-3B-Instruct-4bit")
     ap.add_argument("--primary", default="ENG")
     ap.add_argument("--per-count", type=int, default=2,
@@ -398,11 +611,59 @@ def main(argv=None):
     ap.add_argument("--baseline", action="store_true",
                     help="P2: run the baseline deference-fidelity battery (no-evidence vs "
                          "evidence-conditioned) over all contestable items + floors")
+    ap.add_argument("--tracking", action="store_true",
+                    help="P3: run the evidence-tracking battery on the 10 Bonferroni-significant "
+                         "items (2022-evidence vs 2024-evidence -> scorers.tracking)")
+    ap.add_argument("--delta-check", default="out/_bsa_delta_check.json",
+                    help="P3: read-only year-distribution source (never written)")
+    ap.add_argument("--no-baseline-context", action="store_true",
+                    help="P3: skip the per-item no-evidence baseline elicitation (saves ~10 passes)")
     ap.add_argument("--out", type=Path,
                     help="P2 real run: committed artifact path (must be under out/)")
     ap.add_argument("--smoke-out", type=Path,
                     help="scratch path for a smoke JSON (must NOT be under out/)")
     args = ap.parse_args(argv)
+
+    if args.tracking:
+        # ---- P3 evidence tracking ----
+        smoke = args.smoke_out is not None
+        if smoke == bool(args.out):
+            ap.error("give exactly one of --smoke-out (scratch smoke) or --out (real run)")
+        dest = args.smoke_out if smoke else args.out
+        if smoke and "out" in Path(dest).resolve().parts:
+            ap.error("--smoke-out must not write under out/ (use the scratchpad)")
+        if not smoke and "out" not in Path(dest).resolve().parts:
+            ap.error("--out must write under out/")
+        if not smoke and Path(dest).exists():
+            ap.error(f"refusing to overwrite existing artifact {dest} (hard rule: new path per run)")
+
+        sig_ids = list(SIG_2022_2024)
+        if smoke:
+            sig_ids = sig_ids[:3]   # tiny grid: 3 items
+        report = run_tracking(args.model, n_orders=args.n_orders, seed=args.seed,
+                              primary=args.primary, delta_check_path=args.delta_check,
+                              ids=sig_ids, with_baseline=not args.no_baseline_context,
+                              items=sig_ids, boot=args.n_bootstrap)
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        Path(dest).write_text(json.dumps(report, indent=2))
+
+        h = report["headline"]
+        el = h["elasticity"]
+        print(f"[P3 tracking{' SMOKE' if smoke else ''}] {h['n_items']} sig items, "
+              f"{h['n_trackable']} trackable")
+        dm = h["direction_match_rate"]
+        print(f"  direction match:  {h['direction_match_count']}/{h['n_trackable']}"
+              f"{'' if dm is None else f' = {dm:.2f}'}")
+        if el["mean"] is not None:
+            print(f"  elasticity:       {el['mean']:+.3f} "
+                  f"CI[{el['ci'][0]:+.3f},{el['ci'][1]:+.3f}] (n={el['n']})")
+        print(f"  model moved (nonzero shift): {h['n_model_moved']}/{h['n_items']}")
+        for r in report["items"]:
+            print(f"  {r['id']:<30} real_shift={r['real_shift']:+.3f} "
+                  f"model_shift={r['model_shift']:+.3f} match={r['direction_match']} "
+                  f"E={None if r['elasticity'] is None else round(r['elasticity'],2)}")
+        print(f"wrote {dest}")
+        return report
 
     if not args.baseline:
         # P1 plumbing smoke (default): loader + non-degenerate distribution check.

@@ -190,3 +190,128 @@ def test_group_condition_summaries_slices_and_summarises():
 
 def test_group_condition_summaries_empty_is_empty():
     assert E.group_condition_summaries([], "n_options", seed=0) == {}
+
+
+# ---- P3 pure helpers: evidence tracking ----------------------------------------------
+
+def _delta_check_fixture():
+    """A minimal in-memory delta-check with two 5-option harmonised sig items and one item
+    that must be REJECTED (not harmonised) — enough to exercise sig_year_data's mapping+guards
+    without touching out/_bsa_delta_check.json."""
+    def item(iid, harmon, labels, d22, d24, delta, has_pair=True, has22=True):
+        dists = {"2024": {"distribution": d24, "labels": labels, "n_unweighted": 800}}
+        if has22:
+            dists["2022"] = {"distribution": d22, "labels": labels, "n_unweighted": 1000}
+        pairs = ([{"pair": "2022->2024", "delta": delta, "mean_position_shift": 0.3}]
+                 if has_pair else [])
+        return {"id": iid, "harmonised_labels": harmon, "distributions": dists, "pairs": pairs}
+    labels = ["a", "b", "c", "d", "e"]
+    return {"items": [
+        item("nhs_satisfaction", True, labels,
+             [0.10, 0.30, 0.20, 0.25, 0.15], [0.05, 0.20, 0.20, 0.30, 0.25],
+             [-0.05, -0.10, 0.0, 0.05, 0.10]),
+        item("redistribution", True, labels,
+             [0.20, 0.30, 0.20, 0.20, 0.10], [0.15, 0.25, 0.25, 0.20, 0.15],
+             [-0.05, -0.05, 0.05, 0.0, 0.05]),
+        item("not_harmon", False, labels,
+             [0.2] * 5, [0.2] * 5, [0.0] * 5),
+    ]}
+
+
+def test_sig_year_data_pulls_years_and_delta():
+    dc = _delta_check_fixture()
+    yd = E.sig_year_data(dc, ids=("nhs_satisfaction", "redistribution"))
+    assert set(yd) == {"nhs_satisfaction", "redistribution"}
+    r = yd["nhs_satisfaction"]
+    assert r["dist2022"][0] == pytest.approx(0.10)
+    assert r["dist2024"][-1] == pytest.approx(0.25)
+    assert r["n2022"] == 1000 and r["n2024"] == 800
+    assert r["labels"] == ["a", "b", "c", "d", "e"]
+    assert r["real_delta"] == [-0.05, -0.10, 0.0, 0.05, 0.10]
+
+
+def test_sig_year_data_rejects_non_harmonised():
+    dc = _delta_check_fixture()
+    with pytest.raises(ValueError):
+        E.sig_year_data(dc, ids=("not_harmon",))
+
+
+def test_sig_year_data_rejects_missing_id():
+    dc = _delta_check_fixture()
+    with pytest.raises(KeyError):
+        E.sig_year_data(dc, ids=("does_not_exist",))
+
+
+def test_sig_year_data_rejects_missing_2022():
+    dc = {"items": [{"id": "x", "harmonised_labels": True,
+                     "distributions": {"2024": {"distribution": [0.5, 0.5],
+                                                "labels": ["a", "b"], "n_unweighted": 5}},
+                     "pairs": []}]}
+    with pytest.raises(ValueError):
+        E.sig_year_data(dc, ids=("x",))
+
+
+def test_mean_position_matches_scorer_definition():
+    # a distribution skewed to higher indices has a higher mean position
+    lo = E.mean_position([0.7, 0.2, 0.1])
+    hi = E.mean_position([0.1, 0.2, 0.7])
+    assert hi > lo
+    # uniform over 5 options -> mean index 2.0
+    assert E.mean_position([0.2] * 5) == pytest.approx(2.0)
+
+
+def test_tracking_row_direction_match_when_model_moves_with_population():
+    # population moves up (mass to higher indices); model moves up too -> match, E>0
+    t22 = [0.4, 0.3, 0.2, 0.1]
+    t24 = [0.1, 0.2, 0.3, 0.4]
+    m22 = [0.35, 0.30, 0.20, 0.15]
+    m24 = [0.15, 0.20, 0.30, 0.35]
+    row = E.tracking_row("x", "nhs", m22, m24, t22, t24)
+    assert row["real_shift"] > 0
+    assert row["model_shift"] > 0
+    assert row["direction_match"] is True
+    assert row["elasticity"] > 0
+
+
+def test_tracking_row_direction_mismatch_when_model_moves_opposite():
+    t22 = [0.4, 0.3, 0.2, 0.1]
+    t24 = [0.1, 0.2, 0.3, 0.4]   # population up
+    m22 = [0.15, 0.20, 0.30, 0.35]
+    m24 = [0.35, 0.30, 0.20, 0.15]   # model down
+    row = E.tracking_row("x", "nhs", m22, m24, t22, t24)
+    assert row["direction_match"] is False
+    assert row["elasticity"] < 0
+
+
+def test_tracking_row_frozen_model_has_zero_shift():
+    t22 = [0.4, 0.3, 0.2, 0.1]
+    t24 = [0.1, 0.2, 0.3, 0.4]
+    m = [0.25, 0.25, 0.25, 0.25]
+    row = E.tracking_row("x", "nhs", m, m, t22, t24)
+    assert row["model_shift"] == pytest.approx(0.0)
+    assert row["direction_match"] is False   # sign(0) != sign(pop)
+    assert row["elasticity"] == pytest.approx(0.0)
+
+
+def test_tracking_summary_rate_and_moved_count():
+    rows = [
+        {"direction_match": True, "elasticity": 0.8, "model_shift": 0.2},
+        {"direction_match": True, "elasticity": 1.2, "model_shift": 0.3},
+        {"direction_match": False, "elasticity": -0.5, "model_shift": -0.1},
+        {"direction_match": None, "elasticity": None, "model_shift": 0.0},
+    ]
+    s = E.tracking_summary(rows, seed=0)
+    assert s["n_items"] == 4
+    assert s["n_trackable"] == 3
+    assert s["direction_match_count"] == 2
+    assert s["direction_match_rate"] == pytest.approx(2 / 3)
+    assert s["elasticity"]["mean"] == pytest.approx((0.8 + 1.2 - 0.5) / 3)
+    assert s["n_model_moved"] == 3
+
+
+def test_tracking_summary_empty_trackable_is_none_rate():
+    rows = [{"direction_match": None, "elasticity": None, "model_shift": 0.0}]
+    s = E.tracking_summary(rows, seed=0)
+    assert s["direction_match_rate"] is None
+    assert s["elasticity"]["mean"] is None
+    assert s["n_trackable"] == 0
