@@ -682,3 +682,27 @@ def test_homogenisation_report_drop_direction():
     assert rep["mean_pairwise_tv_untuned"] > rep["mean_pairwise_tv_tuned"]
     assert rep["drop"] > 0                       # positive drop = homogenisation cost
     assert rep["n_probes"] == 3
+
+
+# ---- reproducibility guard: the model default stays the 3B (committed run-blocks) ----
+
+def test_runner_model_defaults_are_the_3b_id():
+    """Every MLX runner's `model_name` default is the committed 3B id, so every committed
+    run-block command reproduces verbatim even after Phase 5 added an 8B `--model` override.
+    REP1 (8B replication) passes `--model` explicitly; it must never shift these defaults."""
+    import inspect
+    expected = "mlx-community/Llama-3.2-3B-Instruct-4bit"
+    for fn in (E.run_baseline, E.run_tracking, E.run_floors, E.run_guard_grid):
+        assert inspect.signature(fn).parameters["model_name"].default == expected, fn.__name__
+
+
+def test_cli_model_flag_defaults_to_the_3b_id():
+    """The `--model` CLI flag exists and defaults to the 3B id, so `--baseline`/`--tracking`
+    run-block commands without an explicit `--model` stay reproducible on the 3B."""
+    import argparse
+    expected = "mlx-community/Llama-3.2-3B-Instruct-4bit"
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", default=expected)
+    assert ap.parse_args([]).model == expected
+    # and an explicit override is honoured (the REP1 8B path)
+    assert ap.parse_args(["--model", "foo/bar"]).model == "foo/bar"
