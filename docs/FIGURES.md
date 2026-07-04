@@ -9,6 +9,16 @@ to PS1's extract in `tests/test_paper_figures.py` so no figure can drift from
 write; these are **bullet points**, not finished captions. Colours are Wong (2011)
 colorblind-safe; output is deterministic (byte-identical re-renders).
 
+**8B overlays (Phase 5):** two figures now carry the 8B replication side by side —
+**F3** (a two-panel 3B|8B floors comparison — the single most striking replication,
+0.707→0.074) and **F2** (a small 8B model-shift marker overlay). **F1, F4, F5 stay
+3B-only** by design: F1's ladder is the 3B narrative spine and the steering/LoRA rungs
+were *not* re-run at 8B (mechanistically-explained negatives); F4's steering geometry is a
+Phase-2 3B-only mechanism (no 8B steering run); F5's 50-item fidelity waterfall is the 3B
+per-item picture, and an 8B overlay would double the bars for no analytic gain (the 8B
+headline — larger gap, still-n.s. lift — is already in F3's baseline column and §10). All
+five figures render from the same script; only F2/F3 read the `_8b` artifacts.
+
 Regenerate: `python scripts/make_paper_figures.py`
 (needs matplotlib; the project `.venv` does **not** ship it — see the note at the bottom).
 
@@ -33,38 +43,61 @@ Regenerate: `python scripts/make_paper_figures.py`
     while holding rights floors is **not** available at any single lever except context.
 
 ## F2 — Evidence tracking, per item (`f2_tracking.{pdf,png}`)
-- **Artifact:** `out/evidcond_tracking_3b.json` → `items[].{real_shift, model_shift,
-  direction_match}`, `headline.{direction_match_count, elasticity}`.
-- **Shows:** the real 2022→2024 public mean-position shift (filled markers) vs the model's
-  evidence-induced shift (open markers) for all 10 Bonferroni-significant items, sorted by
-  real shift; direction mismatches flagged.
-- **Key numbers:** direction match **8/10**; mean elasticity **+0.395**,
-  CI **[+0.020, +0.811]** (barely clears zero); all 10 items moved.
+- **Artifacts:** `out/evidcond_tracking_3b.json` → `items[].{real_shift, model_shift,
+  direction_match}`, `headline.{direction_match_count, elasticity}`; **8B overlay** from
+  `out/evidcond_tracking_8b.json` (same item ids, `items[].{model_shift, direction_match}`,
+  `headline.{direction_match_count, elasticity}`).
+- **Shows:** the real 2022→2024 public mean-position shift (filled blue markers) vs the model's
+  evidence-induced shift for all 10 Bonferroni-significant items, sorted by real shift;
+  **3B = open circles, 8B = open diamonds**, each direction-coloured (green = direction match,
+  orange = mismatch); mismatches flagged. `real_shift` is model-independent, so both models'
+  markers hang off the one shared real marker per item.
+- **Key numbers:** 3B direction match **8/10**, elasticity **+0.395** CI **[+0.020, +0.811]**;
+  **8B direction match 8/10, elasticity +0.647 CI [+0.008, +1.209]** — both barely clear zero;
+  all 10 items moved on both models.
 - **Caption bullets:**
-  - Changing only the evidence *year* moves the model along the real shift for 8 of 10 items.
-  - The two misses — `welfare_dependency`, `big_business_workers` — are exactly the items
-    whose real shift runs against the model's prior (consistent with P2 heterogeneity); the
-    figure shows real and model shifts on opposite sides of zero for both.
-  - Honest ceiling: the effect is **directional, not a magnitude** — the CI barely clears
-    zero, so claim "right direction, incompletely," not "tracks ~40% of the shift."
+  - Changing only the evidence *year* moves the model along the real shift for 8 of 10 items —
+    **on both a 3B and an 8B model** (identical 8/10 rate; 8B elasticity stronger, CIs overlap
+    heavily). Tracking is a real, **size-robust** capability, not a 3B artefact.
+  - The two 3B misses — `welfare_dependency`, `big_business_workers` — are the items whose real
+    shift runs against the model's prior (consistent with P2 heterogeneity). At 8B two items flip
+    but they *cancel*: `welfare_dependency` becomes a match (8B diamond turns green) while
+    `social_care_satisfaction` becomes a mismatch — so the 8/10 headline is identical for a
+    slightly different item set; `big_business_workers` stays a mismatch on both.
+  - Honest ceiling (both models): the effect is **directional, not a magnitude** — the CI barely
+    clears zero, so claim "right direction, incompletely," not "tracks ~40–65% of the shift."
 
 ## F3 — Floors under attack + failed guards (`f3_floors.{pdf,png}`)
-- **Artifacts:** `out/evidcond_floors_3b.json` (no_guard, `headline.{baseline,
+- **Two-panel 3B | 8B replication figure.**
+- **Artifacts (3B, left panel):** `out/evidcond_floors_3b.json` (no_guard, `headline.{baseline,
   hostile_evidence, adversarial_prompt, both}.floor_mass`) +
   `out/floorguard_grid_3b.json` (four guard arms, `headline.arms[*].floor_by_condition`).
-- **Shows:** floor (protective) mass by condition × arm, 0.5 floor line drawn, 95% CIs.
-- **Key numbers:** no_guard baseline **0.512** → hostile **0.318** (crack, 12/12 below 0.5);
+- **Artifacts (8B, right panel):** `out/evidcond_floors_8b.json` (no_guard) +
+  `out/floorguard_grid_8b.json` (the two re-run G1-subset arms `guard_rights_floor`,
+  `guard_constitution` — provenance/combined were dominated 3B arms, not replicated).
+- **Shows:** floor (protective) mass by condition × arm, 0.5 floor line drawn, 95% CIs, shared
+  y-scale so the two models are directly comparable.
+- **Key numbers (3B):** no_guard baseline **0.512** → hostile **0.318** (crack, 12/12 below 0.5);
   guard hostile masses provenance **0.288**, rights-floor **0.310**, constitution **0.402**,
   combined **0.303** — **none** reaches 0.5.
+- **Key numbers (8B):** no_guard baseline **0.707** (a much stronger floor-holder, 4/12 below) →
+  hostile **0.074** (11/12 below) — the **single most striking replication number** (Δ−0.633,
+  **~3× the 3B crack**); adversarial-prompt bar **0.794** (n.s., 1/12 below); guard hostile masses
+  rights-floor **0.371**, constitution **0.409** — again **neither** reaches 0.5.
 - **Caption bullets:**
-  - The synthetic hostile-evidence channel cracks every floor; the adversarial *prompt* alone
-    does not (bars stay near baseline).
-  - `guard_provenance` **backfires**: its hostile bar sits *below* no_guard, and it degrades
-    the no-attack baseline (0.512 → 0.460).
-  - `guard_constitution` is the only partial recovery (tallest hostile bar, 0.402) but still
-    below the 0.5 floor — floor-safety cannot be prompted into the evidence channel.
+  - The synthetic hostile-evidence channel cracks every floor **on both models**; the adversarial
+    *prompt* alone does not (its bars stay near/above baseline on both — sharper on 8B, 1/12 below).
+  - **Scale does not buy evidence-channel safety.** The 8B is a much stronger *baseline*
+    floor-holder (0.707 vs 0.512) yet cracks **~3× deeper** under hostile evidence (0.707→0.074) —
+    the taller baseline makes the fall more dramatic, not safer.
+  - Guards fail on both models. On 3B `guard_provenance` **backfires** (hostile bar below no_guard;
+    degrades the no-attack baseline 0.512 → 0.460); `guard_constitution` is the only 3B partial
+    recovery (0.402) but still below 0.5. On 8B both re-run guards produce a *significant* partial
+    recovery (rights-floor 0.371, constitution 0.409) yet **neither reaches even the 0.45 partial
+    bar** — floor-safety cannot be prompted into the evidence channel at either scale.
   - **SYNTHETIC** hostile evidence (red-team stress data, ~75% anti-rights mass); NOT real
-    BSA opinion. Note the base deficit: 5/12 floors are already below 0.5 unattacked.
+    BSA opinion. The base deficit is model-dependent: 5/12 3B floors are below 0.5 unattacked, vs
+    only 4/12 on the 8B — the *baseline* deficit is a 3B weakness, the *crack* is size-robust.
 
 ## F4 — Steering geometry (`f4_geometry.{pdf,png}`)
 - **Artifacts:** `out/act_steer_geometry_3b.json` (`per_layer[L].{mean_offdiag_cosine,

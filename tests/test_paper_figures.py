@@ -254,3 +254,68 @@ def test_f5_n_worse_matches_ps1(prepped, extract):
 def test_f5_n_worse_equals_negative_count(prepped):
     d = prepped["f5_fidelity"]
     assert d["n_worse"] == int((d["deltas"] < 0).sum())
+
+
+# ---------------------------------------------------------------------------
+# Phase-5 8B overlays: F2 tracking markers + F3 floors panel. Every plotted 8B
+# number is bound to PS1's model_robustness_8b extract so the overlay cannot
+# drift from docs/PAPER_RESULTS.md §10.
+# ---------------------------------------------------------------------------
+def test_f2_has_8b_overlay_aligned_and_bound(prepped, extract):
+    d = prepped["f2_tracking"]
+    assert d["has_8b"] is True
+    # 8B model shifts align to the same 10 sorted items
+    assert d["model_8b"].shape == (10,)
+    assert d["match_8b"].shape == (10,)
+    r8 = extract["model_robustness_8b"]["numbers"]["p3_tracking"]
+    assert d["direction_match_count_8b"] == r8["direction_match_count"] == 8
+    assert int(d["match_8b"].sum()) == d["direction_match_count_8b"]
+    assert d["elasticity_mean_8b"] == pytest.approx(r8["elasticity"]["mean"])
+    assert d["elasticity_ci_8b"][0] == pytest.approx(r8["elasticity"]["ci_lo"])
+    assert d["elasticity_ci_8b"][1] == pytest.approx(r8["elasticity"]["ci_hi"])
+    assert d["elasticity_ci_8b"][0] > 0  # clears zero on 8B too
+
+
+def test_f2_real_shift_shared_across_models(prepped):
+    # real_shift is model-independent — the overlay must reuse the same `real`
+    # series (the figure draws one real marker per item, both models' model-shift
+    # markers hang off it).
+    d = prepped["f2_tracking"]
+    assert d["real"].shape == d["model_8b"].shape
+
+
+def test_f3_8b_panel_shape_and_arms(prepped):
+    d8 = prepped["f3_floors_8b"]
+    assert d8["conditions"] == ["baseline", "hostile_evidence", "adversarial_prompt", "both"]
+    # only the 3 re-run arms (provenance/combined were dominated 3B arms)
+    assert d8["arm_order"] == ["no_guard", "guard_rights_floor", "guard_constitution"]
+    for arm in d8["arm_order"]:
+        assert d8["mass"][arm].shape == (4,)
+    assert d8["floor_min"] == 0.5
+
+
+def test_f3_8b_no_guard_matches_ps1(prepped, extract):
+    d8 = prepped["f3_floors_8b"]
+    fl = extract["model_robustness_8b"]["numbers"]["p4_floors"]
+    for i, c in enumerate(d8["conditions"]):
+        assert d8["mass"]["no_guard"][i] == pytest.approx(fl[c]["floor_mass"]["mean"])
+
+
+def test_f3_8b_the_striking_crack_0707_to_0074(prepped):
+    # The single most striking replication number gets its own panel bar.
+    d8 = prepped["f3_floors_8b"]
+    bi = d8["conditions"].index("baseline")
+    hi = d8["conditions"].index("hostile_evidence")
+    assert d8["mass"]["no_guard"][bi] == pytest.approx(0.7074, abs=1e-3)  # stronger baseline holder
+    assert d8["mass"]["no_guard"][hi] == pytest.approx(0.0743, abs=1e-3)  # cracks ~3x deeper
+    assert d8["mass"]["no_guard"][bi] > 0.5  # 8B baseline holds
+    assert d8["mass"]["no_guard"][hi] < 0.5  # hostile cracks it hard
+
+
+def test_f3_8b_guards_match_ps1_and_still_fail(prepped, extract):
+    d8 = prepped["f3_floors_8b"]
+    arms = extract["model_robustness_8b"]["numbers"]["g1_guards"]["arms"]
+    hi = d8["conditions"].index("hostile_evidence")
+    for name in ("guard_rights_floor", "guard_constitution"):
+        assert d8["mass"][name][hi] == pytest.approx(arms[name]["hostile_floor_mass"]["mean"])
+        assert d8["mass"][name][hi] < 0.45  # still fails the partial bar on 8B

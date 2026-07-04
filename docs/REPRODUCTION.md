@@ -312,6 +312,60 @@ python scripts/make_paper_figures.py
 
 ---
 
+## Phase 5 — 8B replication of the core battery (model robustness)
+
+Four `_8b` artifacts replicate the P2/P3/P4/G1-subset battery on a **second, larger** model,
+`mlx-community/Meta-Llama-3.1-8B-Instruct-4bit` (numbers in
+[`docs/PAPER_RESULTS.md` §10](PAPER_RESULTS.md#10-model-robustness--8b-replication)). MLX /
+Apple Silicon, `.venv`, same item sets and `n_orders=2` as the 3B runs. These reuse the
+**same runners** as P2/P3/P4/G1 — the only difference from the committed 3B commands is the
+`--model` flag; **the run-block `command` field does not echo `--model`** (it is the runner's
+hardcoded canonical string), so the verified command below is byte-identical to the 3B one and
+the model override is documented here in prose.
+
+- **The `--model` flag.** `alignment.evidcond_run` takes `--model`
+  (`ap.add_argument("--model", default="mlx-community/Llama-3.2-3B-Instruct-4bit")`, threaded to
+  `run_baseline`/`run_tracking`/`run_floors`/`run_guard_grid`). The default is unchanged, so the
+  committed 3B run-block commands stay reproducible; the 8B runs pass
+  `--model mlx-community/Meta-Llama-3.1-8B-Instruct-4bit`. The run block records the actual model
+  under `run.models`, not in `run.command` — so the verifier matches the canonical command string.
+- **Model download.** The 8B-4bit weights (~4.5 GB) download once from the MLX community hub
+  (the 4bit variant was not pre-cached — only 3bit/8bit were). Allowed once, per the Phase 5 plan.
+- **Throughput / runtimes.** ~1.11 s / forward pass (vs 3B's ~0.33 s → 3.4× slower). P2 baseline
+  **4:44**, P3 tracking **1:23**, P4 floors **~3:55** (incl. load), G1-subset **~17 min** (12
+  probes × 3 arms × 4 conds × 2 orders = 288 passes). All far under the 45-min ceiling.
+
+**P2 baseline (8B)** → `out/evidcond_baseline_8b.json` (code_ref `ae506633`; added-in `9e087de`).
+Run with `--model mlx-community/Meta-Llama-3.1-8B-Instruct-4bit`.
+
+```
+python -m alignment.evidcond_run --baseline
+```
+
+**P3 tracking (8B)** → `out/evidcond_tracking_8b.json` (code_ref `ae506633`; added-in `9e087de`).
+Reads the read-only BSA delta file `out/_bsa_delta_check.json`. Run with the same `--model` flag.
+
+```
+python -m alignment.evidcond_run --tracking
+```
+
+**P4 floors (8B)** → `out/evidcond_floors_8b.json` (code_ref `9e087de1`; added-in `7006f7d`).
+SYNTHETIC hostile evidence (red-team stress data). Run with the same `--model` flag.
+
+```
+python -m alignment.evidcond_run --floors
+```
+
+**G1 guard-grid subset (8B)** → `out/floorguard_grid_8b.json` (code_ref `9e087de1`; added-in
+`7006f7d`). Subset arms `{no_guard, guard_rights_floor, guard_constitution}` (provenance/combined
+were dominated 3B arms, not re-run). Run with the same `--model` flag.
+
+```
+python -m alignment.evidcond_run --guard-grid
+```
+
+---
+
 ## Known irreproducibilities
 
 Byte-identical reproduction is **not** guaranteed for the following; the headline verdicts are
@@ -351,7 +405,10 @@ nothing in a JSON to check against):
 
 - **run-block-verified:** all 8 Phase-2 `act_steer_*` (holdout, holdout-late, ci, randctrl,
   negalpha, geometry, offtask, personactrl), P0 `w1_cosine`, P2 baseline, P3 tracking, P4
-  floors, P5a `lora-build` (design), P5b `lora-eval`, G1 `guard-grid`.
+  floors, P5a `lora-build` (design), P5b `lora-eval`, G1 `guard-grid`, and the **four Phase-5
+  8B replication** artifacts (`evidcond_{baseline,tracking,floors}_8b`, `floorguard_grid_8b` —
+  the run-block `command` is the runner's canonical string, byte-identical to its 3B twin; the
+  `--model` override is prose-documented, not in the command). 19 verified total.
 - **asserted-by-doc (no run-block `command`):** the 3 Phase-1 logit-bias artifacts, the
   superseded `activation_steering_3b_4opt.json`, the `mlx_lm lora` training call (checked against
   `adapter_config.json` params), the extractor, and the figures.

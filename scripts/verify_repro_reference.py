@@ -81,6 +81,18 @@ EXPECTED = [
      "python scripts/extract_paper_results.py --out out/paper_results_extract.json"),
     ("figures", None,
      "python scripts/make_paper_figures.py"),
+    # Phase 5 — 8B replication. These reuse the P2/P3/P4/G1 runners with a
+    # --model override; the run-block `command` is the runner's canonical string
+    # (NO --model echo), so it byte-matches the same command as the 3B run and is
+    # run-block-verified. The --model flag is documented in prose in the doc.
+    ("rep-p2-baseline-8b", "evidcond_baseline_8b.json",
+     "python -m alignment.evidcond_run --baseline"),
+    ("rep-p3-tracking-8b", "evidcond_tracking_8b.json",
+     "python -m alignment.evidcond_run --tracking"),
+    ("rep-p4-floors-8b", "evidcond_floors_8b.json",
+     "python -m alignment.evidcond_run --floors"),
+    ("rep-g1-guard-grid-8b", "floorguard_grid_8b.json",
+     "python -m alignment.evidcond_run --guard-grid"),
 ]
 
 

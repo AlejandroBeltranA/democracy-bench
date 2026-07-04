@@ -502,6 +502,110 @@ def extract_g1_guards():
     }
 
 
+def extract_model_robustness_8b():
+    """Phase 5 — 8B replication of the core P2/P3/P4/G1-subset battery.
+
+    Reads the four `_8b` artifacts (Meta-Llama-3.1-8B-Instruct-4bit) with the
+    SAME fail-loud contract as the 3B extractors above. This section carries
+    ONLY the 8B numbers; the side-by-side vs 3B lives in docs/PAPER_RESULTS.md
+    (which reads both this section and the 3B sections). Verdicts per claim:
+      - P2 fidelity: evidence lift n.s. on both -> REPLICATES; 8B is a stronger
+        baseline floor-holder (0.707 vs 0.512) -> that ONE sub-number does not.
+      - P3 tracking: 8/10 direction + elasticity CI clears zero -> REPLICATES.
+      - P4 floors: hostile-evidence crack REPLICATES (deeper, ~3x); prompt-attack
+        channel asymmetry REPLICATES (sharper).
+      - G1 guards: both prompt guards still FAIL on both sizes -> REPLICATES;
+        8B recovery is genuine per-probe (TV RISES, not homogenised) yet insufficient.
+    """
+    base, pb = load("evidcond_baseline_8b.json")
+    trk, pt = load("evidcond_tracking_8b.json")
+    fl, pf = load("evidcond_floors_8b.json")
+    gg, pg = load("floorguard_grid_8b.json")
+
+    # --- P2 fidelity (8B) ---
+    bhd = dig(base, ["headline"], pb)
+    bitems = dig(base, ["items"], pb)
+    b_n_worse = sum(1 for it in bitems if it.get("delta", 0.0) < 0.0)
+
+    # --- P4 floors (8B) ---
+    fhd = dig(fl, ["headline"], pf)
+
+    def _cond(name):
+        c = dig(fhd, [name], pf)
+        return {
+            "floor_mass": stat(c, ["floor_mass"], pf),
+            "delta_vs_baseline": stat(c, ["delta_vs_baseline"], pf),
+            "n_below_floor": dig(c, ["n_below_floor"], pf),
+            "floor_min": dig(c, ["floor_min"], pf),
+        }
+
+    # --- G1 guard subset (8B: no_guard, guard_rights_floor, guard_constitution) ---
+    arms = dig(gg, ["headline", "arms"], pg)
+    guard_out = {}
+    for name in ("no_guard", "guard_rights_floor", "guard_constitution"):
+        a = dig(arms, [name], pg)
+        fbc = dig(a, ["floor_by_condition"], pg)
+        entry = {
+            "hostile_floor_mass": stat(dig(fbc, ["hostile_evidence"], pg), ["floor_mass"], pg),
+            "baseline_floor_mass": stat(dig(fbc, ["baseline"], pg), ["floor_mass"], pg),
+            "hostile_below_floor": dig(fbc, ["hostile_evidence", "n_below_floor"], pg),
+            "hostile_mean_pairwise_tv": dig(a, ["hostile_mean_pairwise_tv"], pg),
+        }
+        if name != "no_guard":
+            entry["hostile_delta_vs_no_guard"] = stat(a, ["hostile_evidence_delta_vs_no_guard"], pg)
+            entry["baseline_delta_vs_no_guard"] = stat(a, ["baseline_delta_vs_no_guard"], pg)
+            entry["baseline_degraded"] = dig(a, ["baseline_degraded"], pg)
+            entry["verdict"] = dig(a, ["verdict"], pg)
+        guard_out[name] = entry
+
+    return {
+        "claim": "Phase 5 (8B replication): P2 lift n.s. + P3 8/10 tracking + P4 hostile-evidence crack + G1 prompt-guard failure ALL REPLICATE on Meta-Llama-3.1-8B-Instruct-4bit; the ONE non-replication is 8B being a much stronger BASELINE floor-holder (0.707 vs 3B 0.512), yet it cracks ~3x deeper under hostile evidence.",
+        "model_under_test": "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit (8B, 4-bit)",
+        "sources": [pb, pt, pf, pg],
+        "keys": [
+            "evidcond_baseline_8b: headline.{no_evidence,evidence,delta,fidelity_gap}, items[].delta, floors.no_evidence",
+            "evidcond_tracking_8b: headline.{direction_match_count,direction_match_rate,elasticity,n_model_moved}",
+            "evidcond_floors_8b: headline.{baseline,hostile_evidence,adversarial_prompt,both}.{floor_mass,delta_vs_baseline,n_below_floor}",
+            "floorguard_grid_8b: replication_check, headline.arms[{no_guard,guard_rights_floor,guard_constitution}].{floor_by_condition,*_delta_vs_no_guard,baseline_degraded,verdict}",
+        ],
+        "numbers": {
+            "p2_fidelity": {
+                "no_evidence_rep": stat(bhd, ["no_evidence"], pb),
+                "evidence_rep": stat(bhd, ["evidence"], pb),
+                "delta": stat(bhd, ["delta"], pb),
+                "fidelity_gap": dig(bhd, ["fidelity_gap"], pb),
+                "n_items": len(bitems),
+                "n_items_worse_with_evidence": b_n_worse,
+                "floors_no_evidence": stat(dig(base, ["floors"], pb), ["no_evidence"], pb),
+            },
+            "p3_tracking": {
+                "n_items": dig(dig(trk, ["headline"], pt), ["n_items"], pt),
+                "n_trackable": dig(dig(trk, ["headline"], pt), ["n_trackable"], pt),
+                "direction_match_count": dig(dig(trk, ["headline"], pt), ["direction_match_count"], pt),
+                "direction_match_rate": dig(dig(trk, ["headline"], pt), ["direction_match_rate"], pt),
+                "elasticity": stat(dig(trk, ["headline"], pt), ["elasticity"], pt),
+                "n_model_moved": dig(dig(trk, ["headline"], pt), ["n_model_moved"], pt),
+            },
+            "p4_floors": {
+                "baseline": _cond("baseline"),
+                "hostile_evidence": _cond("hostile_evidence"),
+                "adversarial_prompt": _cond("adversarial_prompt"),
+                "both": _cond("both"),
+            },
+            "g1_guards": {
+                "replication_check": dig(gg, ["replication_check"], pg),
+                "arms": guard_out,
+            },
+        },
+        "caveats": [
+            "Replication model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit (8B, 4-bit) — the ONLY two-model section in this extract; all other sections are the single 3B-4bit model.",
+            "Same battery/grids as the committed 3B runs (P2: 50 contestable + 12 floor; P3: 10 sig items; P4: 12 floor probes x 4 conditions; G1-subset: {no_guard, rights_floor, constitution} — provenance/combined were dominated 3B arms and NOT re-run).",
+            "SYNTHETIC hostile evidence (hostile_distribution, ~75% anti-rights mass) — red-team stress data, not real BSA opinion (same as 3B P4).",
+            "floorguard_grid_8b.replication_check compares the 8B no_guard against the 3B P4 reference (0.5116/0.3177) and is EXPECTEDLY within_tolerance=false (cross-MODEL, not a self-check); the 8B self-consistency is no_guard_hostile 0.0743 == floors_8b hostile 0.0743.",
+        ],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Assembly
 # ---------------------------------------------------------------------------
@@ -513,6 +617,7 @@ EXTRACTORS = {
     "p4_floors": extract_p4_floors,
     "p5_lora": extract_p5_lora,
     "g1_guards": extract_g1_guards,
+    "model_robustness_8b": extract_model_robustness_8b,
 }
 
 

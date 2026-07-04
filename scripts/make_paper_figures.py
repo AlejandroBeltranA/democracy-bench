@@ -108,11 +108,16 @@ def prep_f1_ladder():
     return rungs, verdict_colour
 
 
-def prep_f2_tracking(tracking):
+def prep_f2_tracking(tracking, tracking_8b=None):
     """P3 per-item real vs model 2022->2024 mean-position shift, 10 items.
 
     Returns dict with parallel arrays sorted by real_shift descending:
       ids, real, model, match(bool), and the headline annotation numbers.
+
+    If tracking_8b is supplied (Phase-5 8B replication), also returns the 8B
+    model shifts / matches aligned to the SAME sorted item order (a small marker
+    overlay) plus the 8B headline direction count + elasticity. real_shift is
+    model-independent, so the two models share the `real` series.
     """
     import numpy as np
 
@@ -125,7 +130,7 @@ def prep_f2_tracking(tracking):
     order = np.argsort(-real)  # largest real shift at top
     hd = dig(tracking, ["headline"], "evidcond_tracking_3b.json")
     el = dig(hd, ["elasticity"], "headline")
-    return {
+    out = {
         "ids": [ids[i] for i in order],
         "real": real[order],
         "model": model[order],
@@ -134,7 +139,29 @@ def prep_f2_tracking(tracking):
         "n_items": dig(hd, ["n_items"], "headline"),
         "elasticity_mean": dig(el, ["mean"], "elasticity"),
         "elasticity_ci": list(dig(el, ["ci"], "elasticity")),
+        "has_8b": False,
     }
+
+    if tracking_8b is not None:
+        fp8 = "evidcond_tracking_8b.json"
+        items8 = dig(tracking_8b, ["items"], fp8)
+        by_id8 = {dig(it, ["id"], "item"): it for it in items8}
+        # align 8B model shifts to the SAME sorted order of ids (fail loud if an id is absent)
+        model8 = np.array(
+            [dig(by_id8[i], ["model_shift"], fp8) for i in out["ids"]], dtype=float)
+        match8 = np.array(
+            [bool(dig(by_id8[i], ["direction_match"], fp8)) for i in out["ids"]])
+        hd8 = dig(tracking_8b, ["headline"], fp8)
+        el8 = dig(hd8, ["elasticity"], "headline")
+        out.update({
+            "has_8b": True,
+            "model_8b": model8,
+            "match_8b": match8,
+            "direction_match_count_8b": dig(hd8, ["direction_match_count"], "headline"),
+            "elasticity_mean_8b": dig(el8, ["mean"], "elasticity"),
+            "elasticity_ci_8b": list(dig(el8, ["ci"], "elasticity")),
+        })
+    return out
 
 
 def prep_f3_floors(floors, guards):
@@ -182,6 +209,57 @@ def prep_f3_floors(floors, guards):
     return {
         "conditions": conditions,
         "cond_labels": cond_labels,
+        "arm_order": arm_order,
+        "arm_display": [arm_display[a] for a in arm_order],
+        "mass": mass,
+        "ci_lo": ci_lo,
+        "ci_hi": ci_hi,
+        "floor_min": 0.5,
+    }
+
+
+def prep_f3_floors_8b(floors_8b, guards_8b):
+    """Phase-5 8B replication panel for F3: floor mass by condition for the 8B
+    no_guard (P4) row plus the two G1-subset guard arms (rights_floor,
+    constitution). Same condition order as prep_f3_floors. This is the single
+    most striking replication number (0.707 -> 0.074) and gets its own panel.
+
+    Only the arms that were RE-RUN at 8B are present (provenance/combined were
+    the dominated 3B arms and not replicated), so the 8B panel has 3 arms.
+    """
+    import numpy as np
+
+    conditions = ["baseline", "hostile_evidence", "adversarial_prompt", "both"]
+
+    fp = "evidcond_floors_8b.json"
+    fh = dig(floors_8b, ["headline"], fp)
+    no_guard_mass = [dig(fh, [c, "floor_mass", "mean"], fp) for c in conditions]
+    no_guard_lo = [dig(fh, [c, "floor_mass", "ci", 0], fp) for c in conditions]
+    no_guard_hi = [dig(fh, [c, "floor_mass", "ci", 1], fp) for c in conditions]
+
+    gp = "floorguard_grid_8b.json"
+    arms_json = dig(guards_8b, ["headline", "arms"], gp)
+    guard_order = ["guard_rights_floor", "guard_constitution"]
+    guard_labels = {
+        "guard_rights_floor": "rights-floor (8B)",
+        "guard_constitution": "constitution (8B)",
+    }
+
+    mass = {"no_guard": np.array(no_guard_mass)}
+    ci_lo = {"no_guard": np.array(no_guard_lo)}
+    ci_hi = {"no_guard": np.array(no_guard_hi)}
+    for name in guard_order:
+        a = dig(arms_json, [name], gp)
+        fbc = dig(a, ["floor_by_condition"], gp)
+        mass[name] = np.array([dig(fbc, [c, "floor_mass", "mean"], gp) for c in conditions])
+        ci_lo[name] = np.array([dig(fbc, [c, "floor_mass", "ci", 0], gp) for c in conditions])
+        ci_hi[name] = np.array([dig(fbc, [c, "floor_mass", "ci", 1], gp) for c in conditions])
+
+    arm_order = ["no_guard"] + guard_order
+    arm_display = {"no_guard": "no guard (8B)", **guard_labels}
+    return {
+        "conditions": conditions,
+        "cond_labels": ["baseline", "hostile\nevidence", "adversarial\nprompt", "both"],
         "arm_order": arm_order,
         "arm_display": [arm_display[a] for a in arm_order],
         "mass": mass,
@@ -322,7 +400,12 @@ def plot_f2(plt, data):
     ax.scatter(data["real"], y, s=64, color=CB["blue"], zorder=3, label="real 2022->2024 shift")
     match_c = [CB["green"] if m else CB["vermillion"] for m in data["match"]]
     ax.scatter(data["model"], y, s=64, facecolors="white", edgecolors=match_c,
-               linewidths=1.8, zorder=3, label="model evidence-induced shift")
+               linewidths=1.8, zorder=3, label="3B model shift")
+    if data.get("has_8b"):
+        # small 8B overlay: diamond markers, direction-coloured edge, same order
+        match_c8 = [CB["green"] if m else CB["vermillion"] for m in data["match_8b"]]
+        ax.scatter(data["model_8b"], y, s=42, marker="D", facecolors="white",
+                   edgecolors=match_c8, linewidths=1.4, zorder=2, label="8B model shift")
     ax.axvline(0.0, color="#000000", lw=0.8, zorder=0)
     ax.set_yticks(y)
     ax.set_yticklabels(data["ids"], fontsize=9)
@@ -333,26 +416,28 @@ def plot_f2(plt, data):
         if not m:
             ax.text(ax.get_xlim()[1], y[i], "  dir mismatch", va="center", ha="left",
                     fontsize=7.5, color=CB["vermillion"])
-    ann = (f"direction match {data['direction_match_count']}/{data['n_items']}   "
+    ann = (f"3B: direction match {data['direction_match_count']}/{data['n_items']}   "
            f"elasticity {data['elasticity_mean']:+.3f} "
            f"CI[{data['elasticity_ci'][0]:+.3f}, {data['elasticity_ci'][1]:+.3f}]")
+    if data.get("has_8b"):
+        ann += (f"\n8B: direction match {data['direction_match_count_8b']}/{data['n_items']}   "
+                f"elasticity {data['elasticity_mean_8b']:+.3f} "
+                f"CI[{data['elasticity_ci_8b'][0]:+.3f}, {data['elasticity_ci_8b'][1]:+.3f}]")
     ax.text(0.5, 1.02, ann, transform=ax.transAxes, ha="center", va="bottom",
-            fontsize=9.5, color="#222222")
+            fontsize=9.0, color="#222222")
     ax.legend(loc="lower right", fontsize=8.5, framealpha=0.9)
     fig.tight_layout()
     return fig
 
 
-def plot_f3(plt, data):
+def _plot_f3_panel(ax, data, arm_colours, ymax):
     import numpy as np
 
-    fig, ax = _new_fig(plt, 8.6, 4.8)
     conds = data["cond_labels"]
     arms = data["arm_order"]
     x = np.arange(len(conds))
     n_arm = len(arms)
     width = 0.8 / n_arm
-    arm_colours = [CB["black"], CB["vermillion"], CB["sky"], CB["green"], CB["purple"]]
     for j, arm in enumerate(arms):
         offs = (j - (n_arm - 1) / 2) * width
         m = data["mass"][arm]
@@ -366,9 +451,33 @@ def plot_f3(plt, data):
             fontsize=9, color=CB["vermillion"], fontweight="bold")
     ax.set_xticks(x)
     ax.set_xticklabels(conds, fontsize=9)
-    ax.set_ylabel("floor (protective) mass", fontsize=10)
-    ax.set_ylim(0, max(0.7, float(max(data["ci_hi"]["guard_rights_floor"])) + 0.05))
+    ax.set_ylim(0, ymax)
     ax.legend(loc="upper right", fontsize=8, ncol=1, framealpha=0.9)
+
+
+def plot_f3(plt, data, data_8b=None):
+    # 3B palette: no_guard, provenance, rights_floor, constitution, combined
+    colours_3b = [CB["black"], CB["vermillion"], CB["sky"], CB["green"], CB["purple"]]
+    if data_8b is None:
+        fig, ax = _new_fig(plt, 8.6, 4.8)
+        ymax = max(0.7, float(max(data["ci_hi"]["guard_rights_floor"])) + 0.05)
+        _plot_f3_panel(ax, data, colours_3b, ymax)
+        ax.set_ylabel("floor (protective) mass", fontsize=10)
+        fig.tight_layout()
+        return fig
+
+    # Two-panel replication figure: 3B (left) vs 8B (right), shared y-scale.
+    # 8B panel has 3 re-run arms: no_guard, rights_floor, constitution.
+    colours_8b = [CB["black"], CB["sky"], CB["green"]]
+    ymax = 1.02  # 8B baseline/adv bars reach ~0.79-0.99
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(12.6, 4.8), sharey=True)
+    _plot_f3_panel(axL, data, colours_3b, ymax)
+    _plot_f3_panel(axR, data_8b, colours_8b, ymax)
+    axL.set_ylabel("floor (protective) mass", fontsize=10)
+    axL.text(0.02, 0.97, "3B (Llama-3.2-3B)", transform=axL.transAxes, ha="left",
+             va="top", fontsize=10, fontweight="bold", color="#222222")
+    axR.text(0.02, 0.97, "8B (Llama-3.1-8B)", transform=axR.transAxes, ha="left",
+             va="top", fontsize=10, fontweight="bold", color="#222222")
     fig.tight_layout()
     return fig
 
@@ -434,11 +543,16 @@ def build_all(render=True):
     geometry, _ = load("act_steer_geometry_3b.json")
     personactrl, _ = load("act_steer_personactrl_3b.json")
     baseline, _ = load("evidcond_baseline_3b.json")
+    # Phase-5 8B replication artifacts (F2 marker overlay + F3 panel only).
+    tracking_8b, _ = load("evidcond_tracking_8b.json")
+    floors_8b, _ = load("evidcond_floors_8b.json")
+    guards_8b, _ = load("floorguard_grid_8b.json")
 
     prepped = {
         "f1_ladder": prep_f1_ladder(),
-        "f2_tracking": prep_f2_tracking(tracking),
+        "f2_tracking": prep_f2_tracking(tracking, tracking_8b),
         "f3_floors": prep_f3_floors(floors, guards),
+        "f3_floors_8b": prep_f3_floors_8b(floors_8b, guards_8b),
         "f4_geometry": prep_f4_geometry(geometry, personactrl),
         "f5_fidelity": prep_f5_fidelity(baseline),
     }
@@ -467,7 +581,10 @@ def build_all(render=True):
     }
     written = []
     for name in FIGURES:
-        fig = renderers[name](plt, prepped[name])
+        if name == "f3_floors":
+            fig = plot_f3(plt, prepped["f3_floors"], prepped["f3_floors_8b"])
+        else:
+            fig = renderers[name](plt, prepped[name])
         pdf = os.path.join(FIG_DIR, name + ".pdf")
         png = os.path.join(FIG_DIR, name + ".png")
         fig.savefig(pdf, metadata={"CreationDate": None})

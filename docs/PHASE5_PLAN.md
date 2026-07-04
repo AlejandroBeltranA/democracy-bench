@@ -49,7 +49,7 @@ conditions. Outputs `out/evidcond_floors_8b.json`, `out/floorguard_grid_8b.json`
 baseline floor mass (is 8B a stronger floor-holder?), hostile-evidence delta, prompt-attack
 delta, guard verdicts, homogenisation TV — side-by-side vs 3B.
 
-### REP3 — Paper integration ☐
+### REP3 — Paper integration ☑
 Extend `scripts/extract_paper_results.py` + `docs/PAPER_RESULTS.md` with a "Model robustness
 (8B replication)" section: which claims replicate, which are scoped to 3B. Update REPRODUCTION.md
 with the 8B commands. Figures optionally gain 8B overlays ONLY where they don't clutter (worker
@@ -197,3 +197,64 @@ shape as 3B.
 without homogenisation) yet still fail every success bar. No line-stopping surprises: no degenerate
 distributions; hostile evidence very much DOES move 8B floors (the stop-line's "fails to move AND
 guards pass" was not remotely triggered).
+
+### 2026-07-04 — REP3 DONE (Paper integration) ☑
+Integrated the 8B replication into the four PS deliverables. **No MLX compute** (pure
+read/extract/render); the only `out/` files touched are `out/paper_results_extract.json`
+(regenerable-by-contract, git diff = **244 insertions, 0 deletions** — pure addition of the new
+section) and the two changed figures `out/figures/f2_tracking.{pdf,png}`, `f3_floors.{pdf,png}`.
+
+**Cross-check vs REP1/REP2 Loop logs: every 8B number matches to reported precision** — no
+line-stopping disagreement. P2 delta +0.0137 (n.s.), gap 0.288, floor mass 0.707; P3 8/10,
+elasticity +0.647 CI[+0.008,+1.209]; P4 baseline 0.707→hostile 0.074 (Δ−0.633 CI[−0.772,−0.490],
+11/12 below), adversarial +0.087 (n.s., 1/12 below); G1 rights_floor +0.297 CI[.154,.462] / const
++0.335 CI[.123,.515], both `verdict=fail`, hostile TV rises (0.138→0.485/0.361, not homogenised).
+
+**Extractor:** new `model_robustness_8b` section (`extract_model_robustness_8b()`) reading the four
+`_8b` artifacts with the same fail-loud contract. Regenerated `out/paper_results_extract.json`
+(same path, its contract). **Tests:** +8 in `test_paper_extract.py` binding the 8B headline numbers
+(fidelity delta n.s. + larger gap, 8/10 + elasticity CI, floors 0.707→0.074 delta CI, prompt-attack
+asymmetry, guard fail-verdicts + genuine-per-probe TV-rise, cross-model replication_check).
+
+**PAPER_RESULTS.md:** new §10 "Model robustness — 8B replication" with a per-claim
+REPLICATES/NOT/PARTIAL side-by-side table + the two nuances stated honestly ((a) stronger baseline,
+~3× deeper crack — scale ≠ evidence-channel safety; (b) genuine per-probe recovery, TV *rises*, yet
+still fails). Updated the top single-model caveat (claims are two-model where §10 says so) and two
+"numbers the paper must NOT claim" items: #4 now says **do NOT claim guards are useless-in-principle**
+(8B shows genuine non-homogenised partial recovery) — claim they are **insufficient on both models**;
+#5 now scopes the **baseline** floor deficit as 3B-specific while the **crack** is size-robust.
+
+**REPRODUCTION.md:** new Phase-5 section with the four 8B commands, the `--model` flag note (the
+runner's canonical run-block `command` does NOT echo `--model`, so the verified command is
+byte-identical to its 3B twin and the override is prose-documented), the ~4.5 GB one-time download
+note, and runtimes. Extended `verify_repro_reference.py` (now **19 run-block-verified** + 7
+asserted-by-doc); +1 count test updated, +1 coverage test. Verifier exits 0.
+
+**Figures:** F3 became a **two-panel 3B|8B** floors comparison (the 0.707→0.074 crack is the single
+most striking replication); F2 gained a **small 8B diamond-marker overlay** (direction-coloured,
+same item order). **F1/F4/F5 stay 3B-only** (stated in FIGURES.md): F1 is the 3B narrative spine and
+the steering/LoRA rungs weren't re-run at 8B; F4 is a Phase-2 3B-only steering-geometry mechanism;
+F5's 50-item waterfall would just double bars for no gain (the 8B fidelity headline is already in
+F3's baseline column + §10). Rendered ONLY f2/f3 (`git status` confirms f1/f4/f5 untouched). +5
+figure tests binding every plotted 8B number to the extract. All new plotted numbers test-bound.
+
+**Rendering (matplotlib not in `.venv`, per PS2 rule):** rendered with a throwaway scratchpad venv
+(`matplotlib 3.11.0`, nothing installed into `.venv`). NOTE for supervisor: PS2's pinned **3.5.1**
+would not build a wheel on this box's Python 3.12, so f2/f3 were re-rendered at 3.11.0 — figure
+*bytes* are matplotlib-version-bound (already a documented known-irreproducibility in
+REPRODUCTION.md), but every *plotted number* is test-bound to PS1's extract and unchanged. If
+byte-exact 3.5.1 figures are required, re-render f2/f3 on the original 3.5.1 interpreter.
+
+**Full verification:** `pytest` **401 passed** (387 at REP3 open → +14: 8 extract, 1 repro, 5
+figures); `extract_paper_results.py` exit 0; `verify_repro_reference.py` exit 0;
+`make_paper_figures.py --check` exit 0. Did NOT git commit (per hard rules).
+
+**Surprises (non-line-stopping):** (1) The 8B `run.command` field is the runner's hardcoded
+canonical string and does NOT record `--model` — so the four 8B commands are byte-identical to their
+3B twins in the run block; handled by documenting the `--model` override in prose and keeping the
+verified command equal to the run block (the model is recorded under `run.models`). (2)
+`floorguard_grid_8b.replication_check` compares the 8B no_guard to the **3B** P4 reference
+(0.5116/0.3177) and is `within_tolerance=false` — this is a hardcoded 3B reference, EXPECTED cross-
+model, not a self-check failure; the 8B self-consistency (guard-grid no_guard hostile 0.0743 ==
+floors_8b hostile 0.0743) is exact and test-bound. (3) matplotlib 3.5.1 unbuildable on Python 3.12
+(see rendering note).

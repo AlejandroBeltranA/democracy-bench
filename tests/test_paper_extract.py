@@ -168,7 +168,8 @@ def test_curve_point_missing_field_raises():
 def test_build_succeeds_and_has_all_claims():
     result = epr.build()
     for claim in ("phase1_logit_bias", "phase2_steering", "p2_fidelity",
-                  "p3_tracking", "p4_floors", "p5_lora", "g1_guards"):
+                  "p3_tracking", "p4_floors", "p5_lora", "g1_guards",
+                  "model_robustness_8b"):
         assert claim in result, f"missing claim section {claim}"
 
 
@@ -206,3 +207,99 @@ def test_build_g1_provenance_backfires():
     assert prov["hostile_delta_vs_no_guard"]["mean"] < 0.0
     assert prov["hostile_delta_vs_no_guard"]["ci_clears_zero"] is True
     assert prov["baseline_degraded"] is True
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — 8B replication (model_robustness_8b). Bind every headline number the
+# paper's robustness section quotes to its 8B artifact, matching the REP1/REP2
+# Loop-log claims in docs/PHASE5_PLAN.md.
+# ---------------------------------------------------------------------------
+def test_build_8b_p2_fidelity_lift_replicates_ns():
+    # P2 REPLICATES: evidence lift is n.s. on 8B too (CI straddles zero), with a
+    # LARGER fidelity gap (0.288 vs 3B 0.254). The one non-replication is the
+    # much stronger 8B baseline floor mass (0.707 vs 3B 0.512).
+    n = epr.build()["model_robustness_8b"]["numbers"]["p2_fidelity"]
+    assert n["n_items"] == 50
+    assert abs(n["delta"]["mean"] - 0.013656357425916288) < 1e-9
+    assert n["delta"]["ci_clears_zero"] is False  # lift NOT significant
+    assert abs(n["fidelity_gap"] - 0.287998374134095) < 1e-9
+    assert n["fidelity_gap"] > 0.254  # a LARGER gap than 3B (0.254)
+    assert abs(n["floors_no_evidence"]["mean"] - 0.7073813427357586) < 1e-9
+    assert n["floors_no_evidence"]["mean"] > 0.60  # stronger floor-holder than 3B's 0.512
+
+
+def test_build_8b_p3_tracking_replicates():
+    # P3 REPLICATES: 8/10 direction, elasticity CI clears zero (stronger, +0.647).
+    n = epr.build()["model_robustness_8b"]["numbers"]["p3_tracking"]
+    assert n["direction_match_count"] == 8
+    assert n["direction_match_rate"] == 0.8
+    assert n["n_model_moved"] == 10
+    el = n["elasticity"]
+    assert abs(el["mean"] - 0.646665653166407) < 1e-9
+    assert el["ci_clears_zero"] is True
+    assert el["ci_lo"] > 0.0
+    assert el["mean"] > 0.395  # stronger than 3B's +0.395, CIs overlap heavily
+
+
+def test_build_8b_p4_floor_crack_replicates_deeper():
+    # P4 REPLICATES (deeper): 8B is a stronger baseline (0.707, 4/12 below) yet
+    # hostile evidence cracks it to 0.074 (11/12 below), Δ−0.633 CI excludes 0 —
+    # ~3x the 3B crack (−0.194).
+    fl = epr.build()["model_robustness_8b"]["numbers"]["p4_floors"]
+    assert abs(fl["baseline"]["floor_mass"]["mean"] - 0.7073813427357586) < 1e-9
+    assert fl["baseline"]["n_below_floor"] == 4
+    assert abs(fl["hostile_evidence"]["floor_mass"]["mean"] - 0.07429789938672533) < 1e-8
+    assert fl["hostile_evidence"]["n_below_floor"] == 11
+    dv = fl["hostile_evidence"]["delta_vs_baseline"]
+    assert abs(dv["mean"] - (-0.6330834433490332)) < 1e-9
+    assert dv["ci_clears_zero"] is True  # crack is significant
+    assert dv["mean"] < -0.194  # deeper than the 3B crack (−0.194)
+
+
+def test_build_8b_prompt_attack_channel_asymmetry_replicates():
+    # Channel asymmetry REPLICATES (sharper): the adversarial PROMPT alone is n.s.
+    # on 8B too (CI straddles zero), only 1/12 below floor.
+    fl = epr.build()["model_robustness_8b"]["numbers"]["p4_floors"]
+    adv = fl["adversarial_prompt"]
+    assert adv["delta_vs_baseline"]["ci_clears_zero"] is False  # n.s.
+    assert adv["n_below_floor"] == 1  # 1/12 (vs 3B's 8/12) — sharper asymmetry
+
+
+def test_build_8b_guards_fail_but_recovery_is_genuine_per_probe():
+    # G1 REPLICATES: both guards FAIL (neither reaches 0.45 partial bar, 8+/12
+    # below). Nuance: on 8B recovery is SIGNIFICANT-positive AND genuine per-probe
+    # (hostile TV RISES vs no_guard, i.e. NOT homogenised) — unlike 3B's canned collapse.
+    g = epr.build()["model_robustness_8b"]["numbers"]["g1_guards"]
+    ng_tv = g["arms"]["no_guard"]["hostile_mean_pairwise_tv"]
+    for name in ("guard_rights_floor", "guard_constitution"):
+        arm = g["arms"][name]
+        assert arm["verdict"] == "fail"
+        # significant-positive partial recovery (unlike 3B rights_floor n.s.)
+        assert arm["hostile_delta_vs_no_guard"]["mean"] > 0.0
+        assert arm["hostile_delta_vs_no_guard"]["ci_clears_zero"] is True
+        # but still fails the 0.45 partial bar and leaves 8+/12 cracked
+        assert arm["hostile_floor_mass"]["mean"] < 0.45
+        assert arm["hostile_below_floor"] >= 8
+        # genuine per-probe recovery: TV RISES (answers stay probe-specific)
+        assert arm["hostile_mean_pairwise_tv"] > ng_tv
+
+
+def test_build_8b_guard_rights_floor_recovery_ci():
+    # Bind the headline rights_floor recovery CI (+0.297, CI clears 0).
+    g = epr.build()["model_robustness_8b"]["numbers"]["g1_guards"]
+    rf = g["arms"]["guard_rights_floor"]["hostile_delta_vs_no_guard"]
+    assert abs(rf["mean"] - 0.2971180853415496) < 1e-9
+    assert rf["ci_lo"] > 0.0 and rf["ci_hi"] > 0.0
+
+
+def test_build_8b_guard_replication_check_is_cross_model_false():
+    # The 8B guard artifact's replication_check compares 8B no_guard to the 3B P4
+    # reference and is EXPECTEDLY within_tolerance=false (cross-model, not self-check).
+    g = epr.build()["model_robustness_8b"]["numbers"]["g1_guards"]
+    rc = g["replication_check"]
+    assert rc["baseline_within_tolerance"] is False
+    assert rc["hostile_within_tolerance"] is False
+    # 8B self-consistency: guard-grid no_guard hostile == floors_8b hostile.
+    fl = epr.build()["model_robustness_8b"]["numbers"]["p4_floors"]
+    assert abs(rc["no_guard_hostile_floor_mass"]
+               - fl["hostile_evidence"]["floor_mass"]["mean"]) < 1e-9
