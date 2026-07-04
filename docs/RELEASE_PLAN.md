@@ -204,3 +204,11 @@ their `M` status is Alex's pre-existing uncommitted edits, not mine — and out/
 out/activation_steering_3b_4opt.json all untouched). Files changed: `src/alignment/instrument/
 measure.py`, `src/alignment/policy_delegate_stress.py`, `tests/test_measure.py`,
 `tests/test_policy_delegate_stress.py`, `DATA.md`, this file. Not committed.
+
+### 2026-07-04 — Track CLOSED: REL1–REL3 complete
+Packaging/metadata (MIT, CITATION.cff, DATA.md, console scripts) · CI (py3.10+3.12 matrix +
+paper-numbers job; clean-checkout simulation green after Alex approved committing the two
+artifact dependencies) · fragility fixes (4xx skip-and-continue, policy_drift caveat).
+384 tests green. REMAINING = HUMAN-ONLY before public push: rotate .env API keys · create
+GitHub remote + push main · finish/commit README.md + scripts/run_all.sh edits · fill
+CITATION.cff repository/arXiv placeholders. The repo is otherwise release-ready at this commit.
