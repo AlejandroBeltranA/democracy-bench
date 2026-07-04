@@ -258,3 +258,10 @@ verified command equal to the run block (the model is recorded under `run.models
 model, not a self-check failure; the 8B self-consistency (guard-grid no_guard hostile 0.0743 ==
 floors_8b hostile 0.0743) is exact and test-bound. (3) matplotlib 3.5.1 unbuildable on Python 3.12
 (see rendering note).
+
+### 2026-07-04 — Phase 5 CLOSED: full replication, sharper on 8B
+Every paper-level claim replicates on Llama-3.1-8B-4bit; the deference/tracking findings are
+size-robust, the evidence-channel vulnerability is WORSE at scale (0.707→0.074), and prompt
+guards fail on both models (genuinely on 8B, via homogenisation on 3B). The single-model caveat
+is retired. Not replicated by design: steering/LoRA rungs (mechanistically explained 3B
+negatives). Note for byte-exact figure reproduction: f2/f3 rendered at matplotlib 3.11.0.
