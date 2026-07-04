@@ -30,7 +30,7 @@ to e07aaf3 (the full arc).
 
 ## Work items
 
-### REL1 — Packaging + metadata ☐
+### REL1 — Packaging + metadata ☑
 - `LICENSE` — MIT, copyright Alejandro Beltran 2026.
 - `CITATION.cff` — cite the repo (title "Democracy Bench", author Alejandro Beltran, year
   2026); leave a commented placeholder for the arXiv ID.
@@ -70,3 +70,27 @@ gitignored-file dependencies, which is the whole point of REL2.
 ### 2026-07-04 — Release track opened
 License decision: MIT (Alex). main fast-forwarded 25372f9→e07aaf3 (no checkout; uncommitted
 README/run_all.sh preserved). REL1 dispatched.
+
+### 2026-07-04 — REL1 complete (packaging + metadata) ☑
+Files added: `LICENSE` (MIT, "Copyright (c) 2026 Alejandro Beltran"); `CITATION.cff` (CFF
+1.2.0, title "Democracy Bench", author Beltran/Alejandro, year 2026, repository-code
+placeholder, commented arXiv/preferred-citation placeholder — validated with PyYAML);
+`DATA.md` (provenance for every data source in the repo, all DOIs/caveats copied verbatim
+from the two SOURCES.json files and the P4/G1 artifact caveat fields); `scripts/__init__.py`
+(makes `scripts` a real package so the extractor console entry resolves).
+`pyproject.toml` edits: added `authors=[Alejandro Beltran]`, `license="MIT"`,
+`license-files`, `readme`; sharpened `description` (ladder-of-levers + two-axis, adapted from
+PAPER_RESULTS without overclaiming); `requires-python` left at `>=3.10` (verified: no match
+statements, no tomllib import in src/scripts — 3.10 floor is correct, not raisable/lowerable);
+added `[project.optional-dependencies] figures=["matplotlib>=3.7"]`; added `[project.scripts]`
+for policy_delegate_stress, activation_steering_run, evidcond_run (→ alignment.*:main) and
+extract-paper-results (→ scripts.extract_paper_results:main); added `scripts` to the hatch
+wheel packages so the extractor entry point is importable.
+Verification (throwaway venv under scratchpad/rel1_venv, NOT project .venv): `pip install -e .`
+exit 0; all four console scripts installed; each `--help` exits 0 (the three MLX drivers
+import mlx lazily inside main(), so --help resolves without Apple Silicon); importlib.metadata
+confirms all four entry points load `main` from the right module. tomllib parses pyproject.
+Project-venv `pytest -q`: **364 passed** (unchanged). Secret-hygiene grep on all new/changed
+files: no key-shaped matches. Confirmed microdata gitignored (`data/wvs microdata/`,
+`data/bsa microdata/`) with zero git-tracked files; `.env` gitignored. No out/ files touched;
+do-not-touch list (README.md, run_all.sh, the two uncommitted out/ artifacts) respected.

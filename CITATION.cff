@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Democracy Bench"
+authors:
+  - family-names: Beltran
+    given-names: Alejandro
+type: software
+license: MIT
+year: 2026
+repository-code: "https://github.com/PLACEHOLDER/democracy-bench"
+abstract: >-
+  A survey-grounded evaluation harness that asks, across a ladder of
+  alignment levers (context, decode, activation, weights, scaffold), whether
+  an LLM can carry per-item public democratic preference while holding
+  rights floors. Scored with a two-axis instrument (representation and
+  tracking elasticity) over public-opinion and values-survey targets.
+# preferred-citation:
+#   type: article
+#   title: "Democracy Bench"
+#   authors:
+#     - family-names: Beltran
+#       given-names: Alejandro
+#   year: 2026
+#   # arXiv placeholder — fill in once the preprint is posted:
+#   # identifiers:
+#   #   - type: other
+#   #     value: "arXiv:XXXX.XXXXX"
