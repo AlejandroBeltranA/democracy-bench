@@ -455,6 +455,18 @@ def test_guards_menu_has_the_four_fixed_designs():
     assert set(E.GUARD_ARMS) == {"no_guard", *E.GUARDS}
 
 
+def test_guard_grid_run_block_stamps_the_arms_actually_run():
+    """The run block's guard_arms must reflect the arms ACTUALLY run, not the full menu — so a
+    subset run (e.g. REP2's 8B {no_guard, rights_floor, constitution}) is honestly provenanced.
+    Default (arms=None) falls back to the full GUARD_ARMS for the committed 3B run-block command."""
+    subset = ["no_guard", "guard_rights_floor", "guard_constitution"]
+    rb = E._guard_grid_run_block("m", "ENG", 2, 0, 2000, 12, 0.75, "sha", arms=subset)
+    assert rb["guard_arms"] == subset
+    # default arms=None reproduces the full menu (3B run-block reproducibility unchanged)
+    rb_full = E._guard_grid_run_block("m", "ENG", 2, 0, 2000, 12, 0.75, "sha")
+    assert rb_full["guard_arms"] == list(E.GUARD_ARMS)
+
+
 @pytest.mark.parametrize("mass,below,expect", [
     (0.52, 0, "full"),        # recovers to >= 0.512 -> full neutralisation
     (0.512, 3, "full"),       # exactly the baseline threshold

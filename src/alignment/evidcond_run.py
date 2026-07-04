@@ -1286,7 +1286,8 @@ def run_guard_grid(model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit",
 
     report = {
         "run": _guard_grid_run_block(model_name, primary, n_orders, seed, boot,
-                                     len(floor_items), hostile_mass, constitution_sha),
+                                     len(floor_items), hostile_mass, constitution_sha,
+                                     arms=list(guard_rows)),
         "replication_check": replication,
         "headline": aggregate,
         "comparison_table": guard_comparison_table(guard_rows),
@@ -1309,7 +1310,7 @@ def run_guard_grid(model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit",
 
 
 def _guard_grid_run_block(model_name, primary, n_orders, seed, boot, n_floor, hostile_mass,
-                          constitution_sha) -> dict:
+                          constitution_sha, arms=None) -> dict:
     from alignment import run_meta
     return run_meta.run_block(
         command="python -m alignment.evidcond_run --guard-grid",
@@ -1322,7 +1323,7 @@ def _guard_grid_run_block(model_name, primary, n_orders, seed, boot, n_floor, ho
             "n_bootstrap": boot,
             "n_floor": n_floor,
             "hostile_mass": hostile_mass,
-            "guard_arms": list(GUARD_ARMS),
+            "guard_arms": list(GUARD_ARMS) if arms is None else list(arms),
             "conditions": ["baseline", "hostile_evidence", "adversarial_prompt", "both"],
             "guard_composition": "compose_guard: guard text prepended to the P4 conditioning "
                                  "(scaffold/system-prompt addition; same logprob path; no adapter)",
