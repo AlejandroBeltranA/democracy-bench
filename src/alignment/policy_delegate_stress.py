@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from itertools import combinations
@@ -372,6 +373,11 @@ def run(models: list[str] | None = None, n_samples: int = 100, target_path: Path
             "floor_required": REQUIRED_FLOOR_PROBES,
         },
         "warnings": _design_warnings(contest, floors),
+        # Cells (model x item x mode) that were SKIPPED on a hard client error (e.g. HTTP 400 —
+        # the way Qwen-72B's OpenRouter provider died). Each is absent-with-reason: it is NEVER
+        # scored as data, and every aggregate is computed over successful cells only. The count
+        # here is the honest denominator adjustment.
+        "cell_failures": [],
         "items": {},
         "model_summary": {},
     }
@@ -387,17 +393,29 @@ def run(models: list[str] | None = None, n_samples: int = 100, target_path: Path
             els[label] = {}
             for si in stress_items:
                 cond = conditioning(mode, si, primary_label, year, constitution)
-                if use_logprobs:
-                    dist = M.elicit_item_logprobs(prov[1], si.item, conditioning=cond,
-                                                  n_orders=LOGPROB_ORDERS)
-                    els[label][si.item["id"]] = _LogprobResult(dist, LOGPROB_ORDERS)
-                else:
-                    elicitor, debias = prov[1], prov[2]
-                    els[label][si.item["id"]] = M.elicit_item(
-                        elicitor, si.item, n_samples=n_samples, conditioning=cond, shuffle=debias,
-                        collect_rationale=collect_rationale, paraphrases=si.item.get("paraphrases"),
-                        max_workers=workers,
-                    )
+                iid = si.item["id"]
+                try:
+                    if use_logprobs:
+                        dist = M.elicit_item_logprobs(prov[1], si.item, conditioning=cond,
+                                                      n_orders=LOGPROB_ORDERS)
+                        els[label][iid] = _LogprobResult(dist, LOGPROB_ORDERS)
+                    else:
+                        elicitor, debias = prov[1], prov[2]
+                        els[label][iid] = M.elicit_item(
+                            elicitor, si.item, n_samples=n_samples, conditioning=cond, shuffle=debias,
+                            collect_rationale=collect_rationale, paraphrases=si.item.get("paraphrases"),
+                            max_workers=workers,
+                        )
+                except M.SkipCellError as e:
+                    # Hard client error (e.g. HTTP 400): skip this cell, record it, keep going.
+                    # els[label] simply has no entry for iid -> every aggregate below is over the
+                    # cells that DID succeed (absent-with-reason, never a fabricated distribution).
+                    report["cell_failures"].append({
+                        "model": label, "item": iid, "mode": mode,
+                        "status": e.status, "error": str(e), "snippet": e.snippet,
+                    })
+                    print(f"[skip] cell model={label} item={iid} mode={mode} "
+                          f"status={e.status}: {str(e)[:80]}", flush=True)
         _add_mode_results(report, mode, contest, floors, els, labels, n_samples, collect_rationale)
         report["progress"] = {"modes_done": i, "modes_total": len(modes), "last_mode": mode}
         if checkpoint_path is not None:
@@ -420,6 +438,8 @@ def _add_mode_results(report: dict, mode: str, contest: list[StressItem], floors
         entry = report["items"].setdefault(iid, _item_entry(si))
         mode_entry = entry["modes"].setdefault(mode, {"models": {}})
         for label in labels:
+            if iid not in els[label]:      # cell skipped (hard client error) -> absent, never scored
+                continue
             el = els[label][iid]
             dist = el.distribution
             b = S.scores(dist, target)   # one bundle -> headline rep + logprob-native layer, no drift
@@ -436,7 +456,7 @@ def _add_mode_results(report: dict, mode: str, contest: list[StressItem], floors
                 "diagnostics": el.diagnostics(include_raw=collect_rationale),
             }
         mode_entry["mean_cross_model_drift"] = _mean_pairwise_tv(
-            [els[label][iid].distribution for label in labels]
+            [els[label][iid].distribution for label in labels if iid in els[label]]
         )
 
     for si in floors:
@@ -444,6 +464,8 @@ def _add_mode_results(report: dict, mode: str, contest: list[StressItem], floors
         entry = report["items"].setdefault(iid, _item_entry(si))
         mode_entry = entry["modes"].setdefault(mode, {"models": {}})
         for label in labels:
+            if iid not in els[label]:      # cell skipped (hard client error) -> absent, never scored
+                continue
             el = els[label][iid]
             dist = el.distribution
             pm = drift.protective_mass(dist, si.item["floor_dir"])
@@ -457,7 +479,7 @@ def _add_mode_results(report: dict, mode: str, contest: list[StressItem], floors
                 "diagnostics": el.diagnostics(include_raw=collect_rationale),
             }
         mode_entry["mean_cross_model_drift"] = _mean_pairwise_tv(
-            [els[label][iid].distribution for label in labels]
+            [els[label][iid].distribution for label in labels if iid in els[label]]
         )
 
 
@@ -578,6 +600,11 @@ def _fmt(report: dict) -> str:
     if report["warnings"]:
         lines.append("warnings:")
         lines.extend(f"  - {w}" for w in report["warnings"])
+    fails = report.get("cell_failures", [])
+    if fails:
+        by_model: Counter = Counter(f["model"] for f in fails)
+        lines.append(f"skipped cells (hard client error, absent-with-reason, NOT scored): {len(fails)}")
+        lines.extend(f"  - {m}: {c} cell(s)" for m, c in by_model.items())
     rates = [m["diagnostics"]["parse_rate"]
              for it in report["items"].values()
              for mode in it["modes"].values()

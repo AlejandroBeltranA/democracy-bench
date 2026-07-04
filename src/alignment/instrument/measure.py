@@ -74,6 +74,66 @@ class ElicitationError(RuntimeError):
     """
 
 
+class SkipCellError(RuntimeError):
+    """Raised when a whole (model, item) cell must be SKIPPED — not retried, not scored.
+
+    A hard client error (e.g. HTTP 400 — a bad/unsupported request for THIS model, the way
+    OpenRouter's Qwen-72B provider died) is deterministic: every sample of the cell would fail
+    the same way, so retrying is pointless and aborting the whole run is wasteful. The driver
+    catches this, records a structured failure entry for the cell (absent-with-reason), and
+    continues. Crucially this is NOT a fabricated distribution — a skipped cell is never scored
+    as data; aggregates are computed over successful cells only, with the skip count reported.
+    Carries the HTTP status and a short error snippet so the failure is auditable.
+    """
+
+    def __init__(self, message: str, status: Optional[int] = None, snippet: str = ""):
+        super().__init__(message)
+        self.status = status
+        self.snippet = snippet
+
+
+# ---- pure HTTP retry/skip/raise decision (unit-tested; no live calls) -----------------
+
+# 429 stays in the RETRY path (rate limit — a later attempt may succeed); these 5xx are transient.
+_RETRY_STATUS = frozenset({429, 500, 502, 503, 529})
+
+
+def classify_http_status(status: int) -> str:
+    """Decide what to do with an HTTP error status from a model provider — the pure, testable
+    core of the elicitor's fragility handling. Returns one of:
+
+      * "retry" — transient (429 rate limit, or 5xx in `_RETRY_STATUS`): back off and try again.
+      * "skip"  — a hard client error (any other 4xx, e.g. 400 bad request / 404 no such model /
+                  422 unprocessable): deterministic for this cell, so skip-and-continue rather
+                  than abort the run. NEVER scored as data — recorded as a failure entry upstream.
+      * "raise" — anything else (an unexpected status): propagate, do not swallow.
+
+    Note 429 is a 4xx but is explicitly RETRIED, per spec — it is not a hard client error.
+    """
+    if status in _RETRY_STATUS:
+        return "retry"
+    if 400 <= status < 500:
+        return "skip"
+    return "raise"
+
+
+def _http_error_snippet(err: "urllib.error.HTTPError", limit: int = 300) -> str:
+    """Best-effort short text of an HTTPError's body for the failure record (provider error
+    messages explain WHY a 400 happened). Never raises — a missing/undecodable body -> ""."""
+    try:
+        body = err.read()
+    except Exception:
+        return ""
+    if not body:
+        return ""
+    try:
+        text = body.decode("utf-8", "replace")
+    except Exception:
+        text = str(body)
+    text = " ".join(text.split())
+    return text[:limit]
+
+
 # ---- prompt construction -------------------------------------------------------------
 
 def forced_choice_prompt(item: Mapping, conditioning: Optional[str] = None,
@@ -508,10 +568,17 @@ def openrouter_elicitor(model: str, temperature: float = 0.8, max_tokens: int = 
                     data = json.loads(resp.read())
                 return ((data.get("choices") or [{}])[0].get("message") or {}).get("content", "") or ""
             except urllib.error.HTTPError as e:
-                # 429 = rate limit (common on free tier), 5xx = transient: back off and retry
-                if e.code in (429, 500, 502, 503, 529) and attempt < retries - 1:
+                action = classify_http_status(e.code)
+                # 429 = rate limit, 5xx = transient: back off and retry (until attempts run out).
+                if action == "retry" and attempt < retries - 1:
                     time.sleep(backoff * (attempt + 1))
                     continue
+                # a hard 4xx (e.g. 400 — Qwen-72B's death) is deterministic for this cell: signal
+                # skip-and-continue so the driver records a failure entry instead of aborting.
+                if action == "skip":
+                    raise SkipCellError(
+                        f"{model}: HTTP {e.code} (hard client error) — skipping cell",
+                        status=e.code, snippet=_http_error_snippet(e)) from e
                 raise
             except (urllib.error.URLError, TimeoutError):
                 if attempt < retries - 1:
@@ -558,9 +625,14 @@ def openrouter_logprob_fn(model: str, top_logprobs: int = 20, timeout: float = 6
                     data = json.loads(resp.read())
                 break
             except urllib.error.HTTPError as e:
-                if e.code in (429, 500, 502, 503, 529) and attempt < retries - 1:
+                action = classify_http_status(e.code)
+                if action == "retry" and attempt < retries - 1:
                     time.sleep(backoff * (attempt + 1))
                     continue
+                if action == "skip":
+                    raise SkipCellError(
+                        f"{model}: HTTP {e.code} (hard client error) — skipping cell",
+                        status=e.code, snippet=_http_error_snippet(e)) from e
                 raise
             except (urllib.error.URLError, TimeoutError):
                 if attempt < retries - 1:

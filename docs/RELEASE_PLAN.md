@@ -57,7 +57,7 @@ they keep the paper numbers honest in CI). Confirm the tests actually pass on a 
 simulation (fresh temp dir, `git archive | tar -x`, install, pytest) — this catches
 gitignored-file dependencies, which is the whole point of REL2.
 
-### REL3 — Known-fragility fixes ☐
+### REL3 — Known-fragility fixes ☑
 - Elicitor 400-tolerance: a hard HTTP 400 currently aborts a whole run (retry covers only
   429/5xx; Qwen-72B died this way). Make the cloud elicitor skip-and-continue on 4xx with the
   failure recorded per-item in the run block. Pure retry/skip logic unit-tested; no live calls.
@@ -144,3 +144,63 @@ Project-venv `pytest -q`: **364 passed** (unchanged — only file added is `.git
 no src/test edits, so no importorskip guards were needed). Do-not-touch list respected (README.md,
 run_all.sh, out/_bsa_delta_check.json, out/activation_steering_3b_4opt.json all untouched); nothing
 under out/ modified. Not committed.
+
+### 2026-07-04 — REL3 complete (known-fragility fixes) ☑
+
+**Elicitor 400-tolerance.** The cloud elicitor is `src/alignment/instrument/measure.py`
+(`openrouter_elicitor` for sampling, `openrouter_logprob_fn` for logprobs). Before, any non-retry
+`HTTPError` re-`raise`d and aborted the whole run — a hard 400 (the way Qwen-72B's provider died)
+killed everything. New behaviour, driven by a pure testable function `classify_http_status(status)`:
+
+| status | action | why |
+|---|---|---|
+| 429 | **retry** | rate limit — a later attempt may succeed (429 is a 4xx but is NOT treated as hard) |
+| 500 / 502 / 503 / 529 | **retry** | transient server errors |
+| 400 / 401 / 402 / 403 / 404 / 422 (any other 4xx) | **skip** | deterministic client error for THIS cell → raise `SkipCellError` |
+| anything else (200, 301, 504, 5xx not in the set) | **raise** | unexpected → propagate, never swallow |
+
+Both OpenRouter backends now raise the new `SkipCellError` (carrying status + a short body snippet
+via `_http_error_snippet`) on a "skip" status instead of aborting. The bespoke driver
+`src/alignment/policy_delegate_stress.py` catches `SkipCellError` in its cell loop (`run()`) and
+appends a **structured failure entry** to a new run-block list `report["cell_failures"]`
+(`{model, item, mode, status, error, snippet}`), then continues — the cell is simply absent from
+`els[label]`. **Fail-closed preserved:** a skipped cell is NEVER scored — `_add_mode_results` skips
+absent cells, `_mean_pairwise_tv` and `_mean_metric` aggregate over present cells only, so a bad
+model's summary is `nan` (no cells contributed), never a fabricated distribution. `_fmt` prints the
+skip count. The change is **strictly additive** — a run with zero 400s produces an empty
+`cell_failures` list and byte-identical scoring; no existing committed artifact's numbers change.
+
+**Inspect path: NOT needed.** `src/alignment/policy_inspect.py`'s solver calls only Inspect's own
+`model.generate()` — never the bespoke `openrouter_elicitor`. Inspect's provider layer owns HTTP
+retry/error handling and per-sample tolerance (`fail_on_error`), so its path is already covered.
+Fix belongs to the bespoke driver only.
+
+**Tests (pure / no live HTTP).** `tests/test_measure.py`: `classify_http_status` parametrized over
+retry/skip/raise + the 429-vs-400 sharp edge; the OpenRouter elicitor's 400→`SkipCellError` (status
++ snippet captured) and 429/500→retry-then-succeed, all with `urllib` monkeypatched (fake transport,
+`time.sleep` no-op'd — zero network). `tests/test_policy_delegate_stress.py`: a driver-level test via
+the injectable `logprob_fn_factory` where one model always raises `SkipCellError` — asserts the
+failures are recorded (status+snippet), the bad cells are absent (not scored), the good model scores
+normally, and the bad model's summary is `nan`.
+
+**policy_drift placeholder.** Artifact is `out/policy_drift.json` — a SIM placeholder
+(`simulated: true`, three `SIM provider …` labels). **Who reads it: nothing in the release path.**
+Grep across `src/`, `scripts/`, `tests/`, `.github/` shows the only code reference is
+`alignment/drift.py:225`, which uses it purely as a *write* target (default `--out`); no test,
+`extract_paper_results.py`, `verify_repro_reference.py`, or CI step reads it (verified by grep + a
+clean run of the extractor and verifier, both exit 0, unchanged). Per the standing flag I did NOT
+regenerate or delete it; I added a **PROVENANCE/caveat note to `DATA.md`** (new "SIMULATION
+placeholder — `out/policy_drift.json`" section, alongside the existing SYNTHETIC-caveat sections a
+repo visitor already reads) stating it is a simulation placeholder superseded by the real
+policy-delegate runs / `docs/POLICY_DELEGATE_FINDINGS.md`, and that nothing in the release path
+depends on it. No `out/*.json` modified (a new adjacent `.md` note was the allowed form).
+
+**Verification.** Project-venv `python -m pytest -q`: **384 passed** (up from 364 — +20 new cases,
+the parametrized decision-logic + elicitor + driver tests). `extract_paper_results.py` exit 0;
+`verify_repro_reference.py` exit 0 ("7 asserted-by-doc") — both untouched. Secret-hygiene grep on
+all changed files (measure.py, policy_delegate_stress.py, the two test files, DATA.md): no
+key-shaped matches. No `out/*.json` touched; do-not-touch list respected (README.md, run_all.sh —
+their `M` status is Alex's pre-existing uncommitted edits, not mine — and out/_bsa_delta_check.json,
+out/activation_steering_3b_4opt.json all untouched). Files changed: `src/alignment/instrument/
+measure.py`, `src/alignment/policy_delegate_stress.py`, `tests/test_measure.py`,
+`tests/test_policy_delegate_stress.py`, `DATA.md`, this file. Not committed.

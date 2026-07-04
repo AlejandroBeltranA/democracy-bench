@@ -166,3 +166,17 @@ And from G1 (`out/floorguard_grid_3b.json`) specifically (verbatim):
 
 These are a deliberate adversarial test of the evidence-deference channel and must never be read
 as a measurement of actual UK public opinion.
+
+## SIMULATION placeholder — `out/policy_drift.json`
+
+`out/policy_drift.json` is a **simulation placeholder**, not a real model run. It was produced by
+`alignment.drift`'s default (simulated) path — its `models` are the three `SIM provider …` labels
+and `simulated: true` in the run block. It is **superseded by the real policy-delegate runs**
+(`out/policy_delegate_stress.json` and `out/policy_delegate_stress_local.json`, documented in
+`docs/POLICY_DELEGATE_FINDINGS.md`); the real numbers live there and in the run logs.
+
+Per the standing flag it is **kept as-is**: not regenerated (regeneration needs compute and is a
+human-gated decision) and not deleted. Nothing in the release path reads it — no test, no
+`scripts/extract_paper_results.py`, no `scripts/verify_repro_reference.py`, and no CI step depends
+on it (it is only ever a *write* target of the `alignment.drift` driver). Do not cite any number
+from this file as a measurement.

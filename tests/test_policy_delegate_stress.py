@@ -168,6 +168,50 @@ def test_logprobs_requires_models():
         PDS.run(models=None, estimator="logprobs")
 
 
+def test_hard_client_error_skips_cell_and_records_it_without_scoring():
+    # No network. One model's logprob_fn always raises SkipCellError (a hard HTTP 400, the way
+    # Qwen-72B died); the other succeeds. The run must NOT abort: the bad model's cells are
+    # absent-with-reason (recorded, never scored), the good model's cells are all present.
+    from alignment.instrument import measure as M
+
+    def factory(model):
+        if "bad" in model:
+            def lf(prompt, n):
+                raise M.SkipCellError(f"{model}: HTTP 400 — skipping cell",
+                                      status=400, snippet="unsupported model")
+            return lf
+
+        def lf(prompt, n):
+            v = np.ones(n)
+            v[0] += 2.0
+            return v / v.sum()
+        return lf
+
+    report = PDS.run(models=["openrouter/bad/model", "openrouter/good/model"], n_samples=8,
+                     estimator="logprobs", logprob_fn_factory=factory)
+
+    fails = report["cell_failures"]
+    assert fails, "the 400 cells must be recorded, not silently dropped"
+    # every failure is for the bad model, carries the status + snippet (auditable, structured)
+    assert all(f["model"] == "openrouter:bad/model" for f in fails)
+    assert all(f["status"] == 400 and f["snippet"] for f in fails)
+    # the bad model is skipped across every item x mode cell (contestable + floor)
+    n_items = len(report["items"])
+    assert len(fails) == n_items * len(PDS.PROMPT_MODES)
+
+    # the good model scored normally; the bad model was NEVER scored (absent, not uniform)
+    tax_models = report["items"]["tax_spend"]["modes"]["default"]["models"]
+    assert "openrouter:good/model" in tax_models
+    assert "openrouter:bad/model" not in tax_models
+
+    # aggregates are over successful cells only: the good model has a real summary, the bad
+    # model's contestable summary is nan (no cells contributed) — never a fabricated number.
+    good = report["model_summary"]["openrouter:good/model"]
+    bad = report["model_summary"]["openrouter:bad/model"]
+    assert not np.isnan(good["default_representation"])
+    assert np.isnan(bad["default_representation"])
+
+
 def test_checkpoint_captures_all_completed_modes(tmp_path):
     import json
     ckpt = tmp_path / "ckpt.json"
