@@ -49,7 +49,7 @@ to e07aaf3 (the full arc).
   (`python -m build --version` not required — a tomllib parse + entry-point import check
   suffices).
 
-### REL2 — CI workflow ☐
+### REL2 — CI workflow ☑ (workflow written & verified; **BLOCKED on data-policy decision — see Loop log 2026-07-04**)
 `.github/workflows/ci.yml`: numpy-only test job (python 3.12, `pip install -e '.[dev]'`,
 `python -m pytest -q`), no MLX (Linux runners have no Apple Silicon). Add the repro-reference
 verifier and `extract_paper_results.py` as a second job step (both read-only, artifact-backed —
@@ -94,3 +94,53 @@ Project-venv `pytest -q`: **364 passed** (unchanged). Secret-hygiene grep on all
 files: no key-shaped matches. Confirmed microdata gitignored (`data/wvs microdata/`,
 `data/bsa microdata/`) with zero git-tracked files; `.env` gitignored. No out/ files touched;
 do-not-touch list (README.md, run_all.sh, the two uncommitted out/ artifacts) respected.
+
+### 2026-07-04 — REL2 CI workflow written & verified; BLOCKED on a data-policy decision
+Added `.github/workflows/ci.yml` (only file changed):
+- Job `tests` — ubuntu-latest, matrix python **3.10 AND 3.12** (3.10 = declared floor, proven
+  in CI), `pip install -e '.[dev]'`, `python -m pytest -q`, `fail-fast: false`. No MLX: every
+  mlx import in the codebase is lazy inside driver `main()`, so pytest COLLECTION never touches
+  it on Linux (verified — no test file imports mlx at module scope; the mlx tests self-skip via
+  the inspect/mlx guards).
+- Job `paper-numbers` — `needs: tests`, python 3.12, runs `extract_paper_results.py --out
+  /tmp/extract.json` then `verify_repro_reference.py` (both read committed artifacts).
+- Triggers: push + pull_request on `main`. `concurrency` group cancels superseded runs.
+  `permissions: contents: read`. No secrets referenced anywhere.
+YAML validated with `yaml.safe_load` (jobs/matrix/needs/concurrency all parse).
+
+**Clean-checkout simulation** (scratchpad/rel2_clean, `git archive HEAD | tar -x`, throwaway
+py3.12 venv, NOT project .venv): `pip install -e '.[dev]'` exit 0. **pytest = 5 failed, 345
+passed, 7 skipped, 7 errored** — and `extract_paper_results.py` exits 2. `verify_repro_reference.py`
+PASSES (exit 0; 15 run-block-verified, 7 asserted-by-doc). ALL failures trace to a single
+root cause and it is a STOP-THE-LINE data-policy issue:
+
+  **`out/activation_steering_3b_4opt.json` is UNTRACKED (`??`) — it was never `git add`ed (it is
+  NOT gitignored; `.gitignore` only has `out/*.log`).** It's a real 11.8 KB artifact (the
+  superseded Phase-2 in-sample steering headline; keys experiment/per_layer/overall_best). It is
+  on the hard-rules do-not-touch list (line 24), yet `scripts/extract_paper_results.py`
+  (`extract_phase2_steering`, load at L209) and the tests `test_paper_extract.py` (5 fails) +
+  `test_paper_figures.py` (7 errors) hard-depend on it. `git archive HEAD` correctly omits it →
+  CI would be red. It is the ONLY untracked artifact any extractor/test needs (audited all 19
+  `load()` targets; the other 18 are tracked and present).
+
+Proof it is the sole blocker: copying that one file into the clean-checkout tree (throwaway;
+repo out/ untouched) → **pytest 357 passed, 7 skipped; extractor exit 0.** (357 vs 364 project-
+venv = the 7 mlx/inspect tests that correctly self-skip on Linux.)
+
+I did NOT resolve this myself: committing the file violates the do-not-touch list, and editing
+the extractor/tests to tolerate its absence would silently drop a paper claim (worst-case bug
+per PS1). **Supervisor decision needed:** either (a) `git add out/activation_steering_3b_4opt.json`
+(after secret-hygiene check — it's model-output numbers, no keys) so CI and the clean checkout
+pass, or (b) explicitly de-scope the Phase-2 superseded-headline claim from the extractor/tests.
+This is a release blocker regardless of REL2's YAML.
+
+Python floor: simulation ran on **py3.12** (system py3 is 3.12.1; system py3.9 is too old for the
+project). 3.10 compat verified STATICALLY instead of a claimed 3.10 run: AST scan of all 62 .py
+files (src/scripts/tests) — no `except*`/TryStar, no `tomllib`, no `match` statements, no 3.11+
+typing (Self/assert_never/LiteralString), no `version_info>=(3,11)` guards. `requires-python>=3.10`
+is sound.
+
+Project-venv `pytest -q`: **364 passed** (unchanged — only file added is `.github/workflows/ci.yml`;
+no src/test edits, so no importorskip guards were needed). Do-not-touch list respected (README.md,
+run_all.sh, out/_bsa_delta_check.json, out/activation_steering_3b_4opt.json all untouched); nothing
+under out/ modified. Not committed.

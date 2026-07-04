@@ -1,0 +1,66 @@
+name: CI
+
+# Public-harness CI. Two jobs:
+#   tests        — install the package + dev extra, run the pytest suite on the
+#                  declared Python floor (3.10) AND a current release (3.12).
+#   paper-numbers— after tests pass, run the pure-extraction + repro-reference
+#                  checks that keep the paper numbers and REPRODUCTION.md honest.
+#
+# No MLX anywhere: the runners are Linux (no Apple Silicon). Every mlx import in
+# the codebase is lazy (inside driver main()), so collection and these read-only
+# checks never touch it. No secrets are used by any step.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is the declared floor (requires-python >= 3.10) — CI proves it.
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package + dev extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+      - name: Run test suite
+        run: python -m pytest -q
+
+  paper-numbers:
+    name: paper-numbers
+    runs-on: ubuntu-latest
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package + dev extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+      - name: Extract paper results (pure extraction, no model runs)
+        run: python scripts/extract_paper_results.py --out /tmp/extract.json
+      - name: Verify reproduction reference against committed artifacts
+        run: python scripts/verify_repro_reference.py

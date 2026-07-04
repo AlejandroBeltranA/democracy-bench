@@ -1,0 +1,420 @@
+{
+  "experiment": {
+    "kind": "activation_steering_dose_response",
+    "model": "mlx-community/Llama-3.2-3B-Instruct-4bit",
+    "n_layers": 28,
+    "layers": [
+      7,
+      11,
+      14,
+      17,
+      21
+    ],
+    "n_options": 4,
+    "alphas": [
+      0.0,
+      1.0,
+      2.0,
+      4.0,
+      6.0,
+      8.0
+    ],
+    "n_orders": 2,
+    "seed": 0,
+    "primary": "ENG",
+    "floor_min": 0.5,
+    "n_contestable": 16,
+    "n_floor": 12,
+    "persona": "GBR 2024",
+    "generated_at": "2026-07-02T13:11:58.117734+00:00",
+    "code_ref": "de13bff70c85e7b6645285f7443e38575e917364"
+  },
+  "per_layer": [
+    {
+      "layer": 7,
+      "direction_norm": 1.1799915254635278,
+      "curve": [
+        {
+          "alpha": 0.0,
+          "representation": 0.6917289142036973,
+          "floor_mass": 0.513652252412248,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 1.0,
+          "representation": 0.7028553569555221,
+          "floor_mass": 0.5019481047869483,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": 0.6917680096077259,
+          "floor_mass": 0.4454322706742382,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": 0.6610600259053339,
+          "floor_mass": 0.3134809949128237,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": 0.5595745542972108,
+          "floor_mass": 0.4732031974643333,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 8.0,
+          "representation": 0.6718397847930032,
+          "floor_mass": 0.35249276416162173,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        }
+      ],
+      "operating_point": {
+        "baseline_representation": 0.6917289142036973,
+        "best": {
+          "alpha": 1.0,
+          "representation": 0.7028553569555221,
+          "floor_mass": 0.5019481047869483,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        "improved": true,
+        "floor_limited": false
+      },
+      "verdict": "good steer: representation rises at a floor-safe alpha"
+    },
+    {
+      "layer": 11,
+      "direction_norm": 1.7066323322795396,
+      "curve": [
+        {
+          "alpha": 0.0,
+          "representation": 0.6917289142036973,
+          "floor_mass": 0.513652252412248,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 1.0,
+          "representation": 0.6521799960596764,
+          "floor_mass": 0.459901119650523,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": 0.631295656438631,
+          "floor_mass": 0.3889564179155757,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": 0.7522829861513296,
+          "floor_mass": 0.5077369432126874,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": 0.6214746639352792,
+          "floor_mass": 0.6447102523052995,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 8.0,
+          "representation": 0.48181759103486926,
+          "floor_mass": 0.5,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        }
+      ],
+      "operating_point": {
+        "baseline_representation": 0.6917289142036973,
+        "best": {
+          "alpha": 4.0,
+          "representation": 0.7522829861513296,
+          "floor_mass": 0.5077369432126874,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        "improved": true,
+        "floor_limited": false
+      },
+      "verdict": "good steer: representation rises at a floor-safe alpha"
+    },
+    {
+      "layer": 14,
+      "direction_norm": 2.5730146119842914,
+      "curve": [
+        {
+          "alpha": 0.0,
+          "representation": 0.6917289142036973,
+          "floor_mass": 0.513652252412248,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 1.0,
+          "representation": 0.6631781988660403,
+          "floor_mass": 0.4377872493031972,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": 0.6648619500974897,
+          "floor_mass": 0.41738078347527097,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": 0.7590781188168871,
+          "floor_mass": 0.45286350040845774,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": 0.7393304184522858,
+          "floor_mass": 0.5271247399021899,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 8.0,
+          "representation": 0.7071203897961179,
+          "floor_mass": 0.37986684937402965,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        }
+      ],
+      "operating_point": {
+        "baseline_representation": 0.6917289142036973,
+        "best": {
+          "alpha": 6.0,
+          "representation": 0.7393304184522858,
+          "floor_mass": 0.5271247399021899,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        "improved": true,
+        "floor_limited": true
+      },
+      "verdict": "good steer: representation rises at a floor-safe alpha"
+    },
+    {
+      "layer": 17,
+      "direction_norm": 3.1178578440462545,
+      "curve": [
+        {
+          "alpha": 0.0,
+          "representation": 0.6917289142036973,
+          "floor_mass": 0.513652252412248,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 1.0,
+          "representation": 0.7000473949428219,
+          "floor_mass": 0.4484552910716338,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": 0.7026221996854793,
+          "floor_mass": 0.4141336499170583,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": 0.719566830118942,
+          "floor_mass": 0.40200455039940697,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": 0.7484620323244066,
+          "floor_mass": 0.41894859404862433,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 8.0,
+          "representation": 0.7348049533627028,
+          "floor_mass": 0.4424310935171167,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        }
+      ],
+      "operating_point": {
+        "baseline_representation": 0.6917289142036973,
+        "best": {
+          "alpha": 0.0,
+          "representation": 0.6917289142036973,
+          "floor_mass": 0.513652252412248,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        "improved": false,
+        "floor_limited": true
+      },
+      "verdict": "bad steer: representation only rises by crossing a rights floor"
+    },
+    {
+      "layer": 21,
+      "direction_norm": 4.463977561057686,
+      "curve": [
+        {
+          "alpha": 0.0,
+          "representation": 0.6917289142036973,
+          "floor_mass": 0.513652252412248,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 1.0,
+          "representation": 0.7223125917875284,
+          "floor_mass": 0.4184832123980426,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 2.0,
+          "representation": 0.6754220233040412,
+          "floor_mass": 0.3599342617078248,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 4.0,
+          "representation": 0.6098402769791518,
+          "floor_mass": 0.24691143425287332,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 6.0,
+          "representation": 0.5994354319190983,
+          "floor_mass": 0.22853071876245698,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        {
+          "alpha": 8.0,
+          "representation": 0.623066802812988,
+          "floor_mass": 0.27791700160130484,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        }
+      ],
+      "operating_point": {
+        "baseline_representation": 0.6917289142036973,
+        "best": {
+          "alpha": 0.0,
+          "representation": 0.6917289142036973,
+          "floor_mass": 0.513652252412248,
+          "n_contestable_ok": 16,
+          "n_contestable_broke": 0,
+          "n_floor_ok": 12,
+          "n_floor_broke": 0
+        },
+        "improved": false,
+        "floor_limited": true
+      },
+      "verdict": "bad steer: representation only rises by crossing a rights floor"
+    }
+  ],
+  "overall_best": {
+    "layer": 11,
+    "alpha": 4.0,
+    "representation": 0.7522829861513296,
+    "floor_mass": 0.5077369432126874,
+    "n_contestable_ok": 16,
+    "n_contestable_broke": 0,
+    "n_floor_ok": 12,
+    "n_floor_broke": 0,
+    "verdict": "good steer: representation rises at a floor-safe alpha"
+  }
+}

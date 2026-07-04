@@ -1,0 +1,3331 @@
+{
+  "summary": {
+    "contestable_items": 50,
+    "items_with_2plus_years": 25,
+    "items_with_all_3_years": 9,
+    "items_2024_only": 25,
+    "sig_2022_2024_unadjusted": [
+      "nhs_satisfaction",
+      "ae_satisfaction",
+      "dentist_satisfaction",
+      "gp_satisfaction",
+      "social_care_satisfaction",
+      "redistribution",
+      "welfare_dependency",
+      "benefit_cheat_poverty_reason",
+      "defence_spending",
+      "big_business_workers"
+    ],
+    "sig_2022_2024_bonferroni": [
+      "nhs_satisfaction",
+      "ae_satisfaction",
+      "dentist_satisfaction",
+      "gp_satisfaction",
+      "social_care_satisfaction",
+      "redistribution",
+      "welfare_dependency",
+      "benefit_cheat_poverty_reason",
+      "defence_spending",
+      "big_business_workers"
+    ],
+    "not_harmonised": [
+      "welfare_scale_grouped",
+      "dwp_fairness_trust",
+      "dwp_honesty_trust",
+      "dwp_accuracy_trust",
+      "benefits_damp_mould",
+      "benefits_insulation_rent"
+    ],
+    "method_note": "Per-option two-sample z on weighted shares with unweighted bases; no design-effect correction (real SEs slightly wider). Bonferroni within item over K options."
+  },
+  "items": [
+    {
+      "id": "tax_spend",
+      "domain": "tax_spend",
+      "title": "Tax and spending preference",
+      "variable": "TaxSpend",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 1008,
+          "distribution": [
+            0.0982,
+            0.4269,
+            0.4749
+          ],
+          "labels": [
+            "Reduce taxes and spend less on health, education and social benefits",
+            "Keep taxes and spending on these services at the same level as now",
+            "Increase taxes and spend more on health, education and social benefits"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 3227,
+          "distribution": [
+            0.1572,
+            0.4252,
+            0.4176
+          ],
+          "labels": [
+            "Reduce taxes and spend less on health, education and social benefits",
+            "Keep taxes and spending on these services at the same level as now",
+            "Increase taxes and spend more on health, education and social benefits"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            1008,
+            3227
+          ],
+          "delta": [
+            0.059,
+            -0.0017,
+            -0.0573
+          ],
+          "total_variation": 0.059,
+          "mean_position_shift": -0.1163,
+          "per_option_z": [
+            5.2,
+            -0.1,
+            -3.19
+          ],
+          "max_abs_z": 5.2,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "nhs_satisfaction",
+      "domain": "nhs",
+      "title": "NHS satisfaction",
+      "variable": "NHSSat",
+      "present_years": [
+        2022,
+        2023,
+        2024
+      ],
+      "absent_years": [],
+      "harmonised_labels": true,
+      "distributions": {
+        "2022": {
+          "n_unweighted": 2933,
+          "distribution": [
+            0.0444,
+            0.2413,
+            0.2103,
+            0.3202,
+            0.1838
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        },
+        "2023": {
+          "n_unweighted": 2881,
+          "distribution": [
+            0.0371,
+            0.208,
+            0.2448,
+            0.3112,
+            0.1989
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 2509,
+          "distribution": [
+            0.0227,
+            0.188,
+            0.2,
+            0.3729,
+            0.2164
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2022->2024",
+          "n": [
+            2933,
+            2509
+          ],
+          "delta": [
+            -0.0217,
+            -0.0533,
+            -0.0103,
+            0.0527,
+            0.0326
+          ],
+          "total_variation": 0.0853,
+          "mean_position_shift": 0.2146,
+          "per_option_z": [
+            -4.49,
+            -4.8,
+            -0.94,
+            4.07,
+            3.0
+          ],
+          "max_abs_z": 4.8,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2023->2024",
+          "n": [
+            2881,
+            2509
+          ],
+          "delta": [
+            -0.0143,
+            -0.02,
+            -0.0448,
+            0.0617,
+            0.0175
+          ],
+          "total_variation": 0.0792,
+          "mean_position_shift": 0.1454,
+          "per_option_z": [
+            -3.11,
+            -1.85,
+            -3.96,
+            4.76,
+            1.58
+          ],
+          "max_abs_z": 4.76,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2022->2023",
+          "n": [
+            2933,
+            2881
+          ],
+          "delta": [
+            -0.0074,
+            -0.0333,
+            0.0345,
+            -0.009,
+            0.0151
+          ],
+          "total_variation": 0.0496,
+          "mean_position_shift": 0.0692,
+          "per_option_z": [
+            -1.42,
+            -3.04,
+            3.14,
+            -0.74,
+            1.47
+          ],
+          "max_abs_z": 3.14,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "governing_britain",
+      "domain": "democratic_system",
+      "title": "How well Britain is governed",
+      "variable": "GovtWork",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 1043,
+          "distribution": [
+            0.0301,
+            0.1754,
+            0.3537,
+            0.4409
+          ],
+          "labels": [
+            "Works extremely well and could not be improved",
+            "Could be improved in small ways but mainly works well",
+            "Could be improved quite a lot",
+            "Needs a great deal of improvement"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 860,
+          "distribution": [
+            0.0088,
+            0.1888,
+            0.4156,
+            0.3868
+          ],
+          "labels": [
+            "Works extremely well and could not be improved",
+            "Could be improved in small ways but mainly works well",
+            "Could be improved quite a lot",
+            "Needs a great deal of improvement"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            1043,
+            860
+          ],
+          "delta": [
+            -0.0213,
+            0.0134,
+            0.0619,
+            -0.054
+          ],
+          "total_variation": 0.0753,
+          "mean_position_shift": -0.0249,
+          "per_option_z": [
+            -3.45,
+            0.76,
+            2.76,
+            -2.39
+          ],
+          "max_abs_z": 3.45,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "trust_gov",
+      "domain": "trust",
+      "title": "Trust British governments",
+      "variable": "GovTrust",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 1042,
+          "distribution": [
+            0.026,
+            0.1304,
+            0.4112,
+            0.4323
+          ],
+          "labels": [
+            "Just about always",
+            "Most of the time",
+            "Only some of the time",
+            "Almost never"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 865,
+          "distribution": [
+            0.0101,
+            0.0964,
+            0.4297,
+            0.4638
+          ],
+          "labels": [
+            "Just about always",
+            "Most of the time",
+            "Only some of the time",
+            "Almost never"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            1042,
+            865
+          ],
+          "delta": [
+            -0.0159,
+            -0.034,
+            0.0184,
+            0.0315
+          ],
+          "total_variation": 0.0499,
+          "mean_position_shift": 0.0974,
+          "per_option_z": [
+            -2.66,
+            -2.35,
+            0.81,
+            1.38
+          ],
+          "max_abs_z": 2.66,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "welfare_scale_grouped",
+      "domain": "welfare",
+      "title": "Welfare attitude scale",
+      "variable": "Welfgrp",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": false,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 4764,
+          "distribution": [
+            0.3403,
+            0.469,
+            0.1907
+          ],
+          "labels": [
+            "pro welfare",
+            "neither",
+            "anti welfare"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 3287,
+          "distribution": [
+            0.2872,
+            0.5005,
+            0.2123
+          ],
+          "labels": [
+            "Pro welfare",
+            "Neither",
+            "Anti welfare"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            4764,
+            3287
+          ],
+          "delta": [
+            -0.053,
+            0.0315,
+            0.0216
+          ],
+          "total_variation": 0.053,
+          "mean_position_shift": 0.0746,
+          "per_option_z": [
+            -5.07,
+            2.78,
+            2.36
+          ],
+          "max_abs_z": 5.07,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "ae_satisfaction",
+      "domain": "nhs",
+      "title": "How satisfied or dissatisfied are you with the NHS with regards to Accident and Emergency departments?",
+      "variable": "AESat",
+      "present_years": [
+        2022,
+        2023,
+        2024
+      ],
+      "absent_years": [],
+      "harmonised_labels": true,
+      "distributions": {
+        "2022": {
+          "n_unweighted": 1025,
+          "distribution": [
+            0.0763,
+            0.2426,
+            0.2608,
+            0.2375,
+            0.1828
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        },
+        "2023": {
+          "n_unweighted": 1035,
+          "distribution": [
+            0.0725,
+            0.2597,
+            0.289,
+            0.2257,
+            0.153
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 774,
+          "distribution": [
+            0.0319,
+            0.1687,
+            0.2815,
+            0.2645,
+            0.2534
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2022->2024",
+          "n": [
+            1025,
+            774
+          ],
+          "delta": [
+            -0.0444,
+            -0.0739,
+            0.0207,
+            0.027,
+            0.0706
+          ],
+          "total_variation": 0.1183,
+          "mean_position_shift": 0.3309,
+          "per_option_z": [
+            -4.26,
+            -3.89,
+            0.97,
+            1.3,
+            3.58
+          ],
+          "max_abs_z": 4.26,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2023->2024",
+          "n": [
+            1035,
+            774
+          ],
+          "delta": [
+            -0.0407,
+            -0.091,
+            -0.0075,
+            0.0388,
+            0.1004
+          ],
+          "total_variation": 0.1392,
+          "mean_position_shift": 0.4119,
+          "per_option_z": [
+            -3.97,
+            -4.75,
+            -0.35,
+            1.89,
+            5.22
+          ],
+          "max_abs_z": 5.22,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2022->2023",
+          "n": [
+            1025,
+            1035
+          ],
+          "delta": [
+            -0.0037,
+            0.0171,
+            0.0282,
+            -0.0118,
+            -0.0298
+          ],
+          "total_variation": 0.0453,
+          "mean_position_shift": -0.081,
+          "per_option_z": [
+            -0.32,
+            0.9,
+            1.43,
+            -0.64,
+            -1.81
+          ],
+          "max_abs_z": 1.81,
+          "significant_unadjusted": false,
+          "significant_bonferroni": false
+        }
+      ]
+    },
+    {
+      "id": "dentist_satisfaction",
+      "domain": "nhs",
+      "title": "How satisfied or dissatisfied are you with the NHS with regards to dentists?",
+      "variable": "DentSat",
+      "present_years": [
+        2022,
+        2023,
+        2024
+      ],
+      "absent_years": [],
+      "harmonised_labels": true,
+      "distributions": {
+        "2022": {
+          "n_unweighted": 1024,
+          "distribution": [
+            0.0576,
+            0.2085,
+            0.2914,
+            0.1886,
+            0.2539
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        },
+        "2023": {
+          "n_unweighted": 1032,
+          "distribution": [
+            0.0544,
+            0.1961,
+            0.2595,
+            0.201,
+            0.2891
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 759,
+          "distribution": [
+            0.0503,
+            0.1407,
+            0.2373,
+            0.1905,
+            0.3812
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2022->2024",
+          "n": [
+            1024,
+            759
+          ],
+          "delta": [
+            -0.0072,
+            -0.0678,
+            -0.0541,
+            0.0019,
+            0.1272
+          ],
+          "total_variation": 0.1291,
+          "mean_position_shift": 0.3387,
+          "per_option_z": [
+            -0.67,
+            -3.79,
+            -2.58,
+            0.1,
+            5.71
+          ],
+          "max_abs_z": 5.71,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2023->2024",
+          "n": [
+            1032,
+            759
+          ],
+          "delta": [
+            -0.004,
+            -0.0554,
+            -0.0222,
+            -0.0105,
+            0.0921
+          ],
+          "total_variation": 0.0921,
+          "mean_position_shift": 0.237,
+          "per_option_z": [
+            -0.38,
+            -3.13,
+            -1.08,
+            -0.56,
+            4.08
+          ],
+          "max_abs_z": 4.08,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2022->2023",
+          "n": [
+            1024,
+            1032
+          ],
+          "delta": [
+            -0.0032,
+            -0.0125,
+            -0.0319,
+            0.0125,
+            0.0351
+          ],
+          "total_variation": 0.0476,
+          "mean_position_shift": 0.1016,
+          "per_option_z": [
+            -0.32,
+            -0.7,
+            -1.62,
+            0.71,
+            1.79
+          ],
+          "max_abs_z": 1.79,
+          "significant_unadjusted": false,
+          "significant_bonferroni": false
+        }
+      ]
+    },
+    {
+      "id": "gp_satisfaction",
+      "domain": "nhs",
+      "title": "How satisfied or dissatisfied are you with the NHS with regards to local doctors or GPs?",
+      "variable": "GPSat",
+      "present_years": [
+        2022,
+        2023,
+        2024
+      ],
+      "absent_years": [],
+      "harmonised_labels": true,
+      "distributions": {
+        "2022": {
+          "n_unweighted": 1056,
+          "distribution": [
+            0.0822,
+            0.2575,
+            0.2298,
+            0.3025,
+            0.128
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        },
+        "2023": {
+          "n_unweighted": 1055,
+          "distribution": [
+            0.0785,
+            0.2703,
+            0.2411,
+            0.276,
+            0.1341
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 790,
+          "distribution": [
+            0.0568,
+            0.2566,
+            0.2063,
+            0.3016,
+            0.1787
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2022->2024",
+          "n": [
+            1056,
+            790
+          ],
+          "delta": [
+            -0.0255,
+            -0.0009,
+            -0.0234,
+            -0.0009,
+            0.0508
+          ],
+          "total_variation": 0.0508,
+          "mean_position_shift": 0.1524,
+          "per_option_z": [
+            -2.16,
+            -0.04,
+            -1.21,
+            -0.04,
+            2.97
+          ],
+          "max_abs_z": 2.97,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2023->2024",
+          "n": [
+            1055,
+            790
+          ],
+          "delta": [
+            -0.0218,
+            -0.0137,
+            -0.0348,
+            0.0256,
+            0.0447
+          ],
+          "total_variation": 0.0702,
+          "mean_position_shift": 0.1721,
+          "per_option_z": [
+            -1.86,
+            -0.66,
+            -1.78,
+            1.2,
+            2.6
+          ],
+          "max_abs_z": 2.6,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2022->2023",
+          "n": [
+            1056,
+            1055
+          ],
+          "delta": [
+            -0.0037,
+            0.0128,
+            0.0113,
+            -0.0265,
+            0.0061
+          ],
+          "total_variation": 0.0302,
+          "mean_position_shift": -0.0197,
+          "per_option_z": [
+            -0.32,
+            0.67,
+            0.61,
+            -1.34,
+            0.41
+          ],
+          "max_abs_z": 1.34,
+          "significant_unadjusted": false,
+          "significant_bonferroni": false
+        }
+      ]
+    },
+    {
+      "id": "hospital_satisfaction",
+      "domain": "nhs",
+      "title": "How satisfied or dissatisfied are you with the NHS with regards to being in hospital either as an in-patient or an out-patient?",
+      "variable": "InOutSat",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 769,
+          "distribution": [
+            0.0524,
+            0.2615,
+            0.4023,
+            0.1724,
+            0.1115
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "nhs_quality_care",
+      "domain": "nhs",
+      "title": "How satisfied or dissatisfied are you with the quality of care provided by the NHS",
+      "variable": "NHSSatSp_1_q",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 791,
+          "distribution": [
+            0.1384,
+            0.3766,
+            0.2574,
+            0.1481,
+            0.0795
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "nhs_treatment_range",
+      "domain": "nhs",
+      "title": "How satisfied or dissatisfied are you with the range of treatments and services available on the NHS",
+      "variable": "NHSSatSp_2_q",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 789,
+          "distribution": [
+            0.1189,
+            0.3778,
+            0.2548,
+            0.1423,
+            0.1063
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "nhs_gp_wait",
+      "domain": "nhs",
+      "title": "How satisfied or dissatisfied are you with the length of time it takes to get an appointment at a GP practice",
+      "variable": "NHSSatSp_3_q",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 791,
+          "distribution": [
+            0.052,
+            0.1746,
+            0.152,
+            0.2449,
+            0.3766
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "nhs_hospital_wait",
+      "domain": "nhs",
+      "title": "How satisfied or dissatisfied are you with the length of time it takes to get hospital care",
+      "variable": "NHSSatSp_4_q",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 790,
+          "distribution": [
+            0.0319,
+            0.1086,
+            0.2227,
+            0.3283,
+            0.3085
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "nhs_ae_wait",
+      "domain": "nhs",
+      "title": "How satisfied or dissatisfied are you with the length of time it takes for someone to be seen in Accident and Emergency (A&E)",
+      "variable": "NHSSatSp_5_q",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 787,
+          "distribution": [
+            0.0218,
+            0.0943,
+            0.1835,
+            0.3104,
+            0.3899
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "nhs_spend_level",
+      "domain": "nhs",
+      "title": "From what you have seen or heard, would you say that at the moment the government spends too much money on the NHS, too little money, or about the right amount?",
+      "variable": "GvMonNHS",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 769,
+          "distribution": [
+            0.0169,
+            0.0665,
+            0.2264,
+            0.4581,
+            0.2321
+          ],
+          "labels": [
+            "Far too much money",
+            "Too much money",
+            "About the right amount of money",
+            "Too little money",
+            "Far too little money"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "nhs_tax_spend",
+      "domain": "nhs",
+      "title": "Suppose the government had to choose between the following three options, which do you think it should choose?",
+      "variable": "NHSTaxSpend",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 1031,
+          "distribution": [
+            0.0662,
+            0.4388,
+            0.495
+          ],
+          "labels": [
+            "Reduce taxes and spend less on the NHS",
+            "Keep taxes and spending on the NHS at the same level as now",
+            "Increase taxes and spend more on the NHS"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 764,
+          "distribution": [
+            0.0885,
+            0.4262,
+            0.4853
+          ],
+          "labels": [
+            "Reduce taxes and spend less on the NHS",
+            "Keep taxes and spending on the NHS at the same level as now",
+            "Increase taxes and spend more on the NHS"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            1031,
+            764
+          ],
+          "delta": [
+            0.0223,
+            -0.0125,
+            -0.0098
+          ],
+          "total_variation": 0.0223,
+          "mean_position_shift": -0.0321,
+          "per_option_z": [
+            1.73,
+            -0.53,
+            -0.41
+          ],
+          "max_abs_z": 1.73,
+          "significant_unadjusted": false,
+          "significant_bonferroni": false
+        }
+      ]
+    },
+    {
+      "id": "nhs_free_principle",
+      "domain": "nhs",
+      "title": "Extent to which you think principle should apply to NHS today: The NHS should be free of charge when you need to use it",
+      "variable": "NHSPrinciples1_NHSPrinciples1R_1_slice",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 1050,
+          "distribution": [
+            0.7685,
+            0.1535,
+            0.0566,
+            0.0214
+          ],
+          "labels": [
+            "This principle should definitely apply to the NHS today",
+            "This principle should probably apply to the NHS today",
+            "This principle should probably not apply to the NHS today",
+            "This principle should definitely not apply to the NHS today"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 788,
+          "distribution": [
+            0.7428,
+            0.1629,
+            0.0805,
+            0.0138
+          ],
+          "labels": [
+            "This principle should definitely apply to the NHS today",
+            "This principle should probably apply to the NHS today",
+            "This principle should probably not apply to the NHS today",
+            "This principle should definitely not apply to the NHS today"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            1050,
+            788
+          ],
+          "delta": [
+            -0.0257,
+            0.0094,
+            0.0239,
+            -0.0076
+          ],
+          "total_variation": 0.0333,
+          "mean_position_shift": 0.0344,
+          "per_option_z": [
+            -1.27,
+            0.55,
+            1.99,
+            -1.25
+          ],
+          "max_abs_z": 1.99,
+          "significant_unadjusted": true,
+          "significant_bonferroni": false
+        }
+      ]
+    },
+    {
+      "id": "nhs_universal_principle",
+      "domain": "nhs",
+      "title": "Extent to which you think principle should apply to NHS today: The NHS should be available to everyone",
+      "variable": "NHSPrinciples1_NHSPrinciples1R_3_slice",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 1050,
+          "distribution": [
+            0.6756,
+            0.1527,
+            0.1006,
+            0.0711
+          ],
+          "labels": [
+            "This principle should definitely apply to the NHS today",
+            "This principle should probably apply to the NHS today",
+            "This principle should probably not apply to the NHS today",
+            "This principle should definitely not apply to the NHS today"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 788,
+          "distribution": [
+            0.5561,
+            0.2188,
+            0.1547,
+            0.0705
+          ],
+          "labels": [
+            "This principle should definitely apply to the NHS today",
+            "This principle should probably apply to the NHS today",
+            "This principle should probably not apply to the NHS today",
+            "This principle should definitely not apply to the NHS today"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            1050,
+            788
+          ],
+          "delta": [
+            -0.1195,
+            0.0661,
+            0.054,
+            -0.0006
+          ],
+          "total_variation": 0.1201,
+          "mean_position_shift": 0.1724,
+          "per_option_z": [
+            -5.23,
+            3.58,
+            3.4,
+            -0.05
+          ],
+          "max_abs_z": 5.23,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "nhs_tax_funded_principle",
+      "domain": "nhs",
+      "title": "Extent to which you think principle should apply to NHS today: The NHS should primarily be funded through taxes",
+      "variable": "NHSPrinciples1_NHSPrinciples1R_4_slice",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 1041,
+          "distribution": [
+            0.4982,
+            0.3314,
+            0.1307,
+            0.0397
+          ],
+          "labels": [
+            "This principle should definitely apply to the NHS today",
+            "This principle should probably apply to the NHS today",
+            "This principle should probably not apply to the NHS today",
+            "This principle should definitely not apply to the NHS today"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 779,
+          "distribution": [
+            0.4273,
+            0.3865,
+            0.1499,
+            0.0363
+          ],
+          "labels": [
+            "This principle should definitely apply to the NHS today",
+            "This principle should probably apply to the NHS today",
+            "This principle should probably not apply to the NHS today",
+            "This principle should definitely not apply to the NHS today"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            1041,
+            779
+          ],
+          "delta": [
+            -0.071,
+            0.0551,
+            0.0192,
+            -0.0033
+          ],
+          "total_variation": 0.0743,
+          "mean_position_shift": 0.0835,
+          "per_option_z": [
+            -3.01,
+            2.42,
+            1.16,
+            -0.37
+          ],
+          "max_abs_z": 3.01,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "social_care_satisfaction",
+      "domain": "social_care",
+      "title": "From your own experience, or from what you have heard, how satisfied or dissatisfied are you with social care these days?",
+      "variable": "CareSat3",
+      "present_years": [
+        2022,
+        2023,
+        2024
+      ],
+      "absent_years": [],
+      "harmonised_labels": true,
+      "distributions": {
+        "2022": {
+          "n_unweighted": 2863,
+          "distribution": [
+            0.022,
+            0.1239,
+            0.276,
+            0.3388,
+            0.2392
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        },
+        "2023": {
+          "n_unweighted": 2823,
+          "distribution": [
+            0.0184,
+            0.1201,
+            0.2917,
+            0.3367,
+            0.233
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 2454,
+          "distribution": [
+            0.0177,
+            0.1107,
+            0.3364,
+            0.3291,
+            0.2061
+          ],
+          "labels": [
+            "Very satisfied",
+            "Quite satisfied",
+            "Neither satisfied nor dissatisfied",
+            "Quite dissatisfied",
+            "Very dissatisfied"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2022->2024",
+          "n": [
+            2863,
+            2454
+          ],
+          "delta": [
+            -0.0043,
+            -0.0132,
+            0.0604,
+            -0.0097,
+            -0.0331
+          ],
+          "total_variation": 0.0604,
+          "mean_position_shift": -0.054,
+          "per_option_z": [
+            -1.13,
+            -1.5,
+            4.76,
+            -0.75,
+            -2.9
+          ],
+          "max_abs_z": 4.76,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2023->2024",
+          "n": [
+            2823,
+            2454
+          ],
+          "delta": [
+            -0.0007,
+            -0.0094,
+            0.0447,
+            -0.0077,
+            -0.0268
+          ],
+          "total_variation": 0.0447,
+          "mean_position_shift": -0.0504,
+          "per_option_z": [
+            -0.2,
+            -1.07,
+            3.49,
+            -0.59,
+            -2.35
+          ],
+          "max_abs_z": 3.49,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2022->2023",
+          "n": [
+            2863,
+            2823
+          ],
+          "delta": [
+            -0.0036,
+            -0.0038,
+            0.0157,
+            -0.002,
+            -0.0063
+          ],
+          "total_variation": 0.0157,
+          "mean_position_shift": -0.0035,
+          "per_option_z": [
+            -0.97,
+            -0.44,
+            1.31,
+            -0.16,
+            -0.56
+          ],
+          "max_abs_z": 1.31,
+          "significant_unadjusted": false,
+          "significant_bonferroni": false
+        }
+      ]
+    },
+    {
+      "id": "social_care_who_pays",
+      "domain": "social_care",
+      "title": "Who do you think should pay for social care?",
+      "variable": "CarePa2",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 867,
+          "distribution": [
+            0.3713,
+            0.0333,
+            0.2281,
+            0.3673
+          ],
+          "labels": [
+            "The government",
+            "The individual",
+            "The individual should pay what they can and the government should pay the rest",
+            "The individual should pay what they can up to a capped amount and the government should pay the rest"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "dwp_fairness_trust",
+      "domain": "dwp",
+      "title": "Do you tend to trust or tend not to trust the DWP to treat people fairly?",
+      "variable": "DWPFai",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": false,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 2640,
+          "distribution": [
+            0.0679,
+            0.5898,
+            0.2434,
+            0.0988
+          ],
+          "labels": [
+            "Trust it a great deal",
+            "Tend to trust it",
+            "Tend to distrust it",
+            "Distrust it greatly"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 2355,
+          "distribution": [
+            0.0767,
+            0.5272,
+            0.2941,
+            0.102
+          ],
+          "labels": [
+            "Trust it a great deal",
+            "Tend to trust it",
+            "Tend to distrust it",
+            "Distrust it a great deal"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            2640,
+            2355
+          ],
+          "delta": [
+            0.0088,
+            -0.0626,
+            0.0507,
+            0.0032
+          ],
+          "total_variation": 0.0626,
+          "mean_position_shift": 0.0483,
+          "per_option_z": [
+            1.19,
+            -4.46,
+            4.03,
+            0.38
+          ],
+          "max_abs_z": 4.46,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "dwp_honesty_trust",
+      "domain": "dwp",
+      "title": "Do you tend to trust or tend not to trust the DWP to be honest?",
+      "variable": "DWPHon",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": false,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 2675,
+          "distribution": [
+            0.0963,
+            0.6512,
+            0.1864,
+            0.0661
+          ],
+          "labels": [
+            "Trust it a great deal",
+            "Tend to trust it",
+            "Tend to distrust it",
+            "Distrust it greatly"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 2364,
+          "distribution": [
+            0.0944,
+            0.5907,
+            0.2447,
+            0.0702
+          ],
+          "labels": [
+            "Trust it a great deal",
+            "Tend to trust it",
+            "Tend to distrust it",
+            "Distrust it a great deal"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            2675,
+            2364
+          ],
+          "delta": [
+            -0.002,
+            -0.0605,
+            0.0583,
+            0.0041
+          ],
+          "total_variation": 0.0624,
+          "mean_position_shift": 0.0685,
+          "per_option_z": [
+            -0.24,
+            -4.42,
+            5.02,
+            0.58
+          ],
+          "max_abs_z": 5.02,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "dwp_accuracy_trust",
+      "domain": "dwp",
+      "title": "Do you tend to trust or tend not to trust the DWP to respond to queries accurately and quickly?",
+      "variable": "DWPQui",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": false,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 2604,
+          "distribution": [
+            0.0517,
+            0.5818,
+            0.2728,
+            0.0936
+          ],
+          "labels": [
+            "Trust it a great deal",
+            "Tend to trust it",
+            "Tend to distrust it",
+            "Distrust it greatly"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 2319,
+          "distribution": [
+            0.0495,
+            0.4857,
+            0.3577,
+            0.1071
+          ],
+          "labels": [
+            "Trust it a great deal",
+            "Tend to trust it",
+            "Tend to distrust it",
+            "Distrust it a great deal"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            2604,
+            2319
+          ],
+          "delta": [
+            -0.0022,
+            -0.0961,
+            0.0849,
+            0.0135
+          ],
+          "total_variation": 0.0984,
+          "mean_position_shift": 0.1141,
+          "per_option_z": [
+            -0.36,
+            -6.78,
+            6.41,
+            1.57
+          ],
+          "max_abs_z": 6.78,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "redistribution",
+      "domain": "redistribution",
+      "title": "Government should redistribute income from the better-off to those who are less well off",
+      "variable": "Redistrb",
+      "present_years": [
+        2022,
+        2023,
+        2024
+      ],
+      "absent_years": [],
+      "harmonised_labels": true,
+      "distributions": {
+        "2022": {
+          "n_unweighted": 5787,
+          "distribution": [
+            0.218,
+            0.2976,
+            0.2355,
+            0.1806,
+            0.0682
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        },
+        "2023": {
+          "n_unweighted": 4757,
+          "distribution": [
+            0.1893,
+            0.2647,
+            0.2485,
+            0.1923,
+            0.1052
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 3293,
+          "distribution": [
+            0.1723,
+            0.2513,
+            0.2786,
+            0.1915,
+            0.1063
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2022->2024",
+          "n": [
+            5787,
+            3293
+          ],
+          "delta": [
+            -0.0457,
+            -0.0463,
+            0.043,
+            0.0109,
+            0.0381
+          ],
+          "total_variation": 0.092,
+          "mean_position_shift": 0.2248,
+          "per_option_z": [
+            -5.35,
+            -4.8,
+            4.48,
+            1.28,
+            6.04
+          ],
+          "max_abs_z": 6.04,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2023->2024",
+          "n": [
+            4757,
+            3293
+          ],
+          "delta": [
+            -0.0169,
+            -0.0134,
+            0.0301,
+            -0.0009,
+            0.0012
+          ],
+          "total_variation": 0.0312,
+          "mean_position_shift": 0.0487,
+          "per_option_z": [
+            -1.95,
+            -1.35,
+            3.0,
+            -0.1,
+            0.17
+          ],
+          "max_abs_z": 3.0,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2022->2023",
+          "n": [
+            5787,
+            4757
+          ],
+          "delta": [
+            -0.0288,
+            -0.0329,
+            0.013,
+            0.0118,
+            0.037
+          ],
+          "total_variation": 0.0617,
+          "mean_position_shift": 0.1761,
+          "per_option_z": [
+            -3.66,
+            -3.75,
+            1.55,
+            1.54,
+            6.66
+          ],
+          "max_abs_z": 6.66,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "more_welfare_poor",
+      "domain": "welfare",
+      "title": "The government should spend more money on welfare benefits for the poor, even if it leads to higher taxes",
+      "variable": "morewelf",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 3290,
+          "distribution": [
+            0.0837,
+            0.1965,
+            0.3263,
+            0.284,
+            0.1096
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "welfare_dependency",
+      "domain": "welfare",
+      "title": "If welfare benefits weren't so generous, people would learn to stand on their own two feet",
+      "variable": "WelfFeet",
+      "present_years": [
+        2022,
+        2023,
+        2024
+      ],
+      "absent_years": [],
+      "harmonised_labels": true,
+      "distributions": {
+        "2022": {
+          "n_unweighted": 5780,
+          "distribution": [
+            0.1125,
+            0.2576,
+            0.233,
+            0.2308,
+            0.1661
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        },
+        "2023": {
+          "n_unweighted": 4762,
+          "distribution": [
+            0.1347,
+            0.2763,
+            0.2316,
+            0.2074,
+            0.1499
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 3283,
+          "distribution": [
+            0.1544,
+            0.2696,
+            0.2627,
+            0.1821,
+            0.1311
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2022->2024",
+          "n": [
+            5780,
+            3283
+          ],
+          "delta": [
+            0.0419,
+            0.012,
+            0.0297,
+            -0.0487,
+            -0.0349
+          ],
+          "total_variation": 0.0836,
+          "mean_position_shift": -0.2143,
+          "per_option_z": [
+            5.55,
+            1.24,
+            3.13,
+            -5.58,
+            -4.56
+          ],
+          "max_abs_z": 5.58,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2023->2024",
+          "n": [
+            4762,
+            3283
+          ],
+          "delta": [
+            0.0197,
+            -0.0067,
+            0.0311,
+            -0.0253,
+            -0.0188
+          ],
+          "total_variation": 0.0508,
+          "mean_position_shift": -0.0957,
+          "per_option_z": [
+            2.46,
+            -0.66,
+            3.17,
+            -2.84,
+            -2.4
+          ],
+          "max_abs_z": 3.17,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2022->2023",
+          "n": [
+            5780,
+            4762
+          ],
+          "delta": [
+            0.0222,
+            0.0187,
+            -0.0014,
+            -0.0233,
+            -0.0161
+          ],
+          "total_variation": 0.0409,
+          "mean_position_shift": -0.1186,
+          "per_option_z": [
+            3.43,
+            2.16,
+            -0.17,
+            -2.89,
+            -2.26
+          ],
+          "max_abs_z": 3.43,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "welfare_damage_lives",
+      "domain": "welfare",
+      "title": "Cutting welfare benefits would damage too many people's lives",
+      "variable": "damlives",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 3288,
+          "distribution": [
+            0.1835,
+            0.3449,
+            0.3024,
+            0.1319,
+            0.0374
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "welfare_proudest_achievement",
+      "domain": "welfare",
+      "title": "The creation of the welfare state is one of Britain's proudest achievements",
+      "variable": "proudwlf",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 3280,
+          "distribution": [
+            0.1839,
+            0.297,
+            0.3663,
+            0.1033,
+            0.0496
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "disability_benefits_difficulty",
+      "domain": "welfare",
+      "title": "In general, would you say it is too easy or too difficult for people to be able to claim disability benefits?",
+      "variable": "DisBenDif",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 2259,
+          "distribution": [
+            0.1236,
+            0.1909,
+            0.3727,
+            0.2116,
+            0.1012
+          ],
+          "labels": [
+            "Much too easy",
+            "Somewhat too easy",
+            "Neither too easy nor too difficult",
+            "Somewhat too difficult",
+            "Much too difficult"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "disabled_benefits_spend",
+      "domain": "welfare",
+      "title": "Would you like to see more or less government spending than now on benefits for disabled people who cannot work?",
+      "variable": "SocSpnd2",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 2385,
+          "distribution": [
+            0.1254,
+            0.3351,
+            0.4249,
+            0.0938,
+            0.0209
+          ],
+          "labels": [
+            "Spend much more",
+            "Spend more",
+            "Spend the same as now",
+            "Spend less",
+            "Spend much less"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "benefits_damp_mould",
+      "domain": "welfare",
+      "title": "Consider a family on a low income who receive welfare benefits to help pay their rent. Their rent increases after work to get rid of severe damp and mould in their home. What do you think should happen to the family's welfare benefits?",
+      "variable": "DMWelf",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": false,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 2738,
+          "distribution": [
+            0.5328,
+            0.334,
+            0.1332
+          ],
+          "labels": [
+            "They should be increased to cover all of the cost of the rent rise",
+            "They should be increased to cover some of the cost of the rent rise",
+            "They should not be increased at all and the family should cover the full cost of the rent rise."
+          ]
+        },
+        "2024": {
+          "n_unweighted": 2378,
+          "distribution": [
+            0.4728,
+            0.3949,
+            0.1323
+          ],
+          "labels": [
+            "They should be increased to cover all of the cost of the rent rise",
+            "They should be increased to cover some of the cost of the rent rise",
+            "They should not be increased at all and the family should cover the full cost of the rent rise"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            2738,
+            2378
+          ],
+          "delta": [
+            -0.0601,
+            0.061,
+            -0.0009
+          ],
+          "total_variation": 0.061,
+          "mean_position_shift": 0.0592,
+          "per_option_z": [
+            -4.29,
+            4.52,
+            -0.09
+          ],
+          "max_abs_z": 4.52,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "benefits_insulation_rent",
+      "domain": "welfare",
+      "title": "Low income family's rent increases after landlord spends money on insulation and double glazing. What do you think should happen to welfare benefits?",
+      "variable": "IDGWelf",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": false,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 2728,
+          "distribution": [
+            0.3927,
+            0.4121,
+            0.1951
+          ],
+          "labels": [
+            "They should be increased to cover all of the cost of the rent rise",
+            "They should be increased to cover some of the cost of the rent rise",
+            "They should not be increased at all and the family should cover the full cost of the rent rise."
+          ]
+        },
+        "2024": {
+          "n_unweighted": 2387,
+          "distribution": [
+            0.3323,
+            0.4729,
+            0.1947
+          ],
+          "labels": [
+            "They should be increased to cover all of the cost of the rent rise",
+            "They should be increased to cover some of the cost of the rent rise",
+            "They should not be increased at all and the family should cover the full cost of the rent rise"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            2728,
+            2387
+          ],
+          "delta": [
+            -0.0604,
+            0.0608,
+            -0.0004
+          ],
+          "total_variation": 0.0608,
+          "mean_position_shift": 0.06,
+          "per_option_z": [
+            -4.5,
+            4.37,
+            -0.04
+          ],
+          "max_abs_z": 4.5,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "jobcentre_missed_weekly",
+      "domain": "welfare",
+      "title": "If a person on benefits fails to attend the Jobcentre every week, to talk about ways in which they might find work, what do you think should happen to their benefits?",
+      "variable": "JOBWORK3",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 2425,
+          "distribution": [
+            0.1405,
+            0.3195,
+            0.2073,
+            0.3327
+          ],
+          "labels": [
+            "Their benefits should not be affected",
+            "Their benefits should be reduced a little",
+            "Their benefits should be reduced a lot",
+            "Their benefits should be stopped"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "jobcentre_missed_quarterly",
+      "domain": "welfare",
+      "title": "If a person on benefits fails to attend the Jobcentre every 3 months, to talk about ways in which they might find work, what do you think should happen to their benefits?",
+      "variable": "JOBWORK5",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 2424,
+          "distribution": [
+            0.1005,
+            0.2743,
+            0.2316,
+            0.3936
+          ],
+          "labels": [
+            "Their benefits should not be affected",
+            "Their benefits should be reduced a little",
+            "Their benefits should be reduced a lot",
+            "Their benefits should be stopped"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "benefits_duty_find_better_job",
+      "domain": "welfare",
+      "title": "Imagine a person who receives benefits and is capable of working. How much do you agree or disagree that it is their duty to find a better paid job in order to reduce their reliance on benefits?",
+      "variable": "FinInd",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 2458,
+          "distribution": [
+            0.3287,
+            0.3647,
+            0.234,
+            0.0461,
+            0.0265
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "benefit_fraud_wrongness",
+      "domain": "welfare",
+      "title": "Suppose someone knowingly gave false information to support their benefit claim. What would your view about this be?",
+      "variable": "FalseBn2",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 2756,
+          "distribution": [
+            0.5331,
+            0.2505,
+            0.1757,
+            0.0305,
+            0.0102
+          ],
+          "labels": [
+            "Always wrong",
+            "Usually wrong",
+            "Sometimes wrong",
+            "Rarely wrong",
+            "Never wrong"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 2454,
+          "distribution": [
+            0.5476,
+            0.2946,
+            0.137,
+            0.0107,
+            0.0101
+          ],
+          "labels": [
+            "Always wrong",
+            "Usually wrong",
+            "Sometimes wrong",
+            "Rarely wrong",
+            "Never wrong"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            2756,
+            2454
+          ],
+          "delta": [
+            0.0145,
+            0.0441,
+            -0.0386,
+            -0.0198,
+            -0.0001
+          ],
+          "total_variation": 0.0586,
+          "mean_position_shift": -0.0931,
+          "per_option_z": [
+            1.05,
+            3.57,
+            -3.85,
+            -5.11,
+            -0.04
+          ],
+          "max_abs_z": 5.11,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "benefit_cheat_poverty_reason",
+      "domain": "welfare",
+      "title": "Agreement with statement: The reason that some people on benefits cheat the system is that they don't get enough to live on",
+      "variable": "CheatPor",
+      "present_years": [
+        2022,
+        2023,
+        2024
+      ],
+      "absent_years": [],
+      "harmonised_labels": true,
+      "distributions": {
+        "2022": {
+          "n_unweighted": 2637,
+          "distribution": [
+            0.1004,
+            0.3118,
+            0.2695,
+            0.2445,
+            0.0736
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        },
+        "2023": {
+          "n_unweighted": 2777,
+          "distribution": [
+            0.073,
+            0.2345,
+            0.3132,
+            0.2525,
+            0.1268
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 2465,
+          "distribution": [
+            0.0812,
+            0.1812,
+            0.2965,
+            0.2616,
+            0.1795
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2022->2024",
+          "n": [
+            2637,
+            2465
+          ],
+          "delta": [
+            -0.0192,
+            -0.1306,
+            0.0269,
+            0.0171,
+            0.1058
+          ],
+          "total_variation": 0.1498,
+          "mean_position_shift": 0.3978,
+          "per_option_z": [
+            -2.39,
+            -10.98,
+            2.13,
+            1.4,
+            11.44
+          ],
+          "max_abs_z": 11.44,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2023->2024",
+          "n": [
+            2777,
+            2465
+          ],
+          "delta": [
+            0.0082,
+            -0.0533,
+            -0.0167,
+            0.0091,
+            0.0527
+          ],
+          "total_variation": 0.07,
+          "mean_position_shift": 0.1513,
+          "per_option_z": [
+            1.11,
+            -4.77,
+            -1.31,
+            0.75,
+            5.28
+          ],
+          "max_abs_z": 5.28,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2022->2023",
+          "n": [
+            2637,
+            2777
+          ],
+          "delta": [
+            -0.0274,
+            -0.0773,
+            0.0436,
+            0.008,
+            0.0531
+          ],
+          "total_variation": 0.1047,
+          "mean_position_shift": 0.2464,
+          "per_option_z": [
+            -3.58,
+            -6.4,
+            3.54,
+            0.68,
+            6.56
+          ],
+          "max_abs_z": 6.56,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "tax_high_incomes",
+      "domain": "tax",
+      "title": "Generally, how would you describe taxes in Britain today for those with high incomes? Taxes are",
+      "variable": "TaxHISc2",
+      "present_years": [
+        2023,
+        2024
+      ],
+      "absent_years": [
+        2022
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2023": {
+          "n_unweighted": 973,
+          "distribution": [
+            0.059,
+            0.1693,
+            0.2842,
+            0.2863,
+            0.2011
+          ],
+          "labels": [
+            "Much too high",
+            "Too high",
+            "About right",
+            "Too low",
+            "Much too low"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 815,
+          "distribution": [
+            0.1107,
+            0.1616,
+            0.277,
+            0.2924,
+            0.1583
+          ],
+          "labels": [
+            "Much too high",
+            "Too high",
+            "About right",
+            "Too low",
+            "Much too low"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2023->2024",
+          "n": [
+            973,
+            815
+          ],
+          "delta": [
+            0.0516,
+            -0.0077,
+            -0.0072,
+            0.0061,
+            -0.0428
+          ],
+          "total_variation": 0.0578,
+          "mean_position_shift": -0.1751,
+          "per_option_z": [
+            3.87,
+            -0.44,
+            -0.34,
+            0.28,
+            -2.36
+          ],
+          "max_abs_z": 3.87,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "tax_middle_incomes",
+      "domain": "tax",
+      "title": "Next, for those with middle incomes, are taxes",
+      "variable": "TaxMidSC",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 827,
+          "distribution": [
+            0.1573,
+            0.3149,
+            0.4562,
+            0.0675,
+            0.0041
+          ],
+          "labels": [
+            "Much too high",
+            "Too high",
+            "About right",
+            "Too low",
+            "Much too low"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "tax_low_incomes",
+      "domain": "tax",
+      "title": "Lastly, for those with low incomes, are taxes",
+      "variable": "TaxLowSC",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 817,
+          "distribution": [
+            0.2648,
+            0.3787,
+            0.3362,
+            0.0139,
+            0.0064
+          ],
+          "labels": [
+            "Much too high",
+            "Too high",
+            "About right",
+            "Too low",
+            "Much too low"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "defence_spending",
+      "domain": "spending",
+      "title": "Would you like to see more or less government spending in military and defence?",
+      "variable": "Gvspend5",
+      "present_years": [
+        2022,
+        2024
+      ],
+      "absent_years": [
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2022": {
+          "n_unweighted": 861,
+          "distribution": [
+            0.1333,
+            0.3065,
+            0.3831,
+            0.1329,
+            0.0443
+          ],
+          "labels": [
+            "Spend much more",
+            "Spend more",
+            "Spend the same as now",
+            "Spend less",
+            "Spend much less"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 793,
+          "distribution": [
+            0.1315,
+            0.2769,
+            0.3814,
+            0.1338,
+            0.0764
+          ],
+          "labels": [
+            "Spend much more",
+            "Spend more",
+            "Spend the same as now",
+            "Spend less",
+            "Spend much less"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2022->2024",
+          "n": [
+            861,
+            793
+          ],
+          "delta": [
+            -0.0017,
+            -0.0295,
+            -0.0016,
+            0.0008,
+            0.0321
+          ],
+          "total_variation": 0.0329,
+          "mean_position_shift": 0.098,
+          "per_option_z": [
+            -0.1,
+            -1.32,
+            -0.07,
+            0.05,
+            2.73
+          ],
+          "max_abs_z": 2.73,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        }
+      ]
+    },
+    {
+      "id": "climate_petrol_tax",
+      "domain": "climate",
+      "title": "Do you support: Increasing the tax on petrol",
+      "variable": "ccISSUE_1_Slice",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 872,
+          "distribution": [
+            0.0651,
+            0.1357,
+            0.1918,
+            0.2719,
+            0.3354
+          ],
+          "labels": [
+            "Strongly support",
+            "Somewhat support",
+            "Neither support nor oppose",
+            "Somewhat oppose",
+            "Strongly oppose"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "climate_flying_tax",
+      "domain": "climate",
+      "title": "Do you support: Increasing the tax on flying",
+      "variable": "ccISSUE_3_Slice",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 870,
+          "distribution": [
+            0.157,
+            0.2359,
+            0.2479,
+            0.1924,
+            0.1667
+          ],
+          "labels": [
+            "Strongly support",
+            "Somewhat support",
+            "Neither support nor oppose",
+            "Somewhat oppose",
+            "Strongly oppose"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "big_business_workers",
+      "domain": "economy",
+      "title": "Big business benefits owners at the expense of workers",
+      "variable": "BigBusnN",
+      "present_years": [
+        2022,
+        2023,
+        2024
+      ],
+      "absent_years": [],
+      "harmonised_labels": true,
+      "distributions": {
+        "2022": {
+          "n_unweighted": 5779,
+          "distribution": [
+            0.2803,
+            0.362,
+            0.2398,
+            0.0985,
+            0.0194
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        },
+        "2023": {
+          "n_unweighted": 4751,
+          "distribution": [
+            0.2633,
+            0.3738,
+            0.2394,
+            0.0982,
+            0.0253
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        },
+        "2024": {
+          "n_unweighted": 3295,
+          "distribution": [
+            0.2526,
+            0.3385,
+            0.2786,
+            0.1031,
+            0.0273
+          ],
+          "labels": [
+            "Agree strongly",
+            "Agree",
+            "Neither agree nor disagree",
+            "Disagree",
+            "Disagree strongly"
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": "2022->2024",
+          "n": [
+            5779,
+            3295
+          ],
+          "delta": [
+            -0.0277,
+            -0.0235,
+            0.0388,
+            0.0045,
+            0.0078
+          ],
+          "total_variation": 0.0511,
+          "mean_position_shift": 0.099,
+          "per_option_z": [
+            -2.88,
+            -2.26,
+            4.03,
+            0.69,
+            2.33
+          ],
+          "max_abs_z": 4.03,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2023->2024",
+          "n": [
+            4751,
+            3295
+          ],
+          "delta": [
+            -0.0107,
+            -0.0353,
+            0.0392,
+            0.0049,
+            0.002
+          ],
+          "total_variation": 0.046,
+          "mean_position_shift": 0.0655,
+          "per_option_z": [
+            -1.08,
+            -3.26,
+            3.93,
+            0.72,
+            0.54
+          ],
+          "max_abs_z": 3.93,
+          "significant_unadjusted": true,
+          "significant_bonferroni": true
+        },
+        {
+          "pair": "2022->2023",
+          "n": [
+            5779,
+            4751
+          ],
+          "delta": [
+            -0.017,
+            0.0118,
+            -0.0004,
+            -0.0004,
+            0.0059
+          ],
+          "total_variation": 0.0177,
+          "mean_position_shift": 0.0335,
+          "per_option_z": [
+            -1.95,
+            1.25,
+            -0.05,
+            -0.06,
+            2.02
+          ],
+          "max_abs_z": 2.02,
+          "significant_unadjusted": true,
+          "significant_bonferroni": false
+        }
+      ]
+    },
+    {
+      "id": "gov_resp_jobs",
+      "domain": "government_responsibility",
+      "title": "Government responsibility to: Provide a job for everyone who wants one",
+      "variable": "GovResp_1_q",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 815,
+          "distribution": [
+            0.282,
+            0.3625,
+            0.1988,
+            0.1567
+          ],
+          "labels": [
+            "Definitely should",
+            "Probably should",
+            "Probably should not",
+            "Definitely should not"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "gov_resp_healthcare",
+      "domain": "government_responsibility",
+      "title": "Government responsibility to: Provide health care for the sick",
+      "variable": "GovResp_3_q",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 820,
+          "distribution": [
+            0.8137,
+            0.1728,
+            0.0122,
+            0.0013
+          ],
+          "labels": [
+            "Definitely should",
+            "Probably should",
+            "Probably should not",
+            "Definitely should not"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "gov_resp_old_living",
+      "domain": "government_responsibility",
+      "title": "Government responsibility to: Provide a decent standard of living for the old",
+      "variable": "GovResp_4_q",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 820,
+          "distribution": [
+            0.7546,
+            0.2259,
+            0.0178,
+            0.0016
+          ],
+          "labels": [
+            "Definitely should",
+            "Probably should",
+            "Probably should not",
+            "Definitely should not"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "gov_resp_unemployed_living",
+      "domain": "government_responsibility",
+      "title": "Government responsibility to: Provide a decent standard of living for the unemployed",
+      "variable": "GovResp_6_q",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 813,
+          "distribution": [
+            0.261,
+            0.4652,
+            0.2072,
+            0.0667
+          ],
+          "labels": [
+            "Definitely should",
+            "Probably should",
+            "Probably should not",
+            "Definitely should not"
+          ]
+        }
+      },
+      "pairs": []
+    },
+    {
+      "id": "gov_resp_reduce_income_diff",
+      "domain": "government_responsibility",
+      "title": "Government responsibility to: Reduce income differences between the rich and the poor",
+      "variable": "GovResp_7_q",
+      "present_years": [
+        2024
+      ],
+      "absent_years": [
+        2022,
+        2023
+      ],
+      "harmonised_labels": true,
+      "distributions": {
+        "2024": {
+          "n_unweighted": 810,
+          "distribution": [
+            0.5014,
+            0.2606,
+            0.1572,
+            0.0809
+          ],
+          "labels": [
+            "Definitely should",
+            "Probably should",
+            "Probably should not",
+            "Definitely should not"
+          ]
+        }
+      },
+      "pairs": []
+    }
+  ]
+}
