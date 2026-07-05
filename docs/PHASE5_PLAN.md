@@ -265,3 +265,33 @@ size-robust, the evidence-channel vulnerability is WORSE at scale (0.707→0.074
 guards fail on both models (genuinely on 8B, via homogenisation on 3B). The single-model caveat
 is retired. Not replicated by design: steering/LoRA rungs (mechanistically explained 3B
 negatives). Note for byte-exact figure reproduction: f2/f3 rendered at matplotlib 3.11.0.
+
+### REP4 — Cross-FAMILY panel (Alex's direction, 2026-07-05) ☐
+Phase 5 so far is two sizes of one family. REP4 runs the core battery (P2 + P3 + P4; NO guard
+grid — guard failure is already shown on both Llamas and can be a follow-up) on a 4-model
+cached panel spanning families (all already in the HF cache via decision-drift; zero downloads):
+
+1. `mlx-community/Qwen2.5-7B-Instruct-4bit` (Qwen — prior stress-test model)
+2. `mlx-community/Mistral-7B-Instruct-v0.3-4bit` (Mistral)
+3. `mlx-community/gemma-2-9b-it-4bit` (Google)
+4. `mlx-community/Phi-4-mini-instruct-8bit` (Microsoft, small-but-8bit)
+
+Excluded on purpose: SmolLM-1.7B (position-bias junk at this scale, per the 1B lesson),
+gpt-oss-20b (thermal), Qwen3-8B (thinking-mode chat template complicates forced-choice logprobs).
+
+**THERMAL RULES (new, binding — the machine overheated on 2026-07-04):** one model at a time;
+a ≥120 s idle cooldown between models; if per-pass time >2 s on smoke, flag and halve that
+model's grid (n_orders=1) rather than push; total GPU-active ceiling ~50 min. Prefer dropping a
+model (with a note) over running hot.
+
+Artifacts per model tag (qwen7b / mistral7b / gemma9b / phi4mini):
+`out/evidcond_{baseline,tracking,floors}_<tag>.json`. Per-model smoke first (chat templates
+differ across families — validate non-degenerate distributions before each full run; a model
+that smokes degenerate is DROPPED with a note, not a line-stop, unless ≥2 drop).
+Report: the REP1/REP2 side-by-side table extended to all models; per claim
+REPLICATES/NOT/PARTIAL per family. Key questions: is tracking family-robust? Is the
+hostile-evidence crack universal? Does baseline floor mass scale with capability?
+
+### REP5 — Paper integration of the family panel ☐
+Extend extractor/PAPER_RESULTS §10/REPRODUCTION/figures (F3 panel, F2 markers) with the family
+panel, same contract as REP3. Only after REP4 lands.
