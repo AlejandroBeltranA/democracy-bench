@@ -441,13 +441,18 @@ interval on Bonferroni-significant items.
 % =====================================================================
 
 Every quantitative claim above is regenerated from committed \texttt{out/*.json} run
-artifacts by a fail-loud extractor; each artifact carries a full \texttt{run} block, and
-a reproduction reference verifies run-block commands against the artifacts. The harness,
-item banks, derived aggregate targets, figures, and the extractor are released under an
-open license with a citation-file and data-provenance manifest; raw survey microdata are
-not redistributed and must be obtained from the World Values Survey/GESIS and the UK Data
-Service directly. Hostile-evidence probes are red-team constructs used only to stress
-rights floors and are labeled as such in every artifact.
+artifacts by a fail-loud extractor; each artifact carries a full \texttt{run} block
+(git SHA, exact command, model id, sample count, temperature, seed, schema version), and
+a reproduction reference verifies run-block commands against the artifacts. Local models
+are 4-bit MLX community checkpoints run on Apple Silicon via \texttt{mlx-lm}; the cloud
+panel is served through OpenRouter; scoring is a deterministic temperature-0 first-token
+option-logprob path where exposed and $\geq 100$ samples otherwise, with option order
+randomized and debiased; figures render deterministically (matplotlib 3.11.0). The
+harness, item banks, derived aggregate targets, figures, and the extractor are released
+under an open license with a citation-file and data-provenance manifest; raw survey
+microdata are not redistributed and must be obtained from the World Values Survey/GESIS
+and the UK Data Service directly. Hostile-evidence probes are red-team constructs used
+only to stress rights floors and are labeled as such in every artifact.
 
 % =====================================================================
 \section{Conclusion}
