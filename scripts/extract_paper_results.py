@@ -606,6 +606,95 @@ def extract_model_robustness_8b():
     }
 
 
+def _cross_family_one(tag, model_id):
+    """Extract the core P2/P3/P4 battery for one cross-family model tag
+    (baseline + tracking + floors; NO guard grid — REP4 ran the un-guarded battery
+    only). Same fail-loud contract as the 8B extractor."""
+    base, pb = load(f"evidcond_baseline_{tag}.json")
+    trk, pt = load(f"evidcond_tracking_{tag}.json")
+    fl, pf = load(f"evidcond_floors_{tag}.json")
+    bhd = dig(base, ["headline"], pb)
+    bitems = dig(base, ["items"], pb)
+    thd = dig(trk, ["headline"], pt)
+    fhd = dig(fl, ["headline"], pf)
+
+    def _cond(name):
+        c = dig(fhd, [name], pf)
+        return {
+            "floor_mass": stat(c, ["floor_mass"], pf),
+            "delta_vs_baseline": stat(c, ["delta_vs_baseline"], pf),
+            "n_below_floor": dig(c, ["n_below_floor"], pf),
+        }
+
+    return {
+        "model_under_test": model_id,
+        "sources": [pb, pt, pf],
+        "numbers": {
+            "p2_fidelity": {
+                "no_evidence_rep": stat(bhd, ["no_evidence"], pb),
+                "evidence_rep": stat(bhd, ["evidence"], pb),
+                "delta": stat(bhd, ["delta"], pb),
+                "fidelity_gap": dig(bhd, ["fidelity_gap"], pb),
+                "n_items": len(bitems),
+                "n_items_worse_with_evidence": sum(1 for it in bitems if it.get("delta", 0.0) < 0.0),
+            },
+            "p3_tracking": {
+                "n_items": dig(thd, ["n_items"], pt),
+                "direction_match_count": dig(thd, ["direction_match_count"], pt),
+                "direction_match_rate": dig(thd, ["direction_match_rate"], pt),
+                "elasticity": stat(thd, ["elasticity"], pt),
+                "n_model_moved": dig(thd, ["n_model_moved"], pt),
+            },
+            "p4_floors": {
+                "baseline": _cond("baseline"),
+                "hostile_evidence": _cond("hostile_evidence"),
+                "adversarial_prompt": _cond("adversarial_prompt"),
+                "both": _cond("both"),
+            },
+        },
+    }
+
+
+def extract_cross_family_panel():
+    """Phase 5 REP4 — cross-FAMILY replication of the P2/P3/P4 battery.
+
+    Extends the robustness story from two sizes of one family (3B/8B Llama) to a
+    cross-family panel. Reads the scored models (Qwen-2.5-7B, Phi-4-mini) with the
+    same fail-loud contract; records the two attempted-but-dropped families and WHY,
+    so the panel's coverage is honest and not silently truncated. Per-claim verdict:
+      - P3 tracking: positive (direction-match + elasticity CI clears zero) on BOTH
+        scored families -> tracking is family-robust.
+      - P4 hostile-evidence crack: present and severe on BOTH -> crack is family-robust.
+      - P4 prompt-only channel: never cracks floors (protective or n.s.) -> the
+        evidence/prompt channel asymmetry is family-robust.
+    """
+    models = {
+        "qwen7b": "mlx-community/Qwen2.5-7B-Instruct-4bit",
+        "phi4mini": "mlx-community/Phi-4-mini-instruct-8bit",
+    }
+    scored = {tag: _cross_family_one(tag, mid) for tag, mid in models.items()}
+    return {
+        "claim": "Phase 5 REP4 (cross-family): evidence-tracking (positive elasticity) and the hostile-evidence floor crack both REPLICATE across families (Qwen-2.5-7B, Phi-4-mini) — not just across Llama sizes; the prompt-only channel never cracks floors on any model. Tracking and the crack are family-robust.",
+        "scored_models": scored,
+        "dropped_models": [
+            {
+                "model": "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
+                "reason": "fail-closed: on the full item bank some items yield no option-number token in the top-k first-token logprobs; the elicitor raises (ElicitationError) rather than fabricate a distribution. Smoke (3 items) passed; full bank did not. Dropped rather than scored on partial data.",
+            },
+            {
+                "model": "mlx-community/gemma-2-9b-it-4bit",
+                "reason": "runtime/thermal: the gemma-2 soft-capping / sliding-window path stalled local MLX evaluation (smoke ran >9 min at ~3% CPU with no output) past the panel's thermal budget; stopped to avoid running hardware hot.",
+            },
+        ],
+        "caveats": [
+            "REP4 ran the UN-guarded core battery only (baseline + tracking + floors); the guard grid (G1) was shown to fail on both Llama sizes and was not re-run per family.",
+            "SYNTHETIC hostile evidence (hostile_distribution, ~75% anti-rights mass) — red-team stress data, not real BSA opinion.",
+            "n_orders=2, same 50 contestable / 10 sig / 12 floor item sets as the Llama battery; single 4-bit checkpoint per model.",
+            "Two of six planned families did not complete scoring (Mistral fail-closed; Gemma runtime) — see dropped_models; the panel reports the four models that completed (2 Llama sizes + Qwen + Phi) rather than silently truncating.",
+        ],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Assembly
 # ---------------------------------------------------------------------------
@@ -618,6 +707,7 @@ EXTRACTORS = {
     "p5_lora": extract_p5_lora,
     "g1_guards": extract_g1_guards,
     "model_robustness_8b": extract_model_robustness_8b,
+    "cross_family_panel": extract_cross_family_panel,
 }
 
 

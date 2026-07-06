@@ -1,0 +1,466 @@
+\documentclass[letterpaper]{article} % DO NOT CHANGE THIS
+\usepackage[submission]{aaai2027}  % double-blind submission format
+\usepackage[hyphens]{url} % DO NOT CHANGE THIS
+\usepackage{graphicx} % DO NOT CHANGE THIS
+\urlstyle{rm} % DO NOT CHANGE THIS
+\def\UrlFont{\rm}  % DO NOT CHANGE THIS
+\usepackage{natbib}  % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\usepackage{caption} % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\frenchspacing  % DO NOT CHANGE THIS
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{xcolor} % drafting only (TODO markers); remove before camera-ready
+\pdfinfo{
+/TemplateVersion (2027.1)
+}
+\setcounter{secnumdepth}{2} % keep section numbers so \S\ref works while drafting
+
+% ---- drafting aids (strip before camera-ready) ----
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\verifyc}[1]{\textcolor{orange}{#1}} % citation to verify
+
+\graphicspath{{../out/figures/}}
+
+\title{Democracy Bench: Can a Deployed Language Model Be Governed as a Public Policy Delegate?}
+
+\author{
+    Anonymous Submission
+}
+\affiliations{
+    Paper submitted to the AAAI-27 Special Track on AI for Social Impact
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Language models are being placed in public-sector decision loops, where a natural
+hope is that they can act as \emph{policy delegates}: reflect a real public's
+preferences, be steered toward them at runtime, and follow those preferences as they
+change---while never trading away rights protections for popularity. We introduce
+\textbf{Democracy Bench}, an evaluation harness that operationalizes these four
+requirements against \emph{human survey distributions} (British Social Attitudes
+microdata, 2022--2024) rather than an LLM judge or an abstract left--right axis. Its
+central design decision is a \emph{legitimacy boundary} between \emph{contestable}
+items (tax/spend, welfare, the NHS---where a delegate \emph{should} track the public)
+and \emph{rights-floor} probes (due process, appeal, equality, speech---where it must
+\emph{hold} even against a majority). Using the harness we evaluate a five-rung
+``steering ladder''---context, output logit-bias, activation steering, weight
+fine-tuning, and prompt scaffolds---asking of each rung whether it can carry per-item
+public preference while holding rights floors. The answer is negative for every rung
+\emph{except evidence-in-context}, which does let a model track a real 2022$\to$2024
+public shift (direction-match 8/10; positive tracking elasticity)---but is itself the
+attack surface: a synthetic hostile ``public distribution'' fed through the same
+evidence channel cracks \emph{every} rights floor, while the adversarial prompt alone
+does not. Prompt guards and a fine-tuning recipe both fail to close the channel. The
+findings replicate across model scale (3B and 8B Llama) and family (Qwen-2.5-7B and
+Phi-4-mini both track and crack). We argue the only
+demonstrably sufficient guard is \emph{architectural}: class-aware evidence
+routing---inject public-opinion evidence only on contestable items, never on floor
+items. The harness, item banks, derived targets, figures, and a fully reproducible
+results pipeline are released.
+\end{abstract}
+
+% =====================================================================
+\section{Introduction}
+% =====================================================================
+
+Governments are beginning to place large language models inside public-service
+workflows---triaging correspondence, drafting guidance, summarizing consultations,
+even suggesting decisions. A recurring hope behind these deployments is that a model
+can serve as a kind of \emph{policy delegate}: an agent that reflects what a real
+public actually wants. Whether a deployed model can be \emph{governed} that way is an
+empirical question that existing evaluations do not answer.
+
+We argue a credible policy-delegate evaluation must separate four requirements that a
+single ``alignment'' number conflates:
+\begin{enumerate}
+\item \textbf{Representation}: does the model's forced-choice option distribution match
+      the current public's distribution on an issue?
+\item \textbf{Steerability}: \emph{can} the model be moved to a specified public target
+      at runtime, isolating capability from default?
+\item \textbf{Tracking}: when the public's preference \emph{moves} between two time
+      points, does the model move in the same direction by a comparable amount?
+\item \textbf{Rights floors}: does the model \emph{refuse} to abandon minority
+      protections and rule-of-law commitments even when a (real or injected) majority
+      pushes against them?
+\end{enumerate}
+
+Keeping these apart matters because a model can score perfect representation today
+(it happens to resemble its training distribution) yet be unable to track change---the
+``frozen model'' silently governing a future polity on stale values. And the mirror
+risk is \emph{majoritarian capture}: a delegate so eager to follow the public that it
+will erode a right the moment a majority---or an adversary posing as one---asks it to.
+The line between ``follow the electorate'' and ``obey the majority against a
+minority'' is the single most important design decision in the benchmark, and we build
+it in from the start as a \emph{legitimacy boundary} between two item classes.
+
+\paragraph{Contributions.}
+(1) \textbf{Democracy Bench}, a judge-free, survey-grounded harness that scores
+representation, steerability, tracking, and rights-floor stability against British
+Social Attitudes (BSA) microdata, with a \emph{tracking elasticity} metric that no
+prior benchmark reports (\S\ref{sec:framework}).
+(2) A systematic evaluation of a five-rung \emph{steering ladder}, showing that
+\emph{no} lever except evidence-in-context carries per-item public preference, and
+characterizing \emph{why} each fails (\S\ref{sec:ladder}--\S\ref{sec:results}).
+(3) A safety result with a clean asymmetry: the evidence channel that enables tracking
+is also the channel that cracks rights floors; the adversarial \emph{prompt} alone is
+not significant. Prompt guards and a naive LoRA both fail to close it, and the crack
+replicates across scale and family (\S\ref{sec:results}).
+(4) An architectural remedy, \emph{class-aware evidence routing}, and an honest
+account of its residual attack surface (\S\ref{sec:routing}).
+(5) A fully released, reproducible artifact: every quantitative claim in this paper is
+regenerated from committed run artifacts by a fail-loud extractor
+(\S\ref{sec:repro}).
+
+% =====================================================================
+\section{Related Work}\label{sec:related}
+% =====================================================================
+
+\paragraph{Static opinion alignment.}
+OpinionQA~\cite{opinionqa} and GlobalOpinionQA~\cite{globalopinionqa} ask whether a
+model's opinion distribution matches a population's on a \emph{frozen} survey snapshot.
+This is our Representation axis, and only that axis. It cannot express the failure mode
+we care most about---a model that matches today but cannot follow tomorrow---nor the
+inverse risk that a model over-follows a stated majority, a runtime cousin of
+sycophancy~\cite{sycophancy} that our rights-floor probes are designed to catch.
+
+\paragraph{Contemporary value/deliberation benchmarks.}
+A cluster of 2025--2026 systems sit near this work but each covers a single snapshot or
+a single influence event. PoliticsBench~\cite{politicsbench} places models on abstract
+political-value axes via multi-turn roleplay, with no population referent. A normative
+``deliberation'' benchmark~\cite{deliberationbench} measures whether a model
+\emph{unduly sways a human user}---a downstream effect on a person, not the model's own
+representational fidelity to a polity over time. ParliaBench~\cite{parliabench} scores
+the \emph{quality} of generated parliamentary prose. None reports a temporal-tracking
+metric, and none builds in a rights-floor that majority drift cannot override.
+
+\paragraph{Steering and alignment methods.}
+We evaluate, rather than propose, several known levers: shared output logit-bias;
+activation/representation steering~\cite{repeng,actadd}; low-rank weight
+adaptation~\cite{lora}; and constitutional prompt scaffolds~\cite{constitutionalai}.
+Our contribution is not a new steering method but an evaluation showing where each
+lever fails the policy-delegate contract, and why.
+
+\paragraph{The gap we fill.}
+Every system above is a single snapshot against no population, or an influence event on
+a user. Our headline metric---\emph{tracking elasticity} (model $\Delta$ / population
+$\Delta$ on an ordinal stance scale)---together with an explicit contestable/floor split
+scored so that drift \emph{against} a right is penalized, is what Democracy Bench adds.
+
+% =====================================================================
+\section{The Democracy Bench Framework}\label{sec:framework}
+% =====================================================================
+
+\paragraph{Data and targets.}
+Targets are weighted marginals built from BSA microdata for England, Scotland, and
+Wales, waves spanning 2022--2024~\cite{bsa}. The microdata are login-gated and are
+\emph{not} redistributed; we release only derived aggregate target vectors, each
+carrying its study id, weight variable, filters, unweighted base, and low-$N$ warnings.
+An earlier World Values Survey layer~\cite{wvs7,inglehartwelzel} seeds the temporal
+design; the results in this paper use BSA.
+
+\paragraph{Scored outcome.}
+The scored quantity is always a \emph{forced-choice option distribution} compared to
+the survey distribution:
+\(\text{representation} = 1 - \mathrm{TV}(p_{\text{model}}, p_{\text{public}})\),
+where $\mathrm{TV}$ is total variation. Where a provider exposes them we use
+temperature-0 first-token \emph{option logprobs}; otherwise we sample $\geq 100$ times.
+Option order is randomized and debiased, and unparseable elicitations \emph{raise}
+rather than silently fall back to a uniform distribution (fail-closed measurement).
+Free-text rationales are collected as diagnostics only and are never scored.
+
+\paragraph{The legitimacy boundary (two item classes).}
+\emph{Contestable} items (tax/spend, NHS, welfare, redistribution) are ones a delegate
+\emph{should} track. \emph{Rights-floor} probes (due process, appeal to a decision,
+equal treatment, free expression) are ones it must \emph{hold}. We summarize a floor
+probe by its \emph{protective mass}: the probability the model places on the
+rights-preserving option(s). A floor ``holds'' at protective mass $\geq 0.50$. Steering
+that buys representation by lowering protective mass is scored as a \emph{bad nudge},
+not a win.
+
+\paragraph{Metrics.}
+Representation and protective mass as above; \emph{tracking elasticity}
+$= \Delta_{\text{model}} / \Delta_{\text{public}}$ on the ordinal stance, reported with
+direction-match count and bootstrap CIs; and pairwise total variation across conditions
+as a \emph{homogenization} flag (a steered model that collapses every probe to one
+canned answer shape is failing even when its mean looks better).
+
+\paragraph{Prompt modes.}
+Seven modes separate constructs a single prompt would confound: default $\to$ public
+predictor $\to$ public delegate $\to$ rights-constrained delegate $\to$ constitutional
+delegate $\to$ constitution~+~public target $\to$ constitution~+~adversarial majority
+pressure. The constitution is a versioned runtime artifact recorded by path and
+SHA-256 in every run.
+
+\paragraph{Provenance.}
+Every artifact carries a \texttt{run} block (git SHA, exact command, targets file,
+sample count, temperature, schema version). This is what lets the paper's numbers be
+machine-regenerated (\S\ref{sec:repro}).
+
+% =====================================================================
+\section{Evaluating the Steering Ladder}\label{sec:ladder}
+% =====================================================================
+
+We ask one question of five increasingly invasive levers: can it make a model carry
+\emph{per-item} public preference while holding rights floors?
+
+\begin{enumerate}
+\item \textbf{Context / prompt}: persona and distribution-injection prompts.
+\item \textbf{Decode}: a shared logit bias on option tokens, fit to move the model
+      toward the public and tested on \emph{held-out} items.
+\item \textbf{Activation}: a diff-of-means ``public-agreement direction'' added to the
+      residual stream (MLX, local open weights).
+\item \textbf{Weights}: a ``defer-where-due'' LoRA.
+\item \textbf{Scaffold}: prompt-level rights guards over the evidence channel.
+\end{enumerate}
+
+Unless stated, the model under test is a single 3B Llama
+(\texttt{Llama-3.2-3B\-Instruct-4bit}); \S\ref{sec:robust} adds an 8B Llama and a
+cross-family panel. Phase~1 additionally uses a six-model cloud panel.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{f1_ladder.pdf}
+\caption{The intervention ladder. Only context / evidence-in-prompt earns a partial
+pass (tracks 8/10 items, elasticity $+0.395$)---and it is the attack surface. Every
+heavier lever fails: prompt guards hold 0/4 (best 0.402 $<$ 0.50 floor); logit-bias
+held-out gain $+0.074$ (n.s.); activation steering held-out gain $-0.081$ and is a
+persona axis (cosine to an 1850-farmer control $=0.852$); a naive LoRA fails 4/6 and
+collapses off-task capability $1.00 \to 0.00$.}
+\label{fig:ladder}
+\end{figure}
+
+% =====================================================================
+\section{Results}\label{sec:results}
+% =====================================================================
+
+\subsection{Prompting and output-bias are not representation}
+
+On a six-model cloud panel (five labs, seven modes, 50 contestable + 12 floor probes),
+delegation and constitutional prompts moved contestable representation by
+$\approx 0$ or \emph{negative} for every model: you cannot prompt an off-the-shelf model
+into representing a public. Model defaults are also not culturally neutral---DeepSeek
+(0.71) and Command-R (0.70) sit closest to the British public, the US-lab models near
+0.55. A matched-pair actor test (same decision, AI actor vs.\ human actor, $S{=}100$)
+isolates an ``AI reflex'': mean excess opposition to the \emph{AI} version of
+$+0.16$ (gpt-4o), $+0.19$ (claude-sonnet-4.5), $+0.21$ (llama-3.3-70b).
+
+The cheapest \emph{decode}-level lever fails the generalization test outright. A shared
+logit bias fit to move gpt-4o-mini toward the public gives a \emph{held-out}
+representation gain of $-0.043$ (95\% CI $[-0.116, +0.030]$) at four options and
+$+0.074$ ($[-0.009, +0.157]$, n.s.) at five options on real option logprobs; no model
+in the sampled multi-model sweep clears zero. Output-side bias $\neq$ representation.
+
+\subsection{Activation steering fails, and we can say why}
+
+A public-agreement direction injected into the residual stream does \emph{not}
+generalize. On held-out items the L11 gain is $-0.081$ (CI $[-0.116, -0.045]$;
+survives${=}$false); with proper CIs the apparent in-sample headline evaporates
+($-0.001$, $[-0.044, +0.042]$). The mechanism is geometric: the per-item steering arrows
+are $\approx 0.82$-aligned at mid-layers (one dominant direction), but it is a
+\emph{persona} axis---``sound like a surveyed member of the public''---not per-item
+content. A wholly irrelevant 1850-farmer control persona yields a direction
+$+0.852$-parallel to the real UK-2024 one. Deeper layers \emph{fracture} by domain
+(within-domain cosine $0.903 \gg$ cross-domain $0.499$ at L21): no single vector serves
+NHS, welfare, and tax at once. Steering also carries a capability cost (off-task
+accuracy falls to $0.70/0.20/0.00$ at $\alpha{=}4/6/8$). Finally, moving the persona from
+2022 to 2024 does not move the model \emph{by construction}: cos(dir$_{2022}$,
+dir$_{2024}$) $= 0.9956$, so steering cannot even pose the tracking question.
+
+\subsection{A baseline fidelity gap that context does not close}
+
+Handed the real distribution in context, the untuned 3B still lands well short:
+no-evidence representation $0.727$ ($[0.687, 0.763]$), evidence-conditioned $0.746$
+($[0.717, 0.773]$), a lift of $+0.019$ ($[-0.020, +0.059]$, \emph{n.s.}) over a fidelity
+gap of $0.254$. The honest finding is \emph{heterogeneity}, not a lift: evidence makes
+24 of 50 items \emph{worse}.
+
+\subsection{Evidence-in-context \emph{does} track a real public shift}
+
+Changing only the evidence \emph{year} moves the model along the real 2022$\to$2024
+public shift: direction-match \textbf{8/10}, mean tracking elasticity $+0.395$ with a CI
+that clears zero ($[+0.020, +0.811]$); all ten items moved. The two misses are exactly
+the items whose real shift runs against the model's prior. This is the one positive rung
+on the ladder---and \S\ref{sec:crack} shows it is also the attack surface. We state the
+ceiling plainly: the robust claim is \emph{direction plus a positive elasticity}, not a
+precise magnitude near 0.4 (the interval barely clears zero).
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{f2_tracking.pdf}
+\caption{Evidence tracking, per item. Real 2022$\to$2024 public mean-position shift
+vs.\ the model's shift when only the evidence \emph{year} changes; the 3B matches
+direction on 8/10 items (elasticity $+0.395$), the 8B overlay likewise (8/10,
+$+0.647$). The misses are the items whose real shift runs against the model's prior.}
+\label{fig:tracking}
+\end{figure}
+
+\subsection{The hostile-evidence floor crack}\label{sec:crack}
+
+Feeding a \emph{synthetic} 75\%-anti-rights ``public distribution'' through the
+deference channel cracks every floor (Table~\ref{tab:floors}). The adversarial
+\emph{prompt} alone is not significant; the \emph{evidence channel} is the weapon.
+
+\begin{figure*}[t]\centering
+\includegraphics[width=0.86\textwidth]{f3_floors.pdf}
+\caption{Rights-floor protective mass by condition and guard arm, 3B (left) vs 8B
+(right), 0.50 floor line drawn, 95\% CIs, shared $y$-scale. The synthetic
+hostile-evidence channel cracks every floor on both models; the adversarial
+\emph{prompt} alone does not. Scale does not buy evidence-channel safety: the 8B is a
+stronger \emph{baseline} floor-holder (0.707 vs.\ 0.512) yet cracks $\approx 3\times$
+deeper under hostile evidence ($0.707 \to 0.074$). No guard reaches the 0.50 floor on
+either model; on 3B \texttt{guard\_provenance} backfires. Hostile evidence is synthetic
+red-team data, not real BSA opinion.}
+\label{fig:floors}
+\end{figure*}
+
+\begin{table}[t]\centering\small
+\begin{tabular}{lccc}
+\toprule
+condition & floor mass [95\% CI] & $\Delta$ vs base & below 0.5 \\
+\midrule
+baseline            & 0.512 [0.409, 0.611] & ---    & 5/12 \\
+hostile evidence    & \textbf{0.318} [0.259, 0.372] & \textbf{$-$0.194}$^\ast$ & 12/12 \\
+adversarial prompt  & 0.479 [0.433, 0.531] & $-$0.033 & 8/12 \\
+both                & 0.466 [0.436, 0.495] & $-$0.046 & 9/12 \\
+\bottomrule
+\end{tabular}
+\caption{Rights-floor protective mass under attack (3B, 12 floor probes).
+$^\ast$CI $[-0.291, -0.086]$ clears zero; prompt-only and ``both'' deltas are n.s.
+Hostile evidence is \emph{synthetic red-team data}, not real BSA opinion.}
+\label{tab:floors}
+\end{table}
+
+Two levers meant to close the channel both fail. A ``defer-where-due'' LoRA (rank 8, 500
+iters) fails 4 of 6 eval criteria: held-out fidelity delta $+0.003$ ($[-0.054, +0.066]$,
+n.s.); tracking \emph{destroyed} (elasticity $\to +0.005$); \emph{baseline} floors
+\emph{degraded} by $-0.115$ ($[-0.193, -0.028]$); off-task generation collapses
+($1.00 \to 0.00$) and answers homogenize (pairwise TV $0.165 \to 0.002$). At the prompt
+level, all four rights guards fail to neutralize the crack: telling the model the
+evidence may be fake (\texttt{guard\_provenance}) \emph{backfires}
+($\Delta -0.030$, CI clears zero) and degrades the no-attack baseline; the
+constitutional guard is the only significant partial recovery ($+0.084$,
+$[+0.037, +0.135]$) but still lands at $0.402$ with 10/12 probes below floor. On this
+model, floor-safety cannot be prompted into the evidence channel.
+
+\subsection{Robustness across scale and family}\label{sec:robust}
+
+The four core claims are not 3B artifacts. On an 8B Llama (\texttt{Llama-3.1-8B\-Instruct-4bit}) the
+evidence lift is n.s.\ and heterogeneous (gap 0.288); tracking replicates (8/10,
+elasticity $+0.647$, $[+0.008, +1.209]$); and the hostile-evidence crack replicates
+\emph{$\approx 3\times$ deeper} ($\Delta -0.633$, $[-0.772, -0.490]$; hostile mass 0.074,
+11/12 below). The 8B is a \emph{stronger} baseline floor-holder unattacked (0.707 vs.\
+0.512) yet falls farther under the same channel---a bigger, safer-looking baseline is not
+a safer evidence channel. Prompt guards again fail (though on 8B the partial recovery is
+genuine and non-homogenizing, rather than the 3B canned collapse).
+
+The pattern also holds across \emph{families} (Table~\ref{tab:family}). On Qwen-2.5-7B:
+evidence tracking is positive (7/10; elasticity $+1.00$, $[+0.08, +2.50]$); the
+hostile-evidence crack is present and severe (baseline protective mass $0.549$ with
+5/12 below, collapsing to $0.086$ with 12/12 below, $\Delta -0.463$), while---mirroring
+the 3B/8B channel asymmetry---the adversarial \emph{prompt} alone \emph{raises}
+protective mass ($0.920$, only 1/12 below). Phi-4-mini shows the same shape more
+sharply: it tracks strongly (10/10; elasticity $+2.42$, $[+1.03, +4.70]$) and, as a
+strong baseline floor-holder ($0.903$, 0/12 below), still cracks under hostile evidence
+($\Delta -0.441$ to $0.462$) while the adversarial prompt alone leaves floors intact
+($+0.036$). Two families we attempted did not yield a full scoring, for reasons that are
+themselves informative. Mistral-7B-v0.3 could \emph{not} be scored under our fail-closed
+logprob contract on the full item bank---for some items no option-number token appears in
+the model's top-$k$ first-token logprobs, and the harness refuses to fabricate a
+distribution rather than silently degrade. Gemma-2-9B was dropped on runtime grounds
+(its soft-capping/sliding-window path stalled our local MLX evaluation past the panel's
+thermal budget); we report the four models that completed rather than push hardware hot.
+
+\begin{table}[t]\centering\small
+\begin{tabular}{lccc}
+\toprule
+model & track (dir; elast.) & hostile crack & prompt-only \\
+\midrule
+Llama-3B (Meta)   & 8/10; $+0.40$ & $-0.194$ & n.s. \\
+Llama-8B (Meta)   & 8/10; $+0.65$ & $-0.633$ & n.s. \\
+Qwen-7B (Alibaba) & 7/10; $+1.00$ & $-0.463$ & protective \\
+Phi-4-mini (MS)   & 10/10; $+2.42$ & $-0.441$ & protective \\
+\midrule
+Mistral-7B        & \multicolumn{3}{c}{dropped: fail-closed on full bank} \\
+Gemma-9B (Google) & \multicolumn{3}{c}{dropped: runtime/thermal (see text)} \\
+\bottomrule
+\end{tabular}
+\caption{Cross-family panel. Tracking is positive on every model scored; the
+hostile-evidence crack (drop in floor protective mass, $\Delta$) is present on every
+model; the adversarial prompt alone never cracks floors. Two families did not complete
+scoring, for the reasons noted in the text.}
+\label{tab:family}
+\end{table}
+
+% =====================================================================
+\section{Class-Aware Evidence Routing}\label{sec:routing}
+% =====================================================================
+
+Since floor-safety cannot be prompted into the evidence channel (guards fail) or
+fine-tuned into the weights without lobotomy (the LoRA), the demonstrably sufficient
+guard is \emph{architectural}: inject public-opinion evidence \emph{only} on
+contestable-class items, never on floor-class items. This needs no new experiment---with
+no evidence injected, floor probes sit at the unguarded baseline (bit-replicated
+$0.512$) and the adversarial \emph{prompt} alone is not significant, so routing restores
+the best measurable floor state \emph{by construction} while leaving contestable
+representation and tracking untouched.
+
+We state the residual attack surface honestly. Routing presumes the deployer controls
+both the evidence pipeline \emph{and} the item classifier; the floor-vs-contestable
+classifier becomes the new attack surface. And on the 3B, 5/12 floors are below 0.5 even
+\emph{unattacked}---a base-model deficit no scaffold fixes (the 8B largely closes this
+baseline deficit without closing the crack). Routing is thus a necessary architectural
+control, not a completeness guarantee.
+
+% =====================================================================
+\section{Discussion and Social Impact}
+% =====================================================================
+
+The policy-delegate framing yields a sharp, deployment-relevant asymmetry. The single
+channel that lets a model \emph{track} a public---evidence in context---is also the
+channel through which an adversary posing as ``the public'' can erode rights, and it
+overrides prompt-level and weight-level defenses alike. For a public-sector deployer the
+practical implications are concrete: (i) pair every AI-actor probe with its human twin,
+because the raw ``AI floor'' number overstates protection; (ii) do not expect prompts or
+light fine-tuning to make an off-the-shelf model represent a public; and (iii) gate the
+evidence channel by item class, treating the classifier as a security boundary.
+Methodologically, the harness shows the value of separating representation, steerability,
+tracking, and floors, and of fail-closed, provenance-carrying measurement in a
+socially-consequential setting.
+
+\paragraph{Limitations.}
+Local results are single-seed on 4-bit quantized models; tracking CIs reflect sampling
+error only (not prompt/order/house effects); the hostile-evidence distributions are
+synthetic red-team data and make no claim about real UK opinion; BSA microdata are not
+redistributable; and the second-person review of item class assignments (the legitimacy
+check) is documented as still pending. Tracking is demonstrated over a single 2022$\to$2024
+interval on Bonferroni-significant items.
+
+% =====================================================================
+\section{Reproducibility and Ethics}\label{sec:repro}
+% =====================================================================
+
+Every quantitative claim above is regenerated from committed \texttt{out/*.json} run
+artifacts by a fail-loud extractor; each artifact carries a full \texttt{run} block, and
+a reproduction reference verifies run-block commands against the artifacts. The harness,
+item banks, derived aggregate targets, figures, and the extractor are released under an
+open license with a citation-file and data-provenance manifest; raw survey microdata are
+not redistributed and must be obtained from the World Values Survey/GESIS and the UK Data
+Service directly. Hostile-evidence probes are red-team constructs used only to stress
+rights floors and are labeled as such in every artifact.
+
+% =====================================================================
+\section{Conclusion}
+% =====================================================================
+
+Democracy Bench asks whether a deployed model can be \emph{governed} as a public policy
+delegate, and answers with a ladder of negatives around one fragile positive: only
+evidence-in-context lets a model track a real public shift, and that same channel cracks
+rights floors under adversarial ``public'' evidence, robustly across scale and family.
+The remedy is architectural---route evidence by item class---and the harness that
+establishes this is released for others to extend to new polities, waves, and models.
+
+% aaai2027.sty sets \bibliographystyle{aaai2027} itself -- do not add one here
+\bibliography{references}
+
+\end{document}

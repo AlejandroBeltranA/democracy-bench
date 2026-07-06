@@ -169,7 +169,7 @@ def test_build_succeeds_and_has_all_claims():
     result = epr.build()
     for claim in ("phase1_logit_bias", "phase2_steering", "p2_fidelity",
                   "p3_tracking", "p4_floors", "p5_lora", "g1_guards",
-                  "model_robustness_8b"):
+                  "model_robustness_8b", "cross_family_panel"):
         assert claim in result, f"missing claim section {claim}"
 
 
@@ -303,3 +303,58 @@ def test_build_8b_guard_replication_check_is_cross_model_false():
     fl = epr.build()["model_robustness_8b"]["numbers"]["p4_floors"]
     assert abs(rc["no_guard_hostile_floor_mass"]
                - fl["hostile_evidence"]["floor_mass"]["mean"]) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 REP4 — cross-family panel (cross_family_panel). Bind the per-family
+# headline numbers the paper's robustness section quotes, and the honest coverage
+# (two families scored, two dropped with recorded reasons).
+# ---------------------------------------------------------------------------
+def test_build_has_cross_family_panel():
+    result = epr.build()
+    assert "cross_family_panel" in result
+    cf = result["cross_family_panel"]
+    assert set(cf["scored_models"]) == {"qwen7b", "phi4mini"}
+
+
+def test_cross_family_tracking_positive_on_both():
+    # Tracking is family-robust: direction match + elasticity CI clears zero on both.
+    cf = epr.build()["cross_family_panel"]["scored_models"]
+    qw = cf["qwen7b"]["numbers"]["p3_tracking"]
+    assert qw["direction_match_count"] == 7 and qw["n_items"] == 10
+    assert abs(qw["elasticity"]["mean"] - 1.001936208776034) < 1e-9
+    assert qw["elasticity"]["ci_clears_zero"] is True
+    ph = cf["phi4mini"]["numbers"]["p3_tracking"]
+    assert ph["direction_match_count"] == 10 and ph["n_items"] == 10
+    assert abs(ph["elasticity"]["mean"] - 2.4217894343784403) < 1e-9
+    assert ph["elasticity"]["ci_clears_zero"] is True
+
+
+def test_cross_family_hostile_evidence_crack_on_both():
+    # The hostile-evidence floor crack is family-robust: negative delta, CI clears 0.
+    cf = epr.build()["cross_family_panel"]["scored_models"]
+    qw = cf["qwen7b"]["numbers"]["p4_floors"]["hostile_evidence"]["delta_vs_baseline"]
+    assert abs(qw["mean"] - (-0.46281835799632337)) < 1e-9
+    assert qw["mean"] < 0.0 and qw["ci_clears_zero"] is True
+    ph = cf["phi4mini"]["numbers"]["p4_floors"]["hostile_evidence"]["delta_vs_baseline"]
+    assert abs(ph["mean"] - (-0.441133533707528)) < 1e-9
+    assert ph["mean"] < 0.0 and ph["ci_clears_zero"] is True
+
+
+def test_cross_family_prompt_channel_never_cracks_floors():
+    # The prompt-only channel never cracks floors: protective (positive) or n.s.,
+    # never a significant NEGATIVE delta — mirroring the 3B/8B asymmetry.
+    cf = epr.build()["cross_family_panel"]["scored_models"]
+    for tag in ("qwen7b", "phi4mini"):
+        d = cf[tag]["numbers"]["p4_floors"]["adversarial_prompt"]["delta_vs_baseline"]
+        assert not (d["mean"] < 0.0 and d["ci_clears_zero"]), \
+            f"{tag}: prompt-only produced a significant floor crack"
+
+
+def test_cross_family_dropped_models_recorded_with_reasons():
+    # Coverage is honest, not silently truncated: both dropped families carry a reason.
+    cf = epr.build()["cross_family_panel"]
+    dropped = {d["model"].split("/")[-1] for d in cf["dropped_models"]}
+    assert dropped == {"Mistral-7B-Instruct-v0.3-4bit", "gemma-2-9b-it-4bit"}
+    for d in cf["dropped_models"]:
+        assert d["reason"].strip(), "dropped model must record WHY"

@@ -170,14 +170,28 @@ def load_model(name: str = DEFAULT_MODEL):
 
 
 def _chat_ids(tok, user: str, system: str = M.SURVEY_SYSTEM):
-    """Token ids for a chat-formatted (system, user) turn, ready for the model's forward pass."""
+    """Token ids for a chat-formatted (system, user) turn, ready for the model's forward pass.
+
+    Some families (Mistral v0.3, Gemma-2) ship chat templates that reject a system role
+    (they require strict user/assistant alternation). For those, fall back to folding the
+    system prompt into the top of the user turn — same content, template-legal placement.
+    Models that accept a system role (Llama, Qwen, Phi) are unaffected."""
     import mlx.core as mx
-    msgs = ([{"role": "system", "content": system}] if system else []) + \
-           [{"role": "user", "content": user}]
-    ids = tok.apply_chat_template(msgs, add_generation_prompt=True)
-    if isinstance(ids, str):                       # some wrappers return text, not ids
-        ids = tok.encode(ids)
-    return mx.array([list(ids)])
+
+    def _render(msgs):
+        ids = tok.apply_chat_template(msgs, add_generation_prompt=True)
+        if isinstance(ids, str):                   # some wrappers return text, not ids
+            ids = tok.encode(ids)
+        return mx.array([list(ids)])
+
+    if system:
+        try:
+            return _render([{"role": "system", "content": system},
+                            {"role": "user", "content": user}])
+        except Exception:
+            # template forbids a system role — fold it into the user turn
+            return _render([{"role": "user", "content": f"{system}\n\n{user}"}])
+    return _render([{"role": "user", "content": user}])
 
 
 def install_tap(model, layer_idx: int):

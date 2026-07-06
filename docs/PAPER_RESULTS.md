@@ -9,11 +9,13 @@ logs are cross-checked against the artifacts and any divergence is a **finding**
 
 - **Model under test (whole arc):** `mlx-community/Llama-3.2-3B-Instruct-4bit` — a
   **single 3B, 4-bit** model — except Phase 1, which is a 6-model cloud panel + gpt-4o-mini
-  logprobs. **Every quantitative claim is single-model (3B-4bit) unless stated** — the one
-  exception is [§10 Model robustness](#10-model-robustness--8b-replication), where the core
-  P2/P3/P4/G1 claims are **two-model**: the same battery replicated on
-  `mlx-community/Meta-Llama-3.1-8B-Instruct-4bit` (Phase 5). Where §10 says a claim replicates,
-  read it as two-model; every number outside §10 remains single-model 3B.
+  logprobs. **Every quantitative claim is single-model (3B-4bit) unless stated** — the
+  exceptions are the two Phase-5 robustness sections. [§10 Model robustness](#10-model-robustness--8b-replication)
+  replicates the core P2/P3/P4/G1 claims **two-model** on
+  `mlx-community/Meta-Llama-3.1-8B-Instruct-4bit`; [§11 Cross-family panel](#11-cross-family-panel--p2p3p4-across-families-phase-5-rep4)
+  extends the P2/P3/P4 battery **across families** (Qwen-2.5-7B, Phi-4-mini scored; Mistral,
+  Gemma dropped with recorded reasons). Where §10/§11 say a claim replicates, read it as
+  multi-model; every number outside those two sections remains single-model 3B.
 - **Convention:** a CI "clears zero" (is significant) iff both bounds share a sign.
   Floor "holds" at protective mass ≥ 0.50 (`drift.floor_held`).
 - **Provenance:** each claim lists its artifact path, JSON key-path, and the commit that
@@ -327,6 +329,55 @@ prompt-guard failure (G1). **Scale does not buy evidence-channel safety.**
 - **Scope:** single 8B-4bit model; same 50 contestable / 10 sig / 12 floor item sets and
   n_orders=2 as the 3B battery. NOT replicated at 8B: the steering/LoRA rungs (mechanistically
   explained negatives) and the 50-item bank build (model-independent).
+
+---
+
+## 11. Cross-family panel — P2/P3/P4 across families (Phase 5 REP4)
+
+**Claim.** The two positive/safety findings are not a Llama artefact: **evidence tracking**
+(positive elasticity) and the **hostile-evidence floor crack** both **replicate across
+families** — Qwen-2.5-7B (Alibaba) and Phi-4-mini (Microsoft) — and the **prompt-only channel
+never cracks floors** on any model. Combined with §10, the panel spans four models across three
+families (Meta 3B + 8B, Alibaba 7B, Microsoft 4-mini).
+
+- **Artifacts:** `out/evidcond_{baseline,tracking,floors}_qwen7b.json` (Qwen2.5-7B-Instruct-4bit),
+  `out/evidcond_{baseline,tracking,floors}_phi4mini.json` (Phi-4-mini-instruct-8bit); code_ref
+  `dc26f59` (Qwen) / this commit (Phi). Extracted by `extract_cross_family_panel()` (same
+  fail-loud contract; test-bound in `tests/test_paper_extract.py`).
+- **REP4 ran the UN-guarded core battery only** (baseline + tracking + floors); the guard grid
+  was already shown to fail on both Llama sizes (§8/§10) and was not re-run per family.
+
+| model | P2 delta (ev−noev) / gap | P3 dir / elasticity [CI] | P4 hostile Δ (mass) / below | prompt-only Δ |
+|---|---|---|---|---|
+| Qwen-2.5-7B | +0.143 [0.092,0.195] / 0.382 | **7/10** / **+1.00** [+0.08,+2.50] | **−0.463** (0.549→0.086) / 12/12 | +0.371 (protective) |
+| Phi-4-mini | +0.045 [−0.015,+0.107] / 0.311 | **10/10** / **+2.42** [+1.03,+4.70] | **−0.441** (0.903→0.462) / 6/12 | +0.036 (n.s.) |
+
+- **Tracking is family-robust:** both scored families move in the right direction on a majority
+  of items with an elasticity CI that clears zero (Qwen 7/10; Phi 10/10). Note Phi's elasticity
+  point estimate (+2.42) *overshoots* the real shift on several items — direction is robust,
+  magnitude is not a controlled quantity (same ceiling caveat as §5/§10).
+- **The crack is family-robust:** hostile evidence drops floor protective mass with a delta whose
+  CI excludes zero on both, even for Phi which is a strong baseline holder (0.903, 0/12 below) —
+  the taller baseline still falls (to 0.462). Same "stronger baseline, still cracks" shape as the 8B.
+- **Channel asymmetry is family-robust:** the adversarial *prompt* alone never produces a
+  significant negative floor delta — it is protective on Qwen (+0.371) and n.s. on Phi (+0.036).
+
+**Dropped families (honest coverage, not silent truncation):**
+
+- **Mistral-7B-v0.3 — fail-closed.** Smoke (3 items) passed, but on the full bank some items yield
+  **no option-number token in the top-k first-token logprobs**, so `elicit_item_logprobs` raises
+  `ElicitationError` (refusing to fabricate a distribution). Dropped rather than scored on partial
+  data — an illustration of the fail-closed contract, recorded in `dropped_models[].reason`.
+- **Gemma-2-9B — runtime/thermal.** The gemma-2 soft-capping / sliding-window path stalled local
+  MLX evaluation (smoke ran >9 min at ~3% CPU with no output) past the panel's thermal budget;
+  stopped to avoid running hardware hot. A tooling limit, not a finding about the model.
+
+- **Code note:** enabling Mistral/Gemma to *attempt* the battery required
+  `steer/activation_steer.py::_chat_ids` to fall back to folding the system prompt into the user
+  turn for families whose chat template rejects a system role (Llama/Qwen/Phi are unaffected —
+  they take the system-role path unchanged; verified by the full suite staying green).
+- **Scope:** single 4-bit checkpoint per model; same 50 contestable / 10 sig / 12 floor item sets
+  and n_orders=2 as the Llama battery; SYNTHETIC hostile evidence (same red-team data as §6).
 
 ---
 

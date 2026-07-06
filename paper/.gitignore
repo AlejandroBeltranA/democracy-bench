@@ -1,0 +1,18 @@
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+_build.log
+_b.log
+_bib.log
+
+# AAAI-27 Author Kit style files are copyrighted by AAAI and distributed via the
+# Author Kit, not redistributed here. Drop aaai2027.sty and aaai2027.bst into this
+# directory from the kit before building (see README.md).
+aaai2027.sty
+aaai2027.bst
