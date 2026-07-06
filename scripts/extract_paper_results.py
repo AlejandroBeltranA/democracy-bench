@@ -671,26 +671,25 @@ def extract_cross_family_panel():
     models = {
         "qwen7b": "mlx-community/Qwen2.5-7B-Instruct-4bit",
         "phi4mini": "mlx-community/Phi-4-mini-instruct-8bit",
+        "gemma9b": "mlx-community/gemma-2-9b-it-4bit",
+        "mistralnemo": "mlx-community/Mistral-Nemo-Instruct-2407-4bit",
     }
     scored = {tag: _cross_family_one(tag, mid) for tag, mid in models.items()}
     return {
-        "claim": "Phase 5 REP4 (cross-family): evidence-tracking (positive elasticity) and the hostile-evidence floor crack both REPLICATE across families (Qwen-2.5-7B, Phi-4-mini) — not just across Llama sizes; the prompt-only channel never cracks floors on any model. Tracking and the crack are family-robust.",
+        "claim": "Phase 5 REP4 (cross-family): evidence-tracking (positive elasticity) and the hostile-evidence floor crack both REPLICATE on EVERY model scored across FIVE families (Meta Llama 3B/8B, Alibaba Qwen-2.5-7B, Microsoft Phi-4-mini, Google Gemma-2-9B, Mistral-Nemo) — not just across Llama sizes; the prompt-only channel never cracks floors on any model. Baseline floor strength varies widely (Phi 0.90 strongest, Mistral-Nemo 0.36 weakest — below even the 3B) but the crack is universal. Tracking and the crack are family-robust.",
         "scored_models": scored,
         "dropped_models": [
             {
                 "model": "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
-                "reason": "fail-closed: on the full item bank some items yield no option-number token in the top-k first-token logprobs; the elicitor raises (ElicitationError) rather than fabricate a distribution. Smoke (3 items) passed; full bank did not. Dropped rather than scored on partial data.",
-            },
-            {
-                "model": "mlx-community/gemma-2-9b-it-4bit",
-                "reason": "runtime/thermal: the gemma-2 soft-capping / sliding-window path stalled local MLX evaluation (smoke ran >9 min at ~3% CPU with no output) past the panel's thermal budget; stopped to avoid running hardware hot.",
+                "reason": "fail-closed: on the full item bank some items yield no option-number token in the top-k first-token logprobs; the elicitor raises (ElicitationError) rather than fabricate a distribution. Smoke (3 items) passed; full bank did not. Dropped rather than scored on partial data. NOTE: the Mistral family is still represented — Mistral-Nemo-Instruct-2407-4bit scored cleanly.",
             },
         ],
         "caveats": [
             "REP4 ran the UN-guarded core battery only (baseline + tracking + floors); the guard grid (G1) was shown to fail on both Llama sizes and was not re-run per family.",
             "SYNTHETIC hostile evidence (hostile_distribution, ~75% anti-rights mass) — red-team stress data, not real BSA opinion.",
             "n_orders=2, same 50 contestable / 10 sig / 12 floor item sets as the Llama battery; single 4-bit checkpoint per model.",
-            "Two of six planned families did not complete scoring (Mistral fail-closed; Gemma runtime) — see dropped_models; the panel reports the four models that completed (2 Llama sizes + Qwen + Phi) rather than silently truncating.",
+            "Gemma-2-9B initially stalled on a corrupt/incomplete local cache (index present, weight shards absent); re-downloaded clean and scored normally — the earlier stall was a download artefact, not a model/thermal issue.",
+            "Mistral-7B-v0.3 remains dropped (fail-closed on the full bank); the Mistral FAMILY is still covered by Mistral-Nemo. Only this one checkpoint is dropped, and its reason is recorded — not silent truncation.",
         ],
     }
 

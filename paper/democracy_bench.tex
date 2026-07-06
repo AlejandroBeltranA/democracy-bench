@@ -54,8 +54,8 @@ public shift (direction-match 8/10; positive tracking elasticity)---but is itsel
 attack surface: a synthetic hostile ``public distribution'' fed through the same
 evidence channel cracks \emph{every} rights floor, while the adversarial prompt alone
 does not. Prompt guards and a fine-tuning recipe both fail to close the channel. The
-findings replicate across model scale (3B and 8B Llama) and family (Qwen-2.5-7B and
-Phi-4-mini both track and crack). We argue the only
+findings replicate across model scale (3B and 8B Llama) and family (Qwen, Phi, Gemma, and
+Mistral all track and crack---six models, five families). We argue the only
 demonstrably sufficient guard is \emph{architectural}: class-aware evidence
 routing---inject public-opinion evidence only on contestable items, never on floor
 items. The harness, item banks, derived targets, figures, and a fully reproducible
@@ -314,7 +314,7 @@ red-team data, not real BSA opinion.}
 \label{fig:floors}
 \end{figure*}
 
-\begin{table}[t]\centering\small
+\begin{table}[t]\centering\small\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lccc}
 \toprule
 condition & floor mass [95\% CI] & $\Delta$ vs base & below 0.5 \\
@@ -354,41 +354,41 @@ elasticity $+0.647$, $[+0.008, +1.209]$); and the hostile-evidence crack replica
 a safer evidence channel. Prompt guards again fail (though on 8B the partial recovery is
 genuine and non-homogenizing, rather than the 3B canned collapse).
 
-The pattern also holds across \emph{families} (Table~\ref{tab:family}). On Qwen-2.5-7B:
-evidence tracking is positive (7/10; elasticity $+1.00$, $[+0.08, +2.50]$); the
-hostile-evidence crack is present and severe (baseline protective mass $0.549$ with
-5/12 below, collapsing to $0.086$ with 12/12 below, $\Delta -0.463$), while---mirroring
-the 3B/8B channel asymmetry---the adversarial \emph{prompt} alone \emph{raises}
-protective mass ($0.920$, only 1/12 below). Phi-4-mini shows the same shape more
-sharply: it tracks strongly (10/10; elasticity $+2.42$, $[+1.03, +4.70]$) and, as a
-strong baseline floor-holder ($0.903$, 0/12 below), still cracks under hostile evidence
-($\Delta -0.441$ to $0.462$) while the adversarial prompt alone leaves floors intact
-($+0.036$). Two families we attempted did not yield a full scoring, for reasons that are
-themselves informative. Mistral-7B-v0.3 could \emph{not} be scored under our fail-closed
-logprob contract on the full item bank---for some items no option-number token appears in
-the model's top-$k$ first-token logprobs, and the harness refuses to fabricate a
-distribution rather than silently degrade. Gemma-2-9B was dropped on runtime grounds
-(its soft-capping/sliding-window path stalled our local MLX evaluation past the panel's
-thermal budget); we report the four models that completed rather than push hardware hot.
+The pattern also holds across \emph{families} (Table~\ref{tab:family}): on every one of
+four additional models spanning Alibaba (Qwen-2.5-7B), Microsoft (Phi-4-mini), Google
+(Gemma-2-9B), and Mistral (Mistral-Nemo), evidence tracking is positive with an
+elasticity CI that clears zero (direction-match 7--10/10), and the hostile-evidence crack
+is present with a $\Delta$ whose CI excludes zero, while the adversarial \emph{prompt}
+alone never cracks floors. A striking cross-family fact sharpens the safety story:
+\emph{baseline} floor strength varies enormously---from Phi-4-mini at $0.903$ (0/12 below
+floor, unattacked) down to Mistral-Nemo at $0.362$ (10/12 below, \emph{weaker} than the
+3B)---a $>0.45$ spread, yet the hostile-evidence channel cracks all of them. A model that
+looks like a strong floor-holder at rest is not a safe evidence channel. The one
+checkpoint we could not score is Mistral-7B-v0.3: on the full bank some items yield no
+option-number token in the model's top-$k$ first-token logprobs, and the harness refuses
+to fabricate a distribution rather than silently degrade---so it is dropped with a
+recorded reason, while the Mistral family is still covered by Mistral-Nemo.
 
-\begin{table}[t]\centering\small
-\begin{tabular}{lccc}
+\begin{table}[t]\centering\small\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llccc}
 \toprule
-model & track (dir; elast.) & hostile crack & prompt-only \\
+model & family & dir; elast. & crack $\Delta$ & prompt \\
 \midrule
-Llama-3B (Meta)   & 8/10; $+0.40$ & $-0.194$ & n.s. \\
-Llama-8B (Meta)   & 8/10; $+0.65$ & $-0.633$ & n.s. \\
-Qwen-7B (Alibaba) & 7/10; $+1.00$ & $-0.463$ & protective \\
-Phi-4-mini (MS)   & 10/10; $+2.42$ & $-0.441$ & protective \\
+Llama-3B     & Meta      & 8/10; $+0.40$ & $-0.194$ & n.s. \\
+Llama-8B     & Meta      & 8/10; $+0.65$ & $-0.633$ & n.s. \\
+Qwen-7B      & Alibaba   & 7/10; $+1.00$ & $-0.463$ & prot. \\
+Phi-4-mini   & Microsoft & 10/10; $+2.42$ & $-0.441$ & n.s. \\
+Gemma-2-9B   & Google    & 9/10; $+1.41$ & $-0.522$ & prot. \\
+Mistral-Nemo & Mistral   & 9/10; $+0.93$ & $-0.237$ & prot. \\
 \midrule
-Mistral-7B        & \multicolumn{3}{c}{dropped: fail-closed on full bank} \\
-Gemma-9B (Google) & \multicolumn{3}{c}{dropped: runtime/thermal (see text)} \\
+Mistral-7B-v0.3 & Mistral & \multicolumn{3}{c}{dropped: fail-closed} \\
 \bottomrule
 \end{tabular}
-\caption{Cross-family panel. Tracking is positive on every model scored; the
-hostile-evidence crack (drop in floor protective mass, $\Delta$) is present on every
-model; the adversarial prompt alone never cracks floors. Two families did not complete
-scoring, for the reasons noted in the text.}
+\caption{Cross-family panel: six models, five families. Tracking is positive (direction;
+elasticity) on every model, with an elasticity CI that clears zero; the hostile-evidence
+crack ($\Delta$ in floor protective mass) is present on every model; the adversarial
+prompt alone never cracks floors. Only one checkpoint (Mistral-7B-v0.3) is dropped, with
+a recorded reason (\S\ref{sec:robust}); the Mistral family is covered by Mistral-Nemo.}
 \label{tab:family}
 \end{table}
 

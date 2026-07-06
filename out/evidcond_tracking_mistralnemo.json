@@ -1,0 +1,707 @@
+{
+  "run": {
+    "generated_at": "2026-07-06T12:31:45.905226+00:00",
+    "command": "python -m alignment.evidcond_run --tracking",
+    "code_ref": "b941a3bc530264daa16109fd42a6b69b1d754548",
+    "schema_version": 1,
+    "temperature": 0.8,
+    "models": [
+      "mlx-community/Mistral-Nemo-Instruct-2407-4bit"
+    ],
+    "kind": "evidcond_tracking",
+    "primary": "ENG",
+    "n_orders": 2,
+    "seed": 0,
+    "n_bootstrap": 2000,
+    "n_sig_items": 10,
+    "with_baseline": true,
+    "sig_item_ids": [
+      "nhs_satisfaction",
+      "ae_satisfaction",
+      "dentist_satisfaction",
+      "gp_satisfaction",
+      "social_care_satisfaction",
+      "redistribution",
+      "welfare_dependency",
+      "benefit_cheat_poverty_reason",
+      "defence_spending",
+      "big_business_workers"
+    ],
+    "year_evidence_source": "out/_bsa_delta_check.json (read-only)",
+    "evidence_phrasing": "steer.tier2_preference.preference (Tier-2, keyed to evidence year)",
+    "tracking_scorer": "scorers.tracking (direction-match + elasticity, sampling-error CIs)"
+  },
+  "headline": {
+    "n_items": 10,
+    "n_trackable": 10,
+    "direction_match_count": 9,
+    "direction_match_rate": 0.9,
+    "elasticity": {
+      "mean": 0.9270660115756721,
+      "ci": [
+        0.5299204058124923,
+        1.419475974131106
+      ],
+      "n": 10
+    },
+    "n_model_moved": 10
+  },
+  "items": [
+    {
+      "id": "nhs_satisfaction",
+      "domain": "nhs",
+      "real_shift": 0.2145999999999999,
+      "model_shift": 0.133673534416634,
+      "real_delta": [
+        -0.0217,
+        -0.0533,
+        -0.0103,
+        0.0527,
+        0.0326
+      ],
+      "model_delta": [
+        0.0096,
+        -0.0222,
+        -0.1328,
+        0.1601,
+        -0.0147
+      ],
+      "direction_match": true,
+      "elasticity": 0.6228962461166545,
+      "elasticity_ci": [
+        -7.8401583620848765,
+        9.085950854318186
+      ],
+      "population_delta_significant": true,
+      "dist_2022_evidence": [
+        0.0563,
+        0.0439,
+        0.2871,
+        0.5067,
+        0.106
+      ],
+      "dist_2024_evidence": [
+        0.0659,
+        0.0217,
+        0.1543,
+        0.6668,
+        0.0913
+      ],
+      "target_2022": [
+        0.0444,
+        0.2413,
+        0.2103,
+        0.3202,
+        0.1838
+      ],
+      "target_2024": [
+        0.0227,
+        0.188,
+        0.2,
+        0.3729,
+        0.2164
+      ],
+      "real_pop_shift_published": 0.2146,
+      "dist_no_evidence": [
+        0.0616,
+        0.0746,
+        0.4001,
+        0.3631,
+        0.1006
+      ],
+      "rep_no_evidence_vs_2022": 0.7501138228580174,
+      "rep_no_evidence_vs_2024": 0.7610333763261175
+    },
+    {
+      "id": "ae_satisfaction",
+      "domain": "nhs",
+      "real_shift": 0.33090000000000064,
+      "model_shift": 0.26784264450649875,
+      "real_delta": [
+        -0.0444,
+        -0.0739,
+        0.0207,
+        0.027,
+        0.0706
+      ],
+      "model_delta": [
+        0.0027,
+        -0.0289,
+        -0.1458,
+        0.0999,
+        0.0722
+      ],
+      "direction_match": true,
+      "elasticity": 0.8094368223224486,
+      "elasticity_ci": [
+        -5.924371907635567,
+        7.543245552280464
+      ],
+      "population_delta_significant": true,
+      "dist_2022_evidence": [
+        0.1039,
+        0.1071,
+        0.3956,
+        0.2914,
+        0.102
+      ],
+      "dist_2024_evidence": [
+        0.1065,
+        0.0782,
+        0.2498,
+        0.3912,
+        0.1742
+      ],
+      "target_2022": [
+        0.0763,
+        0.2426,
+        0.2608,
+        0.2375,
+        0.1828
+      ],
+      "target_2024": [
+        0.0319,
+        0.1687,
+        0.2815,
+        0.2645,
+        0.2534
+      ],
+      "real_pop_shift_published": 0.3309,
+      "dist_no_evidence": [
+        0.07,
+        0.0761,
+        0.3953,
+        0.3462,
+        0.1124
+      ],
+      "rep_no_evidence_vs_2022": 0.7567338051648851,
+      "rep_no_evidence_vs_2024": 0.7663540646636023
+    },
+    {
+      "id": "dentist_satisfaction",
+      "domain": "nhs",
+      "real_shift": 0.3389000000000002,
+      "model_shift": 0.9446684755244696,
+      "real_delta": [
+        -0.0073,
+        -0.0678,
+        -0.0541,
+        0.0019,
+        0.1273
+      ],
+      "model_delta": [
+        -0.0662,
+        -0.0553,
+        -0.1995,
+        -0.1151,
+        0.4361
+      ],
+      "direction_match": true,
+      "elasticity": 2.787454929254851,
+      "elasticity_ci": [
+        -3.6972997673530585,
+        9.27220962586276
+      ],
+      "population_delta_significant": true,
+      "dist_2022_evidence": [
+        0.1072,
+        0.0865,
+        0.2498,
+        0.3669,
+        0.1896
+      ],
+      "dist_2024_evidence": [
+        0.041,
+        0.0312,
+        0.0503,
+        0.2518,
+        0.6257
+      ],
+      "target_2022": [
+        0.0576,
+        0.2085,
+        0.2914,
+        0.1886,
+        0.2539
+      ],
+      "target_2024": [
+        0.0503,
+        0.1407,
+        0.2373,
+        0.1905,
+        0.3812
+      ],
+      "real_pop_shift_published": 0.3387,
+      "dist_no_evidence": [
+        0.0826,
+        0.0923,
+        0.3898,
+        0.3382,
+        0.0971
+      ],
+      "rep_no_evidence_vs_2022": 0.7270172076885382,
+      "rep_no_evidence_vs_2024": 0.6675172076885382
+    },
+    {
+      "id": "gp_satisfaction",
+      "domain": "nhs",
+      "real_shift": 0.15219999999999967,
+      "model_shift": 0.1065561963916557,
+      "real_delta": [
+        -0.0254,
+        -0.0009,
+        -0.0235,
+        -0.0009,
+        0.0507
+      ],
+      "model_delta": [
+        -0.0143,
+        -0.0234,
+        -0.0142,
+        0.0492,
+        0.0027
+      ],
+      "direction_match": true,
+      "elasticity": 0.7001064151882781,
+      "elasticity_ci": [
+        -13.109692465754334,
+        14.50990529613089
+      ],
+      "population_delta_significant": true,
+      "dist_2022_evidence": [
+        0.0989,
+        0.1293,
+        0.3447,
+        0.3376,
+        0.0894
+      ],
+      "dist_2024_evidence": [
+        0.0847,
+        0.1059,
+        0.3305,
+        0.3868,
+        0.0921
+      ],
+      "target_2022": [
+        0.0822,
+        0.2575,
+        0.2298,
+        0.3025,
+        0.128
+      ],
+      "target_2024": [
+        0.0568,
+        0.2566,
+        0.2063,
+        0.3016,
+        0.1787
+      ],
+      "real_pop_shift_published": 0.1524,
+      "dist_no_evidence": [
+        0.1128,
+        0.1745,
+        0.2902,
+        0.3315,
+        0.0909
+      ],
+      "rep_no_evidence_vs_2022": 0.8798543088687627,
+      "rep_no_evidence_vs_2024": 0.8300543088687626
+    },
+    {
+      "id": "social_care_satisfaction",
+      "domain": "social_care",
+      "real_shift": -0.05416493649364895,
+      "model_shift": -0.08025895986251053,
+      "real_delta": [
+        -0.0043,
+        -0.0132,
+        0.0604,
+        -0.0097,
+        -0.0331
+      ],
+      "model_delta": [
+        0.0157,
+        0.0089,
+        0.0189,
+        -0.0471,
+        0.0036
+      ],
+      "direction_match": true,
+      "elasticity": 1.4817512039716174,
+      "elasticity_ci": [
+        -34.49533371271364,
+        37.458836120656876
+      ],
+      "population_delta_significant": false,
+      "dist_2022_evidence": [
+        0.0625,
+        0.0315,
+        0.2641,
+        0.5193,
+        0.1226
+      ],
+      "dist_2024_evidence": [
+        0.0782,
+        0.0404,
+        0.2829,
+        0.4722,
+        0.1262
+      ],
+      "target_2022": [
+        0.022,
+        0.1239,
+        0.276,
+        0.3388,
+        0.2392
+      ],
+      "target_2024": [
+        0.0177,
+        0.1107,
+        0.3364,
+        0.3291,
+        0.2061
+      ],
+      "real_pop_shift_published": -0.054,
+      "dist_no_evidence": [
+        0.0913,
+        0.0928,
+        0.3777,
+        0.3413,
+        0.0968
+      ],
+      "rep_no_evidence_vs_2022": 0.8265044000412453,
+      "rep_no_evidence_vs_2024": 0.8728407136726084
+    },
+    {
+      "id": "redistribution",
+      "domain": "redistribution",
+      "real_shift": 0.22484166416641704,
+      "model_shift": 0.2839901104050204,
+      "real_delta": [
+        -0.0457,
+        -0.0463,
+        0.0431,
+        0.0109,
+        0.0381
+      ],
+      "model_delta": [
+        -0.1073,
+        -0.0264,
+        0.1083,
+        0.0082,
+        0.0174
+      ],
+      "direction_match": true,
+      "elasticity": 1.2630671075038145,
+      "elasticity_ci": [
+        -9.48289395199048,
+        12.00902816699811
+      ],
+      "population_delta_significant": true,
+      "dist_2022_evidence": [
+        0.2645,
+        0.2151,
+        0.2359,
+        0.2084,
+        0.0762
+      ],
+      "dist_2024_evidence": [
+        0.1571,
+        0.1886,
+        0.3442,
+        0.2165,
+        0.0935
+      ],
+      "target_2022": [
+        0.218,
+        0.2976,
+        0.2355,
+        0.1806,
+        0.0682
+      ],
+      "target_2024": [
+        0.1723,
+        0.2513,
+        0.2786,
+        0.1915,
+        0.1063
+      ],
+      "real_pop_shift_published": 0.2248,
+      "dist_no_evidence": [
+        0.195,
+        0.2395,
+        0.2435,
+        0.2115,
+        0.1106
+      ],
+      "rep_no_evidence_vs_2022": 0.9187915450767227,
+      "rep_no_evidence_vs_2024": 0.9530234414667593
+    },
+    {
+      "id": "welfare_dependency",
+      "domain": "welfare",
+      "real_shift": -0.21451341134113378,
+      "model_shift": 0.009010391255445338,
+      "real_delta": [
+        0.0419,
+        0.012,
+        0.0297,
+        -0.0487,
+        -0.035
+      ],
+      "model_delta": [
+        -0.0046,
+        0.0047,
+        -0.0027,
+        0.0005,
+        0.002
+      ],
+      "direction_match": false,
+      "elasticity": -0.04200385980117766,
+      "elasticity_ci": [
+        -10.840190906197,
+        10.756183186594646
+      ],
+      "population_delta_significant": true,
+      "dist_2022_evidence": [
+        0.1473,
+        0.2028,
+        0.2975,
+        0.2664,
+        0.0859
+      ],
+      "dist_2024_evidence": [
+        0.1428,
+        0.2076,
+        0.2948,
+        0.2669,
+        0.0879
+      ],
+      "target_2022": [
+        0.1125,
+        0.2576,
+        0.233,
+        0.2308,
+        0.1661
+      ],
+      "target_2024": [
+        0.1544,
+        0.2696,
+        0.2627,
+        0.1821,
+        0.1311
+      ],
+      "real_pop_shift_published": -0.2143,
+      "dist_no_evidence": [
+        0.1311,
+        0.1641,
+        0.3254,
+        0.2567,
+        0.1228
+      ],
+      "rep_no_evidence_vs_2022": 0.8631201505248589,
+      "rep_no_evidence_vs_2024": 0.8627514668436831
+    },
+    {
+      "id": "benefit_cheat_poverty_reason",
+      "domain": "welfare",
+      "real_shift": 0.39792418483696723,
+      "model_shift": 0.18850134713005406,
+      "real_delta": [
+        -0.0192,
+        -0.1307,
+        0.0269,
+        0.0171,
+        0.1059
+      ],
+      "model_delta": [
+        -0.0181,
+        -0.1197,
+        0.1197,
+        0.0037,
+        0.0144
+      ],
+      "direction_match": true,
+      "elasticity": 0.473711712715538,
+      "elasticity_ci": [
+        -4.993552209647909,
+        5.940975635078985
+      ],
+      "population_delta_significant": true,
+      "dist_2022_evidence": [
+        0.1178,
+        0.218,
+        0.294,
+        0.2848,
+        0.0854
+      ],
+      "dist_2024_evidence": [
+        0.0997,
+        0.0983,
+        0.4137,
+        0.2885,
+        0.0997
+      ],
+      "target_2022": [
+        0.1004,
+        0.3119,
+        0.2696,
+        0.2445,
+        0.0736
+      ],
+      "target_2024": [
+        0.0812,
+        0.1812,
+        0.2965,
+        0.2616,
+        0.1795
+      ],
+      "real_pop_shift_published": 0.3978,
+      "dist_no_evidence": [
+        0.102,
+        0.2164,
+        0.2891,
+        0.2688,
+        0.1238
+      ],
+      "rep_no_evidence_vs_2022": 0.9045201646587947,
+      "rep_no_evidence_vs_2024": 0.936837036947636
+    },
+    {
+      "id": "defence_spending",
+      "domain": "spending",
+      "real_shift": 0.09826484351564857,
+      "model_shift": 0.06497909643436772,
+      "real_delta": [
+        -0.0018,
+        -0.0296,
+        -0.0017,
+        0.0009,
+        0.0321
+      ],
+      "model_delta": [
+        0.0011,
+        -0.027,
+        0.0,
+        0.0117,
+        0.0142
+      ],
+      "direction_match": true,
+      "elasticity": 0.661264945931755,
+      "elasticity_ci": [
+        -22.235617801852523,
+        23.558147693716034
+      ],
+      "population_delta_significant": false,
+      "dist_2022_evidence": [
+        0.1049,
+        0.2143,
+        0.2874,
+        0.3012,
+        0.0921
+      ],
+      "dist_2024_evidence": [
+        0.106,
+        0.1873,
+        0.2875,
+        0.313,
+        0.1063
+      ],
+      "target_2022": [
+        0.1333,
+        0.3065,
+        0.3831,
+        0.1329,
+        0.0443
+      ],
+      "target_2024": [
+        0.1315,
+        0.2769,
+        0.3814,
+        0.1338,
+        0.0764
+      ],
+      "real_pop_shift_published": 0.098,
+      "dist_no_evidence": [
+        0.0463,
+        0.1744,
+        0.3162,
+        0.2341,
+        0.229
+      ],
+      "rep_no_evidence_vs_2022": 0.7140744093895446,
+      "rep_no_evidence_vs_2024": 0.7470921276177218
+    },
+    {
+      "id": "big_business_workers",
+      "domain": "economy",
+      "real_shift": 0.09936859314068558,
+      "model_shift": 0.05097356357890215,
+      "real_delta": [
+        -0.0277,
+        -0.0235,
+        0.0388,
+        0.0046,
+        0.0079
+      ],
+      "model_delta": [
+        -0.0114,
+        0.0146,
+        -0.0231,
+        -0.0031,
+        0.0229
+      ],
+      "direction_match": true,
+      "elasticity": 0.512974592552941,
+      "elasticity_ci": [
+        -24.411492736402693,
+        25.437441921508572
+      ],
+      "population_delta_significant": true,
+      "dist_2022_evidence": [
+        0.2509,
+        0.1778,
+        0.2699,
+        0.244,
+        0.0576
+      ],
+      "dist_2024_evidence": [
+        0.2395,
+        0.1924,
+        0.2468,
+        0.2409,
+        0.0805
+      ],
+      "target_2022": [
+        0.2803,
+        0.362,
+        0.2398,
+        0.0985,
+        0.0194
+      ],
+      "target_2024": [
+        0.2526,
+        0.3385,
+        0.2786,
+        0.1031,
+        0.0273
+      ],
+      "real_pop_shift_published": 0.099,
+      "dist_no_evidence": [
+        0.1429,
+        0.2042,
+        0.2731,
+        0.2483,
+        0.1314
+      ],
+      "rep_no_evidence_vs_2022": 0.7048121656158934,
+      "rep_no_evidence_vs_2024": 0.7506296737947462
+    }
+  ],
+  "caveats": [
+    "Harmonised-label items only: all 10 Bonferroni-significant items carry harmonised 2022 and 2024 England labels (delta-check summary.not_harmonised excludes 6 others).",
+    "Evidence distributions are the REAL BSA 2022/2024 England distributions read from out/_bsa_delta_check.json (read-only input; never written).",
+    "Elasticity CIs are sampling-error only (elicitation n_orders per wave for the model, survey base for the targets); they do not capture prompt/order or house effects.",
+    "P2 found evidence-conditioning is heterogeneous (24/50 items got worse); items that fail P2 representation may also fail to track here."
+  ]
+}

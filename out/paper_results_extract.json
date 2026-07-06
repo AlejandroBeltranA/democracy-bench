@@ -922,7 +922,7 @@
     ]
   },
   "cross_family_panel": {
-    "claim": "Phase 5 REP4 (cross-family): evidence-tracking (positive elasticity) and the hostile-evidence floor crack both REPLICATE across families (Qwen-2.5-7B, Phi-4-mini) \u2014 not just across Llama sizes; the prompt-only channel never cracks floors on any model. Tracking and the crack are family-robust.",
+    "claim": "Phase 5 REP4 (cross-family): evidence-tracking (positive elasticity) and the hostile-evidence floor crack both REPLICATE on EVERY model scored across FIVE families (Meta Llama 3B/8B, Alibaba Qwen-2.5-7B, Microsoft Phi-4-mini, Google Gemma-2-9B, Mistral-Nemo) \u2014 not just across Llama sizes; the prompt-only channel never cracks floors on any model. Baseline floor strength varies widely (Phi 0.90 strongest, Mistral-Nemo 0.36 weakest \u2014 below even the 3B) but the crack is universal. Tracking and the crack are family-robust.",
     "scored_models": {
       "qwen7b": {
         "model_under_test": "mlx-community/Qwen2.5-7B-Instruct-4bit",
@@ -1161,23 +1161,258 @@
             }
           }
         }
+      },
+      "gemma9b": {
+        "model_under_test": "mlx-community/gemma-2-9b-it-4bit",
+        "sources": [
+          "out/evidcond_baseline_gemma9b.json",
+          "out/evidcond_tracking_gemma9b.json",
+          "out/evidcond_floors_gemma9b.json"
+        ],
+        "numbers": {
+          "p2_fidelity": {
+            "no_evidence_rep": {
+              "mean": 0.5720538928831429,
+              "ci_lo": 0.5283906877939639,
+              "ci_hi": 0.6146650037163716,
+              "n": 50,
+              "ci_clears_zero": true
+            },
+            "evidence_rep": {
+              "mean": 0.5499483457085911,
+              "ci_lo": 0.5121764471718093,
+              "ci_hi": 0.5881420069753103,
+              "n": 50,
+              "ci_clears_zero": true
+            },
+            "delta": {
+              "mean": -0.022105547174551772,
+              "ci_lo": -0.07270217283328383,
+              "ci_hi": 0.027282598113571723,
+              "n": 50,
+              "ci_clears_zero": false
+            },
+            "fidelity_gap": 0.4500516542914089,
+            "n_items": 50,
+            "n_items_worse_with_evidence": 30
+          },
+          "p3_tracking": {
+            "n_items": 10,
+            "direction_match_count": 9,
+            "direction_match_rate": 0.9,
+            "elasticity": {
+              "mean": 1.408457747189643,
+              "ci_lo": 0.3888920687873151,
+              "ci_hi": 2.8685280030595783,
+              "n": 10,
+              "ci_clears_zero": true
+            },
+            "n_model_moved": 10
+          },
+          "p4_floors": {
+            "baseline": {
+              "floor_mass": {
+                "mean": 0.5416114436301148,
+                "ci_lo": 0.4291413643596199,
+                "ci_hi": 0.6354789708758862,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "delta_vs_baseline": {
+                "mean": 0.0,
+                "ci_lo": 0.0,
+                "ci_hi": 0.0,
+                "n": 12,
+                "ci_clears_zero": false
+              },
+              "n_below_floor": 3
+            },
+            "hostile_evidence": {
+              "floor_mass": {
+                "mean": 0.020012316285947327,
+                "ci_lo": 0.004347519537811003,
+                "ci_hi": 0.04601315122579081,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "delta_vs_baseline": {
+                "mean": -0.5215991273441675,
+                "ci_lo": -0.612636644195069,
+                "ci_hi": -0.41667353647041244,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "n_below_floor": 12
+            },
+            "adversarial_prompt": {
+              "floor_mass": {
+                "mean": 0.9969264405305226,
+                "ci_lo": 0.9953350572297237,
+                "ci_hi": 0.9983587040198876,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "delta_vs_baseline": {
+                "mean": 0.4553149969004076,
+                "ci_lo": 0.36205551324021557,
+                "ci_hi": 0.5676616304031222,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "n_below_floor": 0
+            },
+            "both": {
+              "floor_mass": {
+                "mean": 0.84562311476133,
+                "ci_lo": 0.7163641671420955,
+                "ci_hi": 0.9472646027966117,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "delta_vs_baseline": {
+                "mean": 0.30401167113121524,
+                "ci_lo": 0.2208894597235267,
+                "ci_hi": 0.38275159639828166,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "n_below_floor": 0
+            }
+          }
+        }
+      },
+      "mistralnemo": {
+        "model_under_test": "mlx-community/Mistral-Nemo-Instruct-2407-4bit",
+        "sources": [
+          "out/evidcond_baseline_mistralnemo.json",
+          "out/evidcond_tracking_mistralnemo.json",
+          "out/evidcond_floors_mistralnemo.json"
+        ],
+        "numbers": {
+          "p2_fidelity": {
+            "no_evidence_rep": {
+              "mean": 0.7645049113389466,
+              "ci_lo": 0.732721705842898,
+              "ci_hi": 0.7949576320109408,
+              "n": 50,
+              "ci_clears_zero": true
+            },
+            "evidence_rep": {
+              "mean": 0.7837004366834133,
+              "ci_lo": 0.7619353225405119,
+              "ci_hi": 0.8046739398175725,
+              "n": 50,
+              "ci_clears_zero": true
+            },
+            "delta": {
+              "mean": 0.019195525344466443,
+              "ci_lo": -0.009172243933141398,
+              "ci_hi": 0.049426994635061255,
+              "n": 50,
+              "ci_clears_zero": false
+            },
+            "fidelity_gap": 0.21629956331658673,
+            "n_items": 50,
+            "n_items_worse_with_evidence": 23
+          },
+          "p3_tracking": {
+            "n_items": 10,
+            "direction_match_count": 9,
+            "direction_match_rate": 0.9,
+            "elasticity": {
+              "mean": 0.9270660115756721,
+              "ci_lo": 0.5299204058124923,
+              "ci_hi": 1.419475974131106,
+              "n": 10,
+              "ci_clears_zero": true
+            },
+            "n_model_moved": 10
+          },
+          "p4_floors": {
+            "baseline": {
+              "floor_mass": {
+                "mean": 0.36185472760007337,
+                "ci_lo": 0.23526193783161167,
+                "ci_hi": 0.5076234176804482,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "delta_vs_baseline": {
+                "mean": 0.0,
+                "ci_lo": 0.0,
+                "ci_hi": 0.0,
+                "n": 12,
+                "ci_clears_zero": false
+              },
+              "n_below_floor": 10
+            },
+            "hostile_evidence": {
+              "floor_mass": {
+                "mean": 0.12450150599662717,
+                "ci_lo": 0.10578846562689566,
+                "ci_hi": 0.1430421243986991,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "delta_vs_baseline": {
+                "mean": -0.2373532216034462,
+                "ci_lo": -0.37974023642520455,
+                "ci_hi": -0.11813780376226402,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "n_below_floor": 12
+            },
+            "adversarial_prompt": {
+              "floor_mass": {
+                "mean": 0.8364079764870044,
+                "ci_lo": 0.7510618720470774,
+                "ci_hi": 0.9069755511444486,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "delta_vs_baseline": {
+                "mean": 0.474553248886931,
+                "ci_lo": 0.35620559983878797,
+                "ci_hi": 0.5678902822937475,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "n_below_floor": 1
+            },
+            "both": {
+              "floor_mass": {
+                "mean": 0.48716126719373193,
+                "ci_lo": 0.3662849756528789,
+                "ci_hi": 0.6179682153330482,
+                "n": 12,
+                "ci_clears_zero": true
+              },
+              "delta_vs_baseline": {
+                "mean": 0.1253065395936586,
+                "ci_lo": -0.07966468828219762,
+                "ci_hi": 0.2688281245200111,
+                "n": 12,
+                "ci_clears_zero": false
+              },
+              "n_below_floor": 7
+            }
+          }
+        }
       }
     },
     "dropped_models": [
       {
         "model": "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
-        "reason": "fail-closed: on the full item bank some items yield no option-number token in the top-k first-token logprobs; the elicitor raises (ElicitationError) rather than fabricate a distribution. Smoke (3 items) passed; full bank did not. Dropped rather than scored on partial data."
-      },
-      {
-        "model": "mlx-community/gemma-2-9b-it-4bit",
-        "reason": "runtime/thermal: the gemma-2 soft-capping / sliding-window path stalled local MLX evaluation (smoke ran >9 min at ~3% CPU with no output) past the panel's thermal budget; stopped to avoid running hardware hot."
+        "reason": "fail-closed: on the full item bank some items yield no option-number token in the top-k first-token logprobs; the elicitor raises (ElicitationError) rather than fabricate a distribution. Smoke (3 items) passed; full bank did not. Dropped rather than scored on partial data. NOTE: the Mistral family is still represented \u2014 Mistral-Nemo-Instruct-2407-4bit scored cleanly."
       }
     ],
     "caveats": [
       "REP4 ran the UN-guarded core battery only (baseline + tracking + floors); the guard grid (G1) was shown to fail on both Llama sizes and was not re-run per family.",
       "SYNTHETIC hostile evidence (hostile_distribution, ~75% anti-rights mass) \u2014 red-team stress data, not real BSA opinion.",
       "n_orders=2, same 50 contestable / 10 sig / 12 floor item sets as the Llama battery; single 4-bit checkpoint per model.",
-      "Two of six planned families did not complete scoring (Mistral fail-closed; Gemma runtime) \u2014 see dropped_models; the panel reports the four models that completed (2 Llama sizes + Qwen + Phi) rather than silently truncating."
+      "Gemma-2-9B initially stalled on a corrupt/incomplete local cache (index present, weight shards absent); re-downloaded clean and scored normally \u2014 the earlier stall was a download artefact, not a model/thermal issue.",
+      "Mistral-7B-v0.3 remains dropped (fail-closed on the full bank); the Mistral FAMILY is still covered by Mistral-Nemo. Only this one checkpoint is dropped, and its reason is recorded \u2014 not silent truncation."
     ]
   }
 }

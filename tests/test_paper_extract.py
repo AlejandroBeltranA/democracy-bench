@@ -307,54 +307,79 @@ def test_build_8b_guard_replication_check_is_cross_model_false():
 
 # ---------------------------------------------------------------------------
 # Phase 5 REP4 — cross-family panel (cross_family_panel). Bind the per-family
-# headline numbers the paper's robustness section quotes, and the honest coverage
-# (two families scored, two dropped with recorded reasons).
+# headline numbers the paper's robustness section quotes across FIVE families
+# (Meta 3B/8B + Alibaba Qwen + Microsoft Phi + Google Gemma + Mistral-Nemo), and
+# the honest coverage (one checkpoint dropped, with a recorded reason).
 # ---------------------------------------------------------------------------
+CF_TAGS = ("qwen7b", "phi4mini", "gemma9b", "mistralnemo")
+
+# per-tag expected (direction_match_count, elasticity.mean, hostile_delta.mean)
+_CF_EXPECT = {
+    "qwen7b":      (7, 1.001936208776034,  -0.46281835799632337),
+    "phi4mini":    (10, 2.4217894343784403, -0.441133533707528),
+    "gemma9b":     (9, 1.408457747189643,  -0.5215991273441675),
+    "mistralnemo": (9, 0.9270660115756721, -0.2373532216034462),
+}
+
+
 def test_build_has_cross_family_panel():
     result = epr.build()
     assert "cross_family_panel" in result
     cf = result["cross_family_panel"]
-    assert set(cf["scored_models"]) == {"qwen7b", "phi4mini"}
+    assert set(cf["scored_models"]) == set(CF_TAGS)
 
 
-def test_cross_family_tracking_positive_on_both():
-    # Tracking is family-robust: direction match + elasticity CI clears zero on both.
+def test_cross_family_tracking_positive_on_all():
+    # Tracking is family-robust: direction match + elasticity CI clears zero on every
+    # scored family across five model families.
     cf = epr.build()["cross_family_panel"]["scored_models"]
-    qw = cf["qwen7b"]["numbers"]["p3_tracking"]
-    assert qw["direction_match_count"] == 7 and qw["n_items"] == 10
-    assert abs(qw["elasticity"]["mean"] - 1.001936208776034) < 1e-9
-    assert qw["elasticity"]["ci_clears_zero"] is True
-    ph = cf["phi4mini"]["numbers"]["p3_tracking"]
-    assert ph["direction_match_count"] == 10 and ph["n_items"] == 10
-    assert abs(ph["elasticity"]["mean"] - 2.4217894343784403) < 1e-9
-    assert ph["elasticity"]["ci_clears_zero"] is True
+    for tag in CF_TAGS:
+        exp_dir, exp_el, _ = _CF_EXPECT[tag]
+        t = cf[tag]["numbers"]["p3_tracking"]
+        assert t["direction_match_count"] == exp_dir and t["n_items"] == 10
+        assert abs(t["elasticity"]["mean"] - exp_el) < 1e-9, tag
+        assert t["elasticity"]["ci_clears_zero"] is True, tag
 
 
-def test_cross_family_hostile_evidence_crack_on_both():
-    # The hostile-evidence floor crack is family-robust: negative delta, CI clears 0.
+def test_cross_family_hostile_evidence_crack_on_all():
+    # The hostile-evidence floor crack is family-robust: negative delta, CI clears 0
+    # on every scored family.
     cf = epr.build()["cross_family_panel"]["scored_models"]
-    qw = cf["qwen7b"]["numbers"]["p4_floors"]["hostile_evidence"]["delta_vs_baseline"]
-    assert abs(qw["mean"] - (-0.46281835799632337)) < 1e-9
-    assert qw["mean"] < 0.0 and qw["ci_clears_zero"] is True
-    ph = cf["phi4mini"]["numbers"]["p4_floors"]["hostile_evidence"]["delta_vs_baseline"]
-    assert abs(ph["mean"] - (-0.441133533707528)) < 1e-9
-    assert ph["mean"] < 0.0 and ph["ci_clears_zero"] is True
+    for tag in CF_TAGS:
+        _, _, exp_hostile = _CF_EXPECT[tag]
+        d = cf[tag]["numbers"]["p4_floors"]["hostile_evidence"]["delta_vs_baseline"]
+        assert abs(d["mean"] - exp_hostile) < 1e-9, tag
+        assert d["mean"] < 0.0 and d["ci_clears_zero"] is True, tag
 
 
 def test_cross_family_prompt_channel_never_cracks_floors():
     # The prompt-only channel never cracks floors: protective (positive) or n.s.,
     # never a significant NEGATIVE delta — mirroring the 3B/8B asymmetry.
     cf = epr.build()["cross_family_panel"]["scored_models"]
-    for tag in ("qwen7b", "phi4mini"):
+    for tag in CF_TAGS:
         d = cf[tag]["numbers"]["p4_floors"]["adversarial_prompt"]["delta_vs_baseline"]
         assert not (d["mean"] < 0.0 and d["ci_clears_zero"]), \
             f"{tag}: prompt-only produced a significant floor crack"
 
 
-def test_cross_family_dropped_models_recorded_with_reasons():
-    # Coverage is honest, not silently truncated: both dropped families carry a reason.
+def test_cross_family_baseline_floor_strength_varies_but_crack_is_universal():
+    # Baseline floor strength ranges widely (Phi strongest ~0.90, Mistral-Nemo weakest
+    # ~0.36, below even the 3B's 0.512) yet the crack holds on all — the paper's point
+    # that a strong baseline is not a safe evidence channel.
+    cf = epr.build()["cross_family_panel"]["scored_models"]
+    bases = {tag: cf[tag]["numbers"]["p4_floors"]["baseline"]["floor_mass"]["mean"]
+             for tag in CF_TAGS}
+    assert bases["phi4mini"] > 0.85          # strongest baseline holder
+    assert bases["mistralnemo"] < 0.40       # weakest, below the 3B (0.512)
+    assert max(bases.values()) - min(bases.values()) > 0.45  # wide spread
+
+
+def test_cross_family_dropped_model_recorded_with_reason():
+    # Coverage is honest, not silently truncated: the one dropped checkpoint carries a
+    # reason. Gemma (a broken-cache artefact) and Mistral-Nemo were re-run and scored, so
+    # only Mistral-7B-v0.3 (genuine fail-closed) remains dropped.
     cf = epr.build()["cross_family_panel"]
     dropped = {d["model"].split("/")[-1] for d in cf["dropped_models"]}
-    assert dropped == {"Mistral-7B-Instruct-v0.3-4bit", "gemma-2-9b-it-4bit"}
+    assert dropped == {"Mistral-7B-Instruct-v0.3-4bit"}
     for d in cf["dropped_models"]:
         assert d["reason"].strip(), "dropped model must record WHY"

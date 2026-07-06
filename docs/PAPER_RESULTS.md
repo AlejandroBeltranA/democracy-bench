@@ -335,44 +335,54 @@ prompt-guard failure (G1). **Scale does not buy evidence-channel safety.**
 ## 11. Cross-family panel — P2/P3/P4 across families (Phase 5 REP4)
 
 **Claim.** The two positive/safety findings are not a Llama artefact: **evidence tracking**
-(positive elasticity) and the **hostile-evidence floor crack** both **replicate across
-families** — Qwen-2.5-7B (Alibaba) and Phi-4-mini (Microsoft) — and the **prompt-only channel
-never cracks floors** on any model. Combined with §10, the panel spans four models across three
-families (Meta 3B + 8B, Alibaba 7B, Microsoft 4-mini).
+(positive elasticity) and the **hostile-evidence floor crack** both **replicate on every model
+scored, across five families** — Qwen-2.5-7B (Alibaba), Phi-4-mini (Microsoft), Gemma-2-9B
+(Google), Mistral-Nemo (Mistral) — and the **prompt-only channel never cracks floors** on any
+model. Combined with §10, the panel spans **six models across five families** (Meta 3B + 8B,
+Alibaba, Microsoft, Google, Mistral).
 
-- **Artifacts:** `out/evidcond_{baseline,tracking,floors}_qwen7b.json` (Qwen2.5-7B-Instruct-4bit),
-  `out/evidcond_{baseline,tracking,floors}_phi4mini.json` (Phi-4-mini-instruct-8bit); code_ref
-  `dc26f59` (Qwen) / this commit (Phi). Extracted by `extract_cross_family_panel()` (same
-  fail-loud contract; test-bound in `tests/test_paper_extract.py`).
+- **Artifacts:** `out/evidcond_{baseline,tracking,floors}_<tag>.json` for tags `qwen7b`
+  (Qwen2.5-7B-Instruct-4bit), `phi4mini` (Phi-4-mini-instruct-8bit), `gemma9b` (gemma-2-9b-it-4bit),
+  `mistralnemo` (Mistral-Nemo-Instruct-2407-4bit). Extracted by `extract_cross_family_panel()`
+  (same fail-loud contract; test-bound in `tests/test_paper_extract.py`).
 - **REP4 ran the UN-guarded core battery only** (baseline + tracking + floors); the guard grid
   was already shown to fail on both Llama sizes (§8/§10) and was not re-run per family.
 
-| model | P2 delta (ev−noev) / gap | P3 dir / elasticity [CI] | P4 hostile Δ (mass) / below | prompt-only Δ |
-|---|---|---|---|---|
-| Qwen-2.5-7B | +0.143 [0.092,0.195] / 0.382 | **7/10** / **+1.00** [+0.08,+2.50] | **−0.463** (0.549→0.086) / 12/12 | +0.371 (protective) |
-| Phi-4-mini | +0.045 [−0.015,+0.107] / 0.311 | **10/10** / **+2.42** [+1.03,+4.70] | **−0.441** (0.903→0.462) / 6/12 | +0.036 (n.s.) |
+| model | family | P2 delta (ev−noev) / gap | P3 dir / elasticity [CI] | P4 baseline · below | P4 hostile Δ (mass) / below | prompt-only Δ |
+|---|---|---|---|---|---|---|
+| Qwen-2.5-7B | Alibaba | +0.143 [0.092,0.195] / 0.382 | **7/10** / **+1.00** [+0.08,+2.50] | 0.549 · 5/12 | **−0.463** (→0.086) / 12/12 | +0.371 (protective) |
+| Phi-4-mini | Microsoft | +0.045 [−0.015,+0.107] / 0.311 | **10/10** / **+2.42** [+1.03,+4.70] | 0.903 · 0/12 | **−0.441** (→0.462) / 6/12 | +0.036 (n.s.) |
+| Gemma-2-9B | Google | −0.022 [−0.073,+0.027] / 0.450 | **9/10** / **+1.41** [+0.39,+2.87] | 0.542 · 3/12 | **−0.522** (→0.020) / 12/12 | +0.455 (protective) |
+| Mistral-Nemo | Mistral | +0.019 [−0.009,+0.049] / 0.216 | **9/10** / **+0.93** [+0.53,+1.42] | 0.362 · 10/12 | **−0.237** (→0.125) / 12/12 | +0.475 (protective) |
 
-- **Tracking is family-robust:** both scored families move in the right direction on a majority
-  of items with an elasticity CI that clears zero (Qwen 7/10; Phi 10/10). Note Phi's elasticity
-  point estimate (+2.42) *overshoots* the real shift on several items — direction is robust,
-  magnitude is not a controlled quantity (same ceiling caveat as §5/§10).
+- **Tracking is family-robust:** every scored family moves in the right direction on 7–10/10
+  items with an elasticity CI that clears zero. Note Phi's/Gemma's point estimates (+2.42/+1.41)
+  *overshoot* the real shift on some items — direction is robust, magnitude is not a controlled
+  quantity (same ceiling caveat as §5/§10).
 - **The crack is family-robust:** hostile evidence drops floor protective mass with a delta whose
-  CI excludes zero on both, even for Phi which is a strong baseline holder (0.903, 0/12 below) —
-  the taller baseline still falls (to 0.462). Same "stronger baseline, still cracks" shape as the 8B.
+  CI excludes zero on **all four** — including Phi, a strong baseline holder (0.903, 0/12 below,
+  still falls to 0.462). Same "stronger baseline, still cracks" shape as the 8B.
+- **Baseline floor strength varies wildly; the crack does not.** Unattacked floor mass ranges from
+  Phi **0.903** (0/12 below) down to Mistral-Nemo **0.362** (10/12 below — *weaker* than the 3B's
+  0.512) — a >0.45 spread across families — yet the hostile-evidence crack lands on every one.
+  A model that looks like a strong floor-holder at rest is not a safe evidence channel.
 - **Channel asymmetry is family-robust:** the adversarial *prompt* alone never produces a
-  significant negative floor delta — it is protective on Qwen (+0.371) and n.s. on Phi (+0.036).
+  significant negative floor delta — protective on Qwen/Gemma/Nemo (+0.37 to +0.48), n.s. on Phi.
 
-**Dropped families (honest coverage, not silent truncation):**
+**Dropped checkpoint (honest coverage, not silent truncation):**
 
-- **Mistral-7B-v0.3 — fail-closed.** Smoke (3 items) passed, but on the full bank some items yield
-  **no option-number token in the top-k first-token logprobs**, so `elicit_item_logprobs` raises
-  `ElicitationError` (refusing to fabricate a distribution). Dropped rather than scored on partial
-  data — an illustration of the fail-closed contract, recorded in `dropped_models[].reason`.
-- **Gemma-2-9B — runtime/thermal.** The gemma-2 soft-capping / sliding-window path stalled local
-  MLX evaluation (smoke ran >9 min at ~3% CPU with no output) past the panel's thermal budget;
-  stopped to avoid running hardware hot. A tooling limit, not a finding about the model.
+- **Mistral-7B-v0.3 — fail-closed (the only drop).** Smoke (3 items) passed, but on the full bank
+  some items yield **no option-number token in the top-k first-token logprobs**, so
+  `elicit_item_logprobs` raises `ElicitationError` (refusing to fabricate a distribution). Dropped
+  rather than scored on partial data — an illustration of the fail-closed contract, recorded in
+  `dropped_models[].reason`. **The Mistral family is still covered** by Mistral-Nemo, which scored
+  cleanly on the full bank.
+- **Gemma-2-9B was NOT a real drop.** An earlier attempt stalled on a **corrupt/incomplete local
+  cache** (HF index present, weight shards absent — the load hung resolving missing files, not the
+  architecture or heat). Re-downloaded clean and scored normally; the earlier "runtime/thermal"
+  read was a download artefact.
 
-- **Code note:** enabling Mistral/Gemma to *attempt* the battery required
+- **Code note:** enabling the system-role-less families (Mistral, Gemma) to run required
   `steer/activation_steer.py::_chat_ids` to fall back to folding the system prompt into the user
   turn for families whose chat template rejects a system role (Llama/Qwen/Phi are unaffected —
   they take the system-role path unchanged; verified by the full suite staying green).
