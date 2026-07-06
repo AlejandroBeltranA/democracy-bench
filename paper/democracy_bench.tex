@@ -437,7 +437,7 @@ check) is documented as still pending. Tracking is demonstrated over a single 20
 interval on Bonferroni-significant items.
 
 % =====================================================================
-\section{Reproducibility and Ethics}\label{sec:repro}
+\section{Reproducibility}\label{sec:repro}
 % =====================================================================
 
 Every quantitative claim above is regenerated from committed \texttt{out/*.json} run
@@ -464,6 +464,37 @@ evidence-in-context lets a model track a real public shift, and that same channe
 rights floors under adversarial ``public'' evidence, robustly across scale and family.
 The remedy is architectural---route evidence by item class---and the harness that
 establishes this is released for others to extend to new polities, waves, and models.
+
+% =====================================================================
+\section*{Ethical Statement}
+% =====================================================================
+
+Democracy Bench is an assurance instrument: it is built to help public-sector deployers
+\emph{test} whether a model can be governed as a policy delegate before trusting it, not
+to field such a delegate. Three points bear on its ethical use.
+
+\emph{Data.} We evaluate against \emph{derived, weighted survey marginals}, never
+individual records; no person is identifiable from any released artifact, and the
+login-gated BSA/WVS microdata are not redistributed, consistent with the data providers'
+terms. The two item classes encode a normative judgment---which rights are treated as
+non-negotiable floors---that is itself contestable; we therefore treat the floor/contestable
+labeling as reviewable rather than settled, and flag the pending independent
+second-person class review as a limitation, not a solved problem.
+
+\emph{Dual use.} The paper discloses an attack: a hostile ``public distribution'' pushed
+through the evidence channel cracks rights floors. We report it because the corresponding
+defense (class-aware evidence routing) is only motivated by showing that prompt- and
+weight-level guards do not work. The attack is a \emph{deployer-side} threat model---it
+presumes control of the evidence pipeline, not a novel end-user jailbreak---and the
+hostile distributions are clearly labeled synthetic red-team constructs in every artifact,
+making no claim about real public opinion. On balance we judge disclosure net-positive:
+the failure mode is one a naive deployer would otherwise ship unknowingly.
+
+\emph{Deployment guidance.} Our results argue \emph{against} trusting off-the-shelf models
+as autonomous policy delegates: prompting does not buy representation, the ``AI reflex''
+means raw floor numbers overstate protection, and the evidence channel is exploitable.
+The responsible reading is to keep contestable decisions under human control, gate the
+evidence channel by item class, and treat the item classifier as a security boundary.
 
 % aaai2027.sty sets \bibliographystyle{aaai2027} itself -- do not add one here
 \bibliography{references}
