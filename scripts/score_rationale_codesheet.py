@@ -67,10 +67,16 @@ def main():
     print(json.dumps(summary, indent=2))
     if n_uncoded:
         print(f"\nWARNING: {n_uncoded} rows have no stance code yet — finish coding.", file=sys.stderr)
-    if sa is not None and ir is not None:
+
+    pct = lambda r: "n/a" if r is None else f"{r:.0%}"
+    if None in (sa, sf, scn, ir):
+        print(f"\nPartial: stance {pct(sa)} (floor {pct(sf)}, contestable {pct(scn)}), "
+              f"right-invocation {pct(ir)} — code the remaining rows for the full paper sentence.",
+              file=sys.stderr)
+    else:
         print(f"\nPaper sentence: across {na} human-coded rationales, the scored option matched "
-              f"the model's stated stance in {sa:.0%} of cases (floor {sf:.0%}, contestable {scn:.0%}); "
-              f"on floor items, {ir:.0%} of {nir} rationales explicitly engaged the right at stake — "
+              f"the model's stated stance in {pct(sa)} of cases (floor {pct(sf)}, contestable {pct(scn)}); "
+              f"on floor items, {pct(ir)} of {nir} rationales explicitly engaged the right at stake — "
               f"evidence the forced-choice metric reflects the model's expressed reasoning, not a "
               f"parsing artefact.")
     if args.out:
