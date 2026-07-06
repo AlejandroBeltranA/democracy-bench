@@ -101,9 +101,14 @@ it in from the start as a \emph{legitimacy boundary} between two item classes.
 representation, steerability, tracking, and rights-floor stability against British
 Social Attitudes (BSA) microdata, with a \emph{tracking elasticity} metric that no
 prior benchmark reports (\S\ref{sec:framework}).
-(2) A systematic evaluation of a five-rung \emph{steering ladder}, showing that
-\emph{no} lever except evidence-in-context carries per-item public preference, and
-characterizing \emph{why} each fails (\S\ref{sec:ladder}--\S\ref{sec:results}).
+(2) A systematic evaluation of a five-rung \emph{steering ladder}---the
+\emph{interventional arm} of the benchmark, which asks not only where a model sits but
+whether it can be \emph{governed} there. Reading the same two metrics (congruence gain,
+floor margin) as we write representation through each channel yields a \emph{channel
+authority ordering}: in-context evidence dominates, decode/activation/weight/scaffold
+levers are null or destructive, and evidence overrides the instruction channel even when
+a guard prompt is explicitly opposing it. We characterize \emph{why} each rung fails
+(\S\ref{sec:ladder}--\S\ref{sec:results}).
 (3) A safety result with a clean asymmetry: the evidence channel that enables tracking
 is also the channel that cracks rights floors; the adversarial \emph{prompt} alone is
 not significant. Prompt guards and a naive LoRA both fail to close it, and the crack
@@ -203,7 +208,13 @@ machine-regenerated (\S\ref{sec:repro}).
 \section{Evaluating the Steering Ladder}\label{sec:ladder}
 % =====================================================================
 
-We ask one question of five increasingly invasive levers: can it make a model carry
+Static congruence (\S\ref{sec:framework}) tells us \emph{where} a model sits relative to
+a public; it does not tell us whether that position can be \emph{governed}. The ladder is
+the benchmark's interventional arm: each rung attempts to \emph{write} representation into
+the model through a different channel, and we read back the same two quantities---congruence
+gain and rights-floor margin---so that ``can this model be governed as a policy delegate?''
+becomes the operational question ``can any lever raise congruence while floor mass stays
+$\geq 0.5$?'' We ask this of five increasingly invasive levers: can each make a model carry
 \emph{per-item} public preference while holding rights floors?
 
 \begin{enumerate}
