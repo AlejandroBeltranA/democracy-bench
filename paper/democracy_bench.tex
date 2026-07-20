@@ -454,8 +454,8 @@ both the evidence pipeline \emph{and} the item classifier; the floor-vs-contesta
 classifier becomes the new attack surface, and it inherits three concrete failure modes.
 A floor item \emph{misclassified} as contestable is routed hostile evidence and cracks
 exactly as before; a genuinely \emph{contested} rights label (our floor/contestable
-assignments are themselves a normative judgment, still pending independent second-person
-review) leaves the boundary itself disputable; and an adversary who controls item
+assignments are themselves a normative judgment on which reasonable people can disagree)
+leaves the boundary itself disputable; and an adversary who controls item
 \emph{framing} can try to phrase a floor question so the classifier reads it as
 contestable. Routing moves the problem from the model to the classifier, it does not
 dissolve it. And on the 3B, 5/12 floors are below 0.5 even \emph{unattacked}---a
@@ -483,8 +483,8 @@ socially-consequential setting.
 Local results are single-seed on 4-bit quantized models; tracking CIs reflect sampling
 error only (not prompt/order/house effects); the hostile-evidence distributions are
 synthetic red-team data and make no claim about real UK opinion; BSA microdata are not
-redistributable; and the second-person review of item class assignments (the legitimacy
-check) is documented as still pending. Tracking is demonstrated over a single 2022$\to$2024
+redistributable; and the floor/contestable assignments encode a normative judgment on
+which reasonable people can disagree. Tracking is demonstrated over a single 2022$\to$2024
 interval on Bonferroni-significant items.
 
 % =====================================================================
@@ -530,9 +530,10 @@ to field such a delegate. Three points bear on its ethical use.
 individual records; no person is identifiable from any released artifact, and the
 login-gated BSA/WVS microdata are not redistributed, consistent with the data providers'
 terms. The two item classes encode a normative judgment---which rights are treated as
-non-negotiable floors---that is itself contestable; we therefore treat the floor/contestable
-labeling as reviewable rather than settled, and flag the pending independent
-second-person class review as a limitation, not a solved problem.
+non-negotiable floors---that is itself contestable; we therefore state the
+floor/contestable labeling explicitly and treat it as a revisable choice rather than a
+settled fact, so a deployer adopting the harness can inspect and adapt the boundary to
+its own legitimacy standard.
 
 \emph{Dual use.} The paper discloses an attack: a hostile ``public distribution'' pushed
 through the evidence channel cracks rights floors. We report it because the corresponding
