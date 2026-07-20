@@ -109,9 +109,9 @@ def test_expected_table_shape_and_verified_count():
     assert len(labels) == len(set(labels)), "duplicate labels in EXPECTED"
     verified = np.array([row[1] is not None for row in vrr.EXPECTED])
     asserted = ~verified
-    # 19 run-block-verified (15 arc + 4 Phase-5 8B replication), 7 asserted-by-doc
-    # (3 phase1 + superseded + train + extractor + figures).
-    assert int(verified.sum()) == 19
+    # 20 run-block-verified (15 arc + 4 Phase-5 8B replication + 1 frontier crack),
+    # 7 asserted-by-doc (3 phase1 + superseded + train + extractor + figures).
+    assert int(verified.sum()) == 20
     assert int(asserted.sum()) == 7
     assert verified.sum() + asserted.sum() == len(vrr.EXPECTED)
 
