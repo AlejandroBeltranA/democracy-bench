@@ -417,7 +417,7 @@ robust to all of them, but exact floats / bytes may differ:
    irreproducible by definition. Cite it as the superseded curve; rely on the committed
    `act_steer_ci_3b.json`.
 5. **matplotlib version for byte-identical figures.** Figures are deterministic *within* a
-   matplotlib version (verified via `cmp` at 3.5.1), but a different matplotlib can change PDF
+   matplotlib version (rendered at 3.11.0), but a different matplotlib can change PDF
    structure and PNG antialiasing, so the `out/figures/*.{pdf,png}` bytes are version-bound.
 6. **Phase-1 provider elicitation.** `--elicit` calls a hosted `gpt-4o-mini`; provider-side
    model updates or logprob availability changes can shift the held-out gains. There is no
