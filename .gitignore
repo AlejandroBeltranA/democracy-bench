@@ -21,3 +21,6 @@ __pycache__/
 # run logs
 logs/
 out/*.log
+
+# submission build artifact (never commit)
+democracy_bench_aaai27_supplement.zip
