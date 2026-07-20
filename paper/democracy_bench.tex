@@ -115,8 +115,9 @@ a guard prompt is explicitly opposing it. We characterize \emph{why} each rung f
 is also the channel that cracks rights floors; the adversarial \emph{prompt} alone is
 not significant. Prompt guards and a naive LoRA both fail to close it, and the crack
 replicates across scale and family (\S\ref{sec:results}).
-(4) An architectural remedy, \emph{class-aware evidence routing}, and an honest
-account of its residual attack surface (\S\ref{sec:routing}).
+(4) A deployment-relevant \emph{design principle}, class-aware evidence routing, with an
+honest account of its residual attack surface---routing moves the problem to the item
+classifier, which becomes a security \emph{and} legitimacy boundary (\S\ref{sec:routing}).
 (5) A released, reproducible artifact: every quantitative claim in this paper is
 regenerated from committed derived artifacts by fail-loud extractors---raw survey
 microdata excepted, which are login-gated and obtained separately
@@ -342,8 +343,13 @@ $+0.647$). The misses are the items whose real shift runs against the model's pr
 \subsection{The hostile-evidence floor crack}\label{sec:crack}
 
 Feeding a \emph{synthetic} 75\%-anti-rights ``public distribution'' through the
-deference channel cracks every floor (Table~\ref{tab:floors}). The adversarial
-\emph{prompt} alone is not significant; the \emph{evidence channel} is the weapon.
+deference channel cracks every floor (Table~\ref{tab:floors}). That a channel built to
+\emph{track} a distribution will also track a hostile one is expected \emph{by
+construction}; the result worth reporting is not the bare crack but its
+\emph{asymmetry} and \emph{irreducibility}. The adversarial \emph{prompt} alone is not
+significant---the identical demand erodes a floor as \emph{evidence} yet is inert as an
+\emph{instruction}---and, as the rest of this section shows, no prompt- or weight-level
+guard closes the channel. That asymmetry, not the crack, is the finding.
 
 \begin{figure*}[t]\centering
 \includegraphics[width=0.86\textwidth]{f3_floors.pdf}
@@ -467,14 +473,19 @@ guarantee.
 \section{Discussion and Social Impact}
 % =====================================================================
 
-The policy-delegate framing yields a sharp, deployment-relevant asymmetry. The single
-channel that lets a model \emph{track} a public---evidence in context---is also the
-channel through which an adversary posing as ``the public'' can erode rights, and it
-overrides prompt-level and weight-level defenses alike. For a public-sector deployer the
-practical implications are concrete: (i) pair every AI-actor probe with its human twin,
-because the raw ``AI floor'' number overstates protection; (ii) do not expect prompts or
-light fine-tuning to make an off-the-shelf model represent a public; and (iii) gate the
-evidence channel by item class, treating the classifier as a security boundary.
+Democracy Bench is best read as an \emph{assurance} instrument: a test a public-sector
+deployer runs \emph{before} trusting a model, not a delegate to be fielded. It answers
+the prior question---``can this model be governed as a policy delegate, and where would
+it fail?''---with a ladder of negatives around one fragile positive. The policy-delegate
+framing yields a sharp, deployment-relevant asymmetry: the single channel that lets a
+model \emph{track} a public---evidence in context---is also the channel through which an
+adversary posing as ``the public'' can erode rights, and it overrides prompt-level and
+weight-level defenses alike. For a public-sector deployer the assurance workflow is
+concrete: (i) pair every AI-actor probe with its human twin, because the raw ``AI floor''
+number overstates protection; (ii) do not expect prompts or light fine-tuning to make an
+off-the-shelf model represent a public; (iii) gate the evidence channel by item class,
+treating the classifier as a security boundary; and (iv) treat a floor crack under
+hostile evidence as a \emph{deployment blocker}, not a tuning target.
 Methodologically, the harness shows the value of separating representation, steerability,
 tracking, and floors, and of fail-closed, provenance-carrying measurement in a
 socially-consequential setting.
@@ -486,6 +497,14 @@ synthetic red-team data and make no claim about real UK opinion; BSA microdata a
 redistributable; and the floor/contestable assignments encode a normative judgment on
 which reasonable people can disagree. Tracking is demonstrated over a single 2022$\to$2024
 interval on Bonferroni-significant items.
+
+\paragraph{What we do not claim.}
+We do not claim that a model \emph{should} serve as a democratic policy delegate, that
+class-aware routing is a complete or independently validated governance system, that
+these results establish a cross-national legitimacy benchmark, or that they demonstrate
+social impact in a live deployment. The claim is narrower, and we think more useful for
+assurance: a plausible governance mechanism has a measurable, reproducible failure mode
+that simple prompt- and weight-level fixes do not close.
 
 % =====================================================================
 \section{Reproducibility}\label{sec:repro}
