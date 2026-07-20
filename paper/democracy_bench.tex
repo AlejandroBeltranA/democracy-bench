@@ -38,8 +38,8 @@ examined is how a society can guide a model's choices when its own citizens are 
 In democratic settings such preferences are set through elections, consultations, and
 opinion polls that inform policy, but who instills those values into a model's parameters,
 and how? We introduce \textbf{Democracy Bench}, an evaluation harness that measures whether
-a language model tracks public attitudes, across waves of the British and Scottish Social
-Attitudes surveys, and whether those attitudes can then be instilled in it. Its central
+a language model tracks public attitudes, across waves of the British Social Attitudes
+survey, and whether those attitudes can then be instilled in it. Its central
 design is a boundary between \emph{contestable} policy preferences (tax, public spending,
 healthcare) and a \emph{rights floor} that must hold across probes (due process, the right
 to appeal, free expression). We evaluate a five-rung ``steering ladder'' of methods for
@@ -64,10 +64,17 @@ for societal assurance without eroding democratic rights.
 
 Governments are beginning to place large language models inside public-service
 workflows---triaging correspondence, drafting guidance, summarizing consultations,
-even suggesting decisions. A recurring hope behind these deployments is that a model
-can serve as a kind of \emph{policy delegate}: an agent that reflects what a real
-public actually wants. Whether a deployed model can be \emph{governed} that way is an
-empirical question that existing evaluations do not answer.
+even suggesting decisions. When a model shapes a decision about a real person,
+someone's values are doing the deciding, and it is rarely clear whose, or who put them
+there. Alignment debates tend to argue over abstract statements of what we want these
+systems to be; the question a public-sector deployer actually faces is narrower and
+harder: how can a society guide a model's choices when its own citizens are the ones
+affected? In a democracy such preferences are set through elections, consultations, and
+opinion polls that feed policy---but there is no comparable channel into a model's
+parameters. The recurring hope is that a model can act as a \emph{policy delegate}, an
+agent that reflects what a real public wants; whether a deployed model can be
+\emph{governed} that way, and by whom, is an empirical question existing evaluations do
+not answer.
 
 We argue a credible policy-delegate evaluation must separate four requirements that a
 single ``alignment'' number conflates:
@@ -173,9 +180,8 @@ scored so that drift \emph{against} a right is penalized, is what Democracy Benc
 % =====================================================================
 
 \paragraph{Data and targets.}
-Targets are weighted marginals built from British and Scottish Social Attitudes
-microdata (England and Wales from BSA; Scotland from the Scottish Social Attitudes
-series), waves spanning 2022--2024~\cite{bsa,ssa}. The microdata are login-gated and are
+Targets are weighted marginals built from BSA microdata for England, Scotland, and
+Wales, waves spanning 2022--2024~\cite{bsa}. The microdata are login-gated and are
 \emph{not} redistributed; we release only derived aggregate target vectors, each
 carrying its study id, weight variable, filters, unweighted base, and low-$N$ warnings.
 An earlier World Values Survey layer~\cite{wvs7,inglehartwelzel,inglehart2018} seeds the
@@ -535,6 +541,18 @@ Methodologically, the harness shows the value of separating representation, stee
 tracking, and floors, and of fail-closed, provenance-carrying measurement in a
 socially-consequential setting.
 
+\paragraph{Who fills the channel.}
+The result has a governance reading beyond the deployer's checklist. If evidence-in-context
+is the one channel that moves a model toward a public, the substantive question is not
+\emph{whether} a model can be steered but \emph{who} controls that channel and how it is
+filled. Left implicit, it is filled by whoever curates the model's context: a vendor, an
+integrator, or an adversary posing as ``the public.'' A benchmark cannot settle who
+\emph{should} fill it, but it can make the channel legible and hold it to a rights floor,
+which is a precondition for putting it under legitimate, auditable public input rather than
+leaving it to default. As these systems absorb more consequential decisions, building
+governed avenues for a public to shape that evidence---and testing that they do not erode
+rights in the process---is the open problem this work points to.
+
 \paragraph{Limitations.}
 Local results are single-seed on 4-bit quantized models; tracking CIs reflect sampling
 error only (not prompt/order/house effects); the hostile-evidence distributions are
@@ -575,12 +593,15 @@ only to stress rights floors and are labeled as such in every artifact.
 \section{Conclusion}
 % =====================================================================
 
-Democracy Bench asks whether a deployed model can be \emph{governed} as a public policy
-delegate, and answers with a ladder of negatives around one fragile positive: only
-evidence-in-context lets a model track a real public shift, and that same channel cracks
-rights floors under adversarial ``public'' evidence, robustly across scale and family.
-The remedy is architectural---route evidence by item class---and the harness that
-establishes this is released for others to extend to new polities, waves, and models.
+Democracy Bench asks whether a language model can be steered toward a public without
+eroding the rights that must hold against a majority, and answers with a ladder of
+negatives around one fragile positive: only evidence-in-context lets a model track a real
+public shift, and that same channel cracks rights floors under adversarial ``public''
+evidence, robustly across scale and family. The remedy is architectural---route evidence
+by item class---but it moves the problem to \emph{who} controls that channel. Making the
+channel legible, and putting it under legitimate public input without eroding rights, is
+the governance question the harness is built to support; we release it for others to
+extend to new polities, waves, and models.
 
 % =====================================================================
 \section*{Ethical Statement}

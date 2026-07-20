@@ -99,7 +99,7 @@ democracy-bench/
     logit_bias_calibration.py    Phase 1: shared-bias held-out calibration
     activation_steering_run.py   Phase 2: layers × alphas dose-response sweep
     evidcond_run.py              Phases 3–5: evidence tracking, floor crack, guards, LoRA
-    public_opinion.py            BSA/SSA microdata → weighted targets (+ dashboard)
+    public_opinion.py            BSA microdata → weighted targets (+ dashboard)
   data/
     public_opinion_bsa_regions.json   50-item BSA-only regional config (ENG/SCO/WLS × 2022–24)
     policy_items.jsonl                policy items incl. reviewed rights-floor probes
@@ -147,7 +147,7 @@ python scripts/extract_public_opinion.py
 ## Data & licensing
 
 We ship code, derived **aggregate** distributions, and citations, never the survey microdata
-itself. BSA/SSA microdata comes from the UK Data Service (registration required); the
+itself. BSA microdata comes from the UK Data Service (registration required); the
 extraction config records study ids, file paths, weight variables, and filters, so anyone
 with UKDS access reproduces the targets exactly. Base-size rules: n ≥ 300 headline, 100–299
 directional, < 100 excluded from claims.
