@@ -1,10 +1,9 @@
 % ============================================================================
 % references.bib -- Democracy Bench (AAAI-27 AISI)
 %
-% Verified against primary sources (arXiv/Scholar). Two entries -- politicsbench
-% and deliberationbench -- are very recent (March 2026) preprints; their IDs
-% resolve, but confirm author affiliations and final venue on the arXiv pages
-% before camera-ready. See `note` fields.
+% All entries verified against primary sources (arXiv / UK Data Service, 2026).
+% Survey data citations carry the exact UKDS study numbers, editions, and DOIs
+% for the waves actually used (BSA 9283/9363/9478; SSA 9296/9364/9557).
 % ============================================================================
 
 @inproceedings{opinionqa,
@@ -29,27 +28,29 @@
   year    = {2023}
 }
 
-@article{politicsbench,
-  author  = {Khetan, Rohan and Khetan, Ashna},
-  title   = {{PoliticsBench}: Benchmarking Political Values in Large Language Models with Multi-Turn Roleplay},
-  journal = {arXiv preprint arXiv:2603.23841},
-  year    = {2026},
-  note    = {Recent preprint; confirm affiliations/venue before camera-ready}
+@inproceedings{politicsbench,
+  author    = {Khetan, Rohan and Khetan, Ashna},
+  title     = {{PoliticsBench}: Benchmarking Political Values in Large Language Models with Multi-Turn Roleplay},
+  booktitle = {ICML 2026 Workshop on Trustworthy AI for Good},
+  year      = {2026},
+  note      = {arXiv:2603.23841}
 }
 
 @article{deliberationbench,
   author  = {Hewitt, Luke and Kroner Dale, Maximilian and de Font-Reaulx, Paul},
   title   = {{DeliberationBench}: A Normative Benchmark for the Influence of Large Language Models on Users' Views},
   journal = {arXiv preprint arXiv:2603.10018},
-  year    = {2026},
-  note    = {Recent preprint; confirm affiliations/venue before camera-ready}
+  year    = {2026}
 }
 
-@article{parliabench,
-  author  = {Koniaris, Marios and Tsipi, Argyro and Tsanakas, Panayiotis},
-  title   = {{ParliaBench}: An Evaluation and Benchmarking Framework for {LLM}-Generated Parliamentary Speech},
-  journal = {arXiv preprint arXiv:2511.08247},
-  year    = {2025}
+@inproceedings{parliabench,
+  author    = {Koniaris, Marios and Tsipi, Argyro and Tsanakas, Panayiotis},
+  title     = {{ParliaBench}: An Evaluation and Benchmarking Framework for {LLM}-Generated Parliamentary Speech},
+  booktitle = {Proceedings of the Fifteenth Language Resources and Evaluation Conference (LREC 2026)},
+  pages     = {4797--4818},
+  publisher = {European Language Resources Association (ELRA)},
+  year      = {2026},
+  note      = {arXiv:2511.08247}
 }
 
 @misc{wvs7,
@@ -57,7 +58,7 @@
   title        = {World Values Survey: Round Seven -- Country-Pooled Datafile Version 5.0},
   year         = {2022},
   howpublished = {Madrid and Vienna: JD Systems Institute and WVSA Secretariat},
-  note         = {DOI: 10.14281/18241.20 (use the version matching the data actually used)}
+  note         = {DOI: 10.14281/18241.20}
 }
 
 @book{inglehartwelzel,
@@ -67,12 +68,56 @@
   year      = {2005}
 }
 
+@book{pitkin,
+  author    = {Pitkin, Hanna Fenichel},
+  title     = {The Concept of Representation},
+  publisher = {University of California Press},
+  address   = {Berkeley, CA},
+  year      = {1967}
+}
+
+@book{dahl,
+  author    = {Dahl, Robert A.},
+  title     = {Democracy and Its Critics},
+  publisher = {Yale University Press},
+  address   = {New Haven, CT},
+  year      = {1989}
+}
+
+@article{pageshapiro,
+  author  = {Page, Benjamin I. and Shapiro, Robert Y.},
+  title   = {Effects of Public Opinion on Policy},
+  journal = {American Political Science Review},
+  volume  = {77},
+  number  = {1},
+  pages   = {175--190},
+  year    = {1983}
+}
+
+@inproceedings{binns,
+  author    = {Binns, Reuben},
+  title     = {Fairness in Machine Learning: Lessons from Political Philosophy},
+  booktitle = {Proceedings of the 1st Conference on Fairness, Accountability and Transparency (FAT)},
+  series    = {Proceedings of Machine Learning Research (PMLR)},
+  volume    = {81},
+  pages     = {149--159},
+  year      = {2018}
+}
+
 @misc{bsa,
   author       = {{National Centre for Social Research}},
-  title        = {British Social Attitudes Survey},
-  year         = {2024},
-  howpublished = {UK Data Service},
-  note         = {Confirm series/edition numbers for the 2022--2024 waves used}
+  title        = {British Social Attitudes Survey, 2022, 2023 and 2024},
+  year         = {2026},
+  howpublished = {UK Data Service. SN 9283 (2022), 9363 (2023), 9478 (2024); 2nd editions},
+  note         = {DOIs: 10.5255/UKDA-SN-9283-2, 10.5255/UKDA-SN-9363-2, 10.5255/UKDA-SN-9478-2}
+}
+
+@misc{ssa,
+  author       = {{ScotCen Social Research}},
+  title        = {Scottish Social Attitudes Survey, 2021--2022, 2023 and 2024},
+  year         = {2026},
+  howpublished = {UK Data Service. SN 9296 (2021--22), 9364 (2023), 9557 (2024)},
+  note         = {DOIs: 10.5255/UKDA-SN-9296-2, 10.5255/UKDA-SN-9364-2, 10.5255/UKDA-SN-9557-1}
 }
 
 @article{repeng,

@@ -50,16 +50,6 @@
 \hrule
 \vspace{1em}
 
-\textbf{Instructions for Authors:}
-
-This document outlines key aspects for assessing reproducibility. Please provide your input by editing this \texttt{.tex} file directly.
-
-For each question (that applies), replace the ``Type your response here'' text with your answer.
-
-\vspace{1em}
-\hrule
-\vspace{1em}
-
 % The questions start here
 
 \checksubsection{General Paper Structure}
@@ -121,7 +111,7 @@ yes
 	yes
 
 	\question{All novel datasets introduced in this paper are included in a data appendix}{(yes/partial/no/NA)}
-	partial
+	partial. The novel derived artifacts (weighted target vectors, item banks, the versioned public-service constitution, and the coded rationale codesheet) are released. The underlying raw microdata are login-gated third-party survey data (see below) and cannot be redistributed, so only derived aggregates appear in the appendix.
 
 	\question{All novel datasets introduced in this paper will be made publicly available upon publication of the paper with a license that allows free usage for research purposes}{(yes/partial/no/NA)}
 	yes
@@ -130,7 +120,7 @@ yes
 	yes
 
 	\question{All datasets drawn from the existing literature (potentially including authors' own previously published work) are publicly available}{(yes/partial/no/NA)}
-	partial
+	partial. The survey collections are publicly catalogued and citable (UK Data Service SN 9283/9363/9478 for British Social Attitudes; SN 9296/9364/9557 for Scottish Social Attitudes; WVS Round 7), but access is registration-gated and the microdata are not redistributable under the providers' terms. We release the derived weighted marginals and the exact extraction provenance so the targets can be regenerated from an authorised copy.
 
 	\question{All datasets that are not publicly available are described in detail, with explanation why publicly available alternatives are not scientifically satisficing}{(yes/partial/no/NA)}
 	yes
@@ -148,7 +138,7 @@ yes
 \begin{itemize}
 
 	\question{This paper states the number and range of values tried per (hyper-) parameter during development of the paper, along with the criterion used for selecting the final parameter setting}{(yes/partial/no/NA)}
-	partial
+	partial. The swept ranges are stated for the interventions that have them (activation steering: layers 7--21, dose $\alpha \in [0,8]$; LoRA: rank 8, 500 iterations, learning rate 1e-4), with held-out generalisation as the selection criterion. Most measurements use the deterministic temperature-0 option-logprob path, so there is no decoding hyperparameter to tune; where sampling is used the sample count is fixed in advance ($\geq 100$).
 
 	\question{Any code required for pre-processing data is included in the appendix}{(yes/partial/no)}
 	yes
@@ -160,13 +150,13 @@ yes
 	yes
 
 	\question{All source code implementing new methods have comments detailing the implementation, with references to the paper where each step comes from}{(yes/partial/no)}
-	partial
+	partial. The instrument, scorers, and each driver carry module- and function-level documentation, and every artifact records the code commit that produced it; not every individual line carries a back-reference to a specific paper step.
 
 	\question{If an algorithm depends on randomness, then the method used for setting seeds is described in a way sufficient to allow replication of results}{(yes/partial/no/NA)}
 	yes
 
 	\question{This paper specifies the computing infrastructure used for running experiments (hardware and software), including GPU/CPU models; amount of memory; operating system; names and versions of relevant software libraries and frameworks}{(yes/partial/no)}
-	yes
+	yes. Local models run on Apple Silicon via \texttt{mlx-lm} on 4-bit MLX community checkpoints; the cloud panel is served through OpenRouter and requires provider credentials. Core dependencies are \texttt{numpy} and \texttt{inspect-ai}; figures use matplotlib. A small number of reproduction commands are ``asserted-by-doc'' (an artifact predates the standardised run block, or is a provider elicitation); these are itemised in \texttt{docs/REPRODUCTION.md}, and known non-bit-reproducibilities (4-bit quantisation across hardware, provider drift) are documented there.
 
 	\question{This paper formally describes evaluation metrics used and explains the motivation for choosing these metrics}{(yes/partial/no)}
 	yes
@@ -181,7 +171,7 @@ yes
 	yes
 
 	\question{This paper lists all final (hyper-)parameters used for each model/algorithm in the paper’s experiments}{(yes/partial/no/NA)}
-	partial
+	partial. The final settings for the steering, LoRA, and elicitation runs are recorded in each artifact's run block (git SHA, model id, sample count, temperature, seed, schema version) and are regenerable from it; a few provider-side decoding defaults for the hosted cloud panel are not exposed by the API and so cannot be listed.
 
 
 \end{itemize}

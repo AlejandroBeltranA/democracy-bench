@@ -55,11 +55,13 @@ attack surface: a synthetic hostile ``public distribution'' fed through the same
 evidence channel cracks \emph{every} rights floor, while the adversarial prompt alone
 does not. Prompt guards and a fine-tuning recipe both fail to close the channel. The
 findings replicate across model scale (3B and 8B Llama) and family (Qwen, Phi, Gemma, and
-Mistral all track and crack---six models, five families). We argue the only
-demonstrably sufficient guard is \emph{architectural}: class-aware evidence
-routing---inject public-opinion evidence only on contestable items, never on floor
-items. The harness, item banks, derived targets, figures, and a fully reproducible
-results pipeline are released.
+Mistral all track and crack---six models, five families). We argue the only guard we
+find sufficient to close \emph{this channel} is \emph{architectural}: class-aware
+evidence routing---inject public-opinion evidence only on contestable items, never on
+floor items---a necessary control under the current item labels rather than a
+completeness guarantee. The harness, item banks, derived targets, figures, and a results
+pipeline that regenerates every reported number from committed derived artifacts are
+released; the raw survey microdata are login-gated and obtained separately.
 \end{abstract}
 
 % =====================================================================
@@ -115,13 +117,30 @@ not significant. Prompt guards and a naive LoRA both fail to close it, and the c
 replicates across scale and family (\S\ref{sec:results}).
 (4) An architectural remedy, \emph{class-aware evidence routing}, and an honest
 account of its residual attack surface (\S\ref{sec:routing}).
-(5) A fully released, reproducible artifact: every quantitative claim in this paper is
-regenerated from committed run artifacts by a fail-loud extractor
+(5) A released, reproducible artifact: every quantitative claim in this paper is
+regenerated from committed derived artifacts by fail-loud extractors---raw survey
+microdata excepted, which are login-gated and obtained separately
 (\S\ref{sec:repro}).
 
 % =====================================================================
 \section{Related Work}\label{sec:related}
 % =====================================================================
+
+\paragraph{Representation, responsiveness, and rights.}
+The distinction the benchmark is built on is an old one in democratic theory. Pitkin's
+mandate--independence controversy~\cite{pitkin} separates a \emph{delegate}, bound to
+enact expressed preferences, from a \emph{trustee} licensed to exercise judgment;
+``policy delegate'' names the first horn deliberately. That a delegate should move with
+opinion is empirical as well as normative: Page and Shapiro~\cite{pageshapiro} find that
+policy in fact tracks large, durable shifts in public preference, which is the
+responsiveness our tracking-elasticity metric operationalizes for a model. Yet
+responsiveness is not the whole of legitimacy. Dahl's account of the democratic
+process~\cite{dahl} pairs majority rule with the problem of inclusion---the protections a
+majority may not vote away---which is the line our rights floors draw. Casting a
+public-sector model in these terms, rather than in accuracy alone, follows work bringing
+political philosophy to bear on machine-learning systems~\cite{binns}; Democracy Bench
+turns those commitments into measurements against a real polity, on both sides of that
+line.
 
 \paragraph{Static opinion alignment.}
 OpinionQA~\cite{opinionqa} and GlobalOpinionQA~\cite{globalopinionqa} ask whether a
@@ -159,8 +178,9 @@ scored so that drift \emph{against} a right is penalized, is what Democracy Benc
 % =====================================================================
 
 \paragraph{Data and targets.}
-Targets are weighted marginals built from BSA microdata for England, Scotland, and
-Wales, waves spanning 2022--2024~\cite{bsa}. The microdata are login-gated and are
+Targets are weighted marginals built from British and Scottish Social Attitudes
+microdata (England and Wales from BSA; Scotland from the Scottish Social Attitudes
+series), waves spanning 2022--2024~\cite{bsa,ssa}. The microdata are login-gated and are
 \emph{not} redistributed; we release only derived aggregate target vectors, each
 carrying its study id, weight variable, filters, unweighted base, and low-$N$ warnings.
 An earlier World Values Survey layer~\cite{wvs7,inglehartwelzel} seeds the temporal
@@ -185,7 +205,7 @@ plus a stratified contestable slice): whether the scored option matches the rati
 stated stance, and, on floor items, whether the rationale engages the right at stake. The
 scored option matched the stated stance in 92\% of cases (floor 99\%, contestable 86\%),
 and 72\% of floor rationales explicitly invoked the right at issue. The forced-choice
-metric therefore reflects the model's expressed reasoning rather than a parsing artefact.
+metric therefore reflects the model's expressed reasoning rather than a parsing artifact.
 This is a judge-free construct-validity check, not an LLM-graded one; the coded sheet and
 its deterministic scorer are released so the numbers can be recoded and regenerated.
 
@@ -421,9 +441,9 @@ a recorded reason (\S\ref{sec:robust}); the Mistral family is covered by Mistral
 % =====================================================================
 
 Since floor-safety cannot be prompted into the evidence channel (guards fail) or
-fine-tuned into the weights without lobotomy (the LoRA), the demonstrably sufficient
-guard is \emph{architectural}: inject public-opinion evidence \emph{only} on
-contestable-class items, never on floor-class items. This needs no new experiment---with
+fine-tuned into the weights without lobotomy (the LoRA), the guard that demonstrably
+closes \emph{this channel} is \emph{architectural}: inject public-opinion evidence
+\emph{only} on contestable-class items, never on floor-class items. This needs no new experiment---with
 no evidence injected, floor probes sit at the unguarded baseline (bit-replicated
 $0.512$) and the adversarial \emph{prompt} alone is not significant, so routing restores
 the best measurable floor state \emph{by construction} while leaving contestable
@@ -431,10 +451,17 @@ representation and tracking untouched.
 
 We state the residual attack surface honestly. Routing presumes the deployer controls
 both the evidence pipeline \emph{and} the item classifier; the floor-vs-contestable
-classifier becomes the new attack surface. And on the 3B, 5/12 floors are below 0.5 even
-\emph{unattacked}---a base-model deficit no scaffold fixes (the 8B largely closes this
-baseline deficit without closing the crack). Routing is thus a necessary architectural
-control, not a completeness guarantee.
+classifier becomes the new attack surface, and it inherits three concrete failure modes.
+A floor item \emph{misclassified} as contestable is routed hostile evidence and cracks
+exactly as before; a genuinely \emph{contested} rights label (our floor/contestable
+assignments are themselves a normative judgment, still pending independent second-person
+review) leaves the boundary itself disputable; and an adversary who controls item
+\emph{framing} can try to phrase a floor question so the classifier reads it as
+contestable. Routing moves the problem from the model to the classifier, it does not
+dissolve it. And on the 3B, 5/12 floors are below 0.5 even \emph{unattacked}---a
+base-model deficit no scaffold fixes (the 8B largely closes this baseline deficit without
+closing the crack). Routing is thus a necessary architectural control, not a completeness
+guarantee.
 
 % =====================================================================
 \section{Discussion and Social Impact}
