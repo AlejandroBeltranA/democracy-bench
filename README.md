@@ -1,4 +1,4 @@
-# Democracy Bench: can a deployed model be governed as a public policy delegate?
+# Democracy Bench: can a language model be steered toward the public without eroding democratic rights?
 
 Democracy Bench asks whether an LLM deployed in public-sector settings can be governed as
 a public's policy delegate. It measures four things and keeps them apart: whether the model
