@@ -109,11 +109,18 @@ def test_expected_table_shape_and_verified_count():
     assert len(labels) == len(set(labels)), "duplicate labels in EXPECTED"
     verified = np.array([row[1] is not None for row in vrr.EXPECTED])
     asserted = ~verified
-    # 15 run-block-verified, 7 asserted-by-doc (3 phase1 + superseded + train +
-    # extractor + figures)
-    assert int(verified.sum()) == 15
+    # 19 run-block-verified (15 arc + 4 Phase-5 8B replication), 7 asserted-by-doc
+    # (3 phase1 + superseded + train + extractor + figures).
+    assert int(verified.sum()) == 19
     assert int(asserted.sum()) == 7
     assert verified.sum() + asserted.sum() == len(vrr.EXPECTED)
+
+
+def test_expected_table_covers_the_four_8b_replication_artifacts():
+    arts = {row[1] for row in vrr.EXPECTED}
+    for a in ("evidcond_baseline_8b.json", "evidcond_tracking_8b.json",
+              "evidcond_floors_8b.json", "floorguard_grid_8b.json"):
+        assert a in arts, f"8B artifact {a} not covered by the verifier"
 
 
 def test_expected_commands_are_command_shaped():
