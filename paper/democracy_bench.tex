@@ -31,33 +31,31 @@
 \maketitle
 
 \begin{abstract}
-Language models are being placed in public-sector decision loops, where a natural
-hope is that they can act as \emph{policy delegates}: reflect a real public's
-preferences, be steered toward them at runtime, and follow those preferences as they
-change---while never trading away rights protections for popularity. We introduce
-\textbf{Democracy Bench}, an evaluation harness that operationalizes these four
-requirements against \emph{human survey distributions} (British Social Attitudes
-microdata, 2022--2024) rather than an LLM judge or an abstract left--right axis. Its
-central design decision is a \emph{legitimacy boundary} between \emph{contestable}
-items (tax/spend, welfare, the NHS---where a delegate \emph{should} track the public)
-and \emph{rights-floor} probes (due process, appeal, equality, speech---where it must
-\emph{hold} even against a majority). Using the harness we evaluate a five-rung
-``steering ladder''---context, output logit-bias, activation steering, weight
-fine-tuning, and prompt scaffolds---asking of each rung whether it can carry per-item
-public preference while holding rights floors. The answer is negative for every rung
-\emph{except evidence-in-context}, which does let a model track a real 2022$\to$2024
-public shift (direction-match 8/10; positive tracking elasticity)---but is itself the
-attack surface: a synthetic hostile ``public distribution'' fed through the same
-evidence channel cracks \emph{every} rights floor, while the adversarial prompt alone
-does not. Prompt guards and a fine-tuning recipe both fail to close the channel. The
-findings replicate across model scale (3B and 8B Llama) and family (Qwen, Phi, Gemma, and
-Mistral all track and crack---six models, five families). We argue the only guard we
-find sufficient to close \emph{this channel} is \emph{architectural}: class-aware
-evidence routing---inject public-opinion evidence only on contestable items, never on
-floor items---a necessary control under the current item labels rather than a
-completeness guarantee. The harness, item banks, derived targets, figures, and a results
-pipeline that regenerates every reported number from committed derived artifacts are
-released; the raw survey microdata are login-gated and obtained separately.
+As large language models are drawn into public-sector decision loops, it is unclear who
+governs the values instilled into a model that makes decisions about real people. Debates
+on alignment tend to fix on abstract statements of what we want these systems to be; less
+examined is how a society can guide a model's choices when its own citizens are affected.
+In democratic settings such preferences are set through elections, consultations, and
+opinion polls that inform policy, but who instills those values into a model's parameters,
+and how? We introduce \textbf{Democracy Bench}, an evaluation harness that measures whether
+a language model tracks public attitudes, across waves of the British and Scottish Social
+Attitudes surveys, and whether those attitudes can then be instilled in it. Its central
+design is a boundary between \emph{contestable} policy preferences (tax, public spending,
+healthcare) and a \emph{rights floor} that must hold across probes (due process, the right
+to appeal, free expression). We evaluate a five-rung ``steering ladder'' of methods for
+instilling democratic preference while holding those rights. Most rungs fail. The exception
+is evidence-in-context, which lets a model track the real 2022$\to$2024 shift in public
+attitudes but is itself the attack surface: a synthetic hostile ``public distribution''
+erodes \emph{every} rights floor, and neither prompt guards nor a fine-tuning recipe closes
+the channel. The result replicates across scale (3B and 8B Llama) and family (Qwen, Phi,
+Gemma, and Mistral all track and crack). The only sufficient guard we find is
+\emph{architectural}: class-aware evidence routing, injecting public-opinion evidence on
+contestable items but never on floor items, a necessary control under the current item
+labels rather than a complete fix. Built on the Inspect framework and reproducible given
+access to the raw survey microdata, Democracy Bench reframes the question from whether a
+model can be steered to who controls the channel that steers it. As human agency in these
+systems narrows, giving the public legitimate ways to inject their attitudes is necessary
+for societal assurance without eroding democratic rights.
 \end{abstract}
 
 % =====================================================================
