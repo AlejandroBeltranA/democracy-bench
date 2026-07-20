@@ -1,0 +1,20 @@
+{
+  "n_rows": 150,
+  "n_stance_uncoded": 0,
+  "stance_consistent": {
+    "rate": 0.92,
+    "n": 150
+  },
+  "stance_consistent_floor": {
+    "rate": 0.9861111111111112,
+    "n": 72
+  },
+  "stance_consistent_contestable": {
+    "rate": 0.8589743589743589,
+    "n": 78
+  },
+  "invokes_right_floor": {
+    "rate": 0.7222222222222222,
+    "n": 72
+  }
+}

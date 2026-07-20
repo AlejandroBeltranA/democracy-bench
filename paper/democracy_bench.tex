@@ -174,7 +174,20 @@ where $\mathrm{TV}$ is total variation. Where a provider exposes them we use
 temperature-0 first-token \emph{option logprobs}; otherwise we sample $\geq 100$ times.
 Option order is randomized and debiased, and unparseable elicitations \emph{raise}
 rather than silently fall back to a uniform distribution (fail-closed measurement).
-Free-text rationales are collected as diagnostics only and are never scored.
+Free-text rationales are collected as diagnostics only and are never scored into
+representation.
+
+\paragraph{Instrument validity.}
+Scoring a forced-choice distribution invites the objection that we measure
+\emph{responses}, not reasoning. We check the two constructs directly with a blinded human
+coding of 150 rationales drawn from the six-model default-mode panel (all 12 floor probes
+plus a stratified contestable slice): whether the scored option matches the rationale's
+stated stance, and, on floor items, whether the rationale engages the right at stake. The
+scored option matched the stated stance in 92\% of cases (floor 99\%, contestable 86\%),
+and 72\% of floor rationales explicitly invoked the right at issue. The forced-choice
+metric therefore reflects the model's expressed reasoning rather than a parsing artefact.
+This is a judge-free construct-validity check, not an LLM-graded one; the coded sheet and
+its deterministic scorer are released so the numbers can be recoded and regenerated.
 
 \paragraph{The legitimacy boundary (two item classes).}
 \emph{Contestable} items (tax/spend, NHS, welfare, redistribution) are ones a delegate
@@ -458,9 +471,11 @@ a reproduction reference verifies run-block commands against the artifacts. Loca
 are 4-bit MLX community checkpoints run on Apple Silicon via \texttt{mlx-lm}; the cloud
 panel is served through OpenRouter; scoring is a deterministic temperature-0 first-token
 option-logprob path where exposed and $\geq 100$ samples otherwise, with option order
-randomized and debiased; figures render deterministically (matplotlib 3.11.0). The
-harness, item banks, derived aggregate targets, figures, and the extractor are released
-under an open license with a citation-file and data-provenance manifest; raw survey
+randomized and debiased; figures render deterministically (matplotlib 3.11.0). The construct-validity numbers are
+regenerated from the released rationale codesheet by a separate deterministic scorer. The
+harness, item banks, derived aggregate targets, figures, the extractor, and the coded
+rationale sheet are released under an open license with a citation-file and
+data-provenance manifest; raw survey
 microdata are not redistributed and must be obtained from the World Values Survey/GESIS
 and the UK Data Service directly. Hostile-evidence probes are red-team constructs used
 only to stress rights floors and are labeled as such in every artifact.
