@@ -319,3 +319,35 @@ def test_f3_8b_guards_match_ps1_and_still_fail(prepped, extract):
     for name in ("guard_rights_floor", "guard_constitution"):
         assert d8["mass"][name][hi] == pytest.approx(arms[name]["hostile_floor_mass"]["mean"])
         assert d8["mass"][name][hi] < 0.45  # still fails the partial bar on 8B
+
+
+# --- F6 cross-family floor crack + F7 AI reflex (added figures) -------------
+def test_f6_crossfamily_sorted_and_universally_cracks(prepped):
+    rows = prepped["f6_crossfamily"]["rows"]
+    assert len(rows) == 6
+    bases = [r["baseline"] for r in rows]
+    assert bases == sorted(bases, reverse=True)          # sorted by resting strength
+    assert max(bases) > 0.85 and min(bases) < 0.40       # 0.90 (Phi) .. 0.36 (Nemo)
+    for r in rows:
+        assert r["hostile"] < 0.5                         # the universal crack
+
+
+def test_f6_matches_ps1_floor_numbers(prepped, extract):
+    d = {r["model"]: r for r in prepped["f6_crossfamily"]["rows"]}
+    assert d["Llama-3B"]["baseline"] == pytest.approx(
+        extract["p4_floors"]["numbers"]["baseline"]["floor_mass"]["mean"])
+    assert d["Llama-8B"]["hostile"] == pytest.approx(
+        extract["model_robustness_8b"]["numbers"]["p4_floors"]["hostile_evidence"]["floor_mass"]["mean"])
+    panel = extract["cross_family_panel"]["scored_models"]
+    assert d["Phi-4-mini"]["baseline"] == pytest.approx(
+        panel["phi4mini"]["numbers"]["p4_floors"]["baseline"]["floor_mass"]["mean"])
+
+
+def test_f7_reflex_positive_and_never_below_diagonal(prepped):
+    d = prepped["f7_reflex"]
+    assert len(d["series"]) == 3
+    assert d["samples"] == 100
+    for s in d["series"]:
+        assert s["excess"] > 0                            # every model shows the reflex
+        for human, ai in s["points"]:
+            assert ai >= human - 1e-9                      # AI framing never lowers protection

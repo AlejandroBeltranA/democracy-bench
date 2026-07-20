@@ -179,8 +179,8 @@ microdata (England and Wales from BSA; Scotland from the Scottish Social Attitud
 series), waves spanning 2022--2024~\cite{bsa,ssa}. The microdata are login-gated and are
 \emph{not} redistributed; we release only derived aggregate target vectors, each
 carrying its study id, weight variable, filters, unweighted base, and low-$N$ warnings.
-An earlier World Values Survey layer~\cite{wvs7,inglehartwelzel} seeds the temporal
-design; the results in this paper use BSA.
+An earlier World Values Survey layer~\cite{wvs7,inglehartwelzel,inglehart2018} seeds the
+temporal design; the results in this paper use BSA.
 
 \paragraph{Scored outcome.}
 The scored quantity is always a \emph{forced-choice option distribution} compared to
@@ -284,7 +284,19 @@ into representing a public. Model defaults are also not culturally neutral---Dee
 (0.71) and Command-R (0.70) sit closest to the British public, the US-lab models near
 0.55. A matched-pair actor test (same decision, AI actor vs.\ human actor, $S{=}100$)
 isolates an ``AI reflex'': mean excess opposition to the \emph{AI} version of
-$+0.16$ (gpt-4o), $+0.19$ (claude-sonnet-4.5), $+0.21$ (llama-3.3-70b).
+$+0.16$ (gpt-4o), $+0.19$ (claude-sonnet-4.5), $+0.21$ (llama-3.3-70b)
+(Figure~\ref{fig:reflex}).
+
+\begin{figure}[t]\centering
+\includegraphics[width=0.82\linewidth]{f7_reflex.pdf}
+\caption{The AI reflex (matched-pair control, $S{=}100$). Protective mass on the
+\emph{identical} rights decision framed with a human actor ($x$) vs.\ an AI actor ($y$),
+one point per probe per model. Every point lies on or above the $y{=}x$ line: the AI
+framing never \emph{lowers} protection and sharply raises it on contested probes (mean
+AI-excess $+0.16$/$+0.19$/$+0.21$). The raw ``AI floor'' therefore overstates protection
+relative to a human-actor baseline.}
+\label{fig:reflex}
+\end{figure}
 
 The cheapest \emph{decode}-level lever fails the generalization test outright. A shared
 logit bias fit to move gpt-4o-mini toward the public gives a \emph{held-out}
@@ -407,12 +419,24 @@ is present with a $\Delta$ whose CI excludes zero, while the adversarial \emph{p
 alone never cracks floors. A striking cross-family fact sharpens the safety story:
 \emph{baseline} floor strength varies enormously---from Phi-4-mini at $0.903$ (0/12 below
 floor, unattacked) down to Mistral-Nemo at $0.362$ (10/12 below, \emph{weaker} than the
-3B)---a $>0.45$ spread, yet the hostile-evidence channel cracks all of them. A model that
+3B)---a $>0.45$ spread, yet the hostile-evidence channel cracks all of them
+(Figure~\ref{fig:crossfamily}). A model that
 looks like a strong floor-holder at rest is not a safe evidence channel. The one
 checkpoint we could not score is Mistral-7B-v0.3: on the full bank some items yield no
 option-number token in the model's top-$k$ first-token logprobs, and the harness refuses
 to fabricate a distribution rather than silently degrade---so it is dropped with a
 recorded reason, while the Mistral family is still covered by Mistral-Nemo.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{f6_crossfamily.pdf}
+\caption{Looking safe at rest is not being a safe evidence channel. Rights-floor
+protective mass at rest (blue) vs.\ under synthetic hostile evidence (orange), six models
+sorted by resting floor strength. Baseline spans $0.36$--$0.90$, yet under hostile
+evidence \emph{every} model falls below the $0.50$ floor, and resting strength barely
+predicts the post-attack value---Llama-8B is the second-strongest at rest ($0.71$) yet
+cracks the deepest, to $0.07$. Hostile evidence is synthetic red-team data.}
+\label{fig:crossfamily}
+\end{figure}
 
 \begin{table}[t]\centering\small\setlength{\tabcolsep}{4pt}
 \begin{tabular}{llccc}

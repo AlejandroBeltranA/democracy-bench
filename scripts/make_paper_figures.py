@@ -529,7 +529,104 @@ def plot_f5(plt, data):
 # ===========================================================================
 # Driver
 # ===========================================================================
-FIGURES = ["f1_ladder", "f2_tracking", "f3_floors", "f4_geometry", "f5_fidelity"]
+def prep_f6_crossfamily(floor_arts):
+    """Cross-family floor crack: baseline vs hostile-evidence protective mass per model,
+    sorted by baseline (descending). floor_arts: list of (display_name, floors_artifact)."""
+    rows = []
+    for disp, art in floor_arts:
+        rows.append({
+            "model": disp,
+            "baseline": dig(art, ["headline", "baseline", "floor_mass", "mean"], disp),
+            "hostile": dig(art, ["headline", "hostile_evidence", "floor_mass", "mean"], disp),
+        })
+    rows.sort(key=lambda r: r["baseline"], reverse=True)
+    return {"rows": rows, "floor": 0.5}
+
+
+def plot_f6(plt, data):
+    from matplotlib.lines import Line2D
+
+    rows = data["rows"]
+    fig, ax = _new_fig(plt, 8.4, 4.4)
+    n = len(rows)
+    for i, r in enumerate(rows):
+        yy = n - 1 - i  # highest baseline at top
+        ax.plot([r["hostile"], r["baseline"]], [yy, yy], color=CB["grey"], lw=1.3, zorder=1)
+        ax.scatter(r["baseline"], yy, s=72, color=CB["blue"], zorder=3)
+        ax.scatter(r["hostile"], yy, s=72, color=CB["vermillion"], zorder=3)
+        ax.text(r["baseline"] + 0.015, yy, f"{r['baseline']:.2f}", va="center", ha="left",
+                fontsize=8.5, color=CB["blue"])
+        if r["hostile"] < 0.05:  # too close to the axis for a left-side label
+            ax.text(r["hostile"] + 0.02, yy + 0.18, f"{r['hostile']:.2f}", va="bottom",
+                    ha="left", fontsize=8.5, color=CB["vermillion"])
+        else:
+            ax.text(r["hostile"] - 0.015, yy, f"{r['hostile']:.2f}", va="center", ha="right",
+                    fontsize=8.5, color=CB["vermillion"])
+    ax.axvline(data["floor"], color=CB["vermillion"], lw=1.4, ls="--", zorder=0)
+    ax.text(data["floor"] + 0.008, n - 0.5, "0.5 floor", ha="left", va="top",
+            fontsize=8.5, color=CB["vermillion"])
+    ax.set_yticks([n - 1 - i for i in range(n)])
+    ax.set_yticklabels([r["model"] for r in rows], fontsize=9.5)
+    ax.set_ylim(-0.6, n - 0.4)
+    ax.set_xlim(0.0, 1.0)
+    ax.set_xlabel("rights-floor protective mass", fontsize=10)
+    ax.set_axisbelow(True)
+    ax.yaxis.grid(False)
+    handles = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=CB["blue"], markersize=9,
+               label="at rest (unattacked)"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=CB["vermillion"], markersize=9,
+               label="under hostile evidence"),
+    ]
+    ax.legend(handles=handles, loc="lower right", fontsize=8.5, framealpha=0.9)
+    fig.tight_layout()
+    return fig
+
+
+def prep_f7_reflex(reflex):
+    """AI reflex: per-(model, probe) human-actor vs AI-actor protective mass, plus each
+    model's mean matched AI-excess. Reads out/reflex_test.json (matched-pair control, S=100)."""
+    models = dig(reflex, ["models"])
+    series = []
+    for mid, mm in models.items():
+        pts = [(pv["human_protective"], pv["ai_protective"])
+               for pv in dig(mm, ["pairs"]).values()
+               if isinstance(pv, dict) and "human_protective" in pv and "ai_protective" in pv]
+        series.append({
+            "model": mid.split("/")[-1],
+            "points": pts,
+            "excess": dig(mm, ["mean_matched_ai_excess"], mid),
+        })
+    return {"series": series, "samples": dig(reflex, ["run", "samples"])}
+
+
+def plot_f7(plt, data):
+    fig, ax = _new_fig(plt, 6.2, 5.8)
+    colours = [CB["blue"], CB["vermillion"], CB["green"]]
+    markers = ["o", "s", "D"]
+    ax.plot([0, 1], [0, 1], color="#000000", lw=0.8, ls="--", zorder=0)
+    ax.text(0.04, 0.07, "no actor effect (y = x)", fontsize=8, color="#555555",
+            rotation=45, rotation_mode="anchor", va="bottom", ha="left")
+    for si, s in enumerate(data["series"]):
+        xs = [p[0] for p in s["points"]]
+        ys = [p[1] for p in s["points"]]
+        ax.scatter(xs, ys, s=58, color=colours[si % 3], marker=markers[si % 3],
+                   alpha=0.85, edgecolors="white", linewidths=0.6, zorder=3,
+                   label=f"{s['model']}  ({s['excess']:+.2f})")
+    ax.set_xlim(-0.03, 1.05)
+    ax.set_ylim(-0.03, 1.05)
+    ax.set_xlabel("protective mass — human actor", fontsize=10)
+    ax.set_ylabel("protective mass — AI actor", fontsize=10)
+    ax.text(0.5, 1.02, f"points above the line: more protection against the AI actor (S={data['samples']})",
+            transform=ax.transAxes, ha="center", va="bottom", fontsize=8.5, color="#222222")
+    ax.legend(loc="lower right", fontsize=8.5, framealpha=0.9, title="mean AI-excess")
+    ax.set_aspect("equal", adjustable="box")
+    fig.tight_layout()
+    return fig
+
+
+FIGURES = ["f1_ladder", "f2_tracking", "f3_floors", "f4_geometry", "f5_fidelity",
+           "f6_crossfamily", "f7_reflex"]
 
 
 def build_all(render=True):
@@ -547,6 +644,12 @@ def build_all(render=True):
     tracking_8b, _ = load("evidcond_tracking_8b.json")
     floors_8b, _ = load("evidcond_floors_8b.json")
     guards_8b, _ = load("floorguard_grid_8b.json")
+    # Cross-family floor artifacts (F6) + matched-pair reflex control (F7).
+    floors_qwen, _ = load("evidcond_floors_qwen7b.json")
+    floors_phi, _ = load("evidcond_floors_phi4mini.json")
+    floors_gemma, _ = load("evidcond_floors_gemma9b.json")
+    floors_nemo, _ = load("evidcond_floors_mistralnemo.json")
+    reflex, _ = load("reflex_test.json")
 
     prepped = {
         "f1_ladder": prep_f1_ladder(),
@@ -555,6 +658,11 @@ def build_all(render=True):
         "f3_floors_8b": prep_f3_floors_8b(floors_8b, guards_8b),
         "f4_geometry": prep_f4_geometry(geometry, personactrl),
         "f5_fidelity": prep_f5_fidelity(baseline),
+        "f6_crossfamily": prep_f6_crossfamily([
+            ("Llama-3B", floors), ("Llama-8B", floors_8b),
+            ("Qwen-7B", floors_qwen), ("Phi-4-mini", floors_phi),
+            ("Gemma-2-9B", floors_gemma), ("Mistral-Nemo", floors_nemo)]),
+        "f7_reflex": prep_f7_reflex(reflex),
     }
     if not render:
         return prepped
@@ -578,6 +686,8 @@ def build_all(render=True):
         "f3_floors": plot_f3,
         "f4_geometry": plot_f4,
         "f5_fidelity": plot_f5,
+        "f6_crossfamily": plot_f6,
+        "f7_reflex": plot_f7,
     }
     written = []
     for name in FIGURES:
