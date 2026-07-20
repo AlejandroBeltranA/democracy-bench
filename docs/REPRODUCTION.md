@@ -36,8 +36,8 @@ source .venv/bin/activate      # numpy + inspect-ai + mlx / mlx-lm (Apple Silico
   logprobs from `gpt-4o-mini`; the sampled sweep reads a pre-existing panel artifact and runs
   on CPU. Requires provider credentials, **not** Apple Silicon.
 - **Figures** (`scripts/make_paper_figures.py`) need **matplotlib** (rendered with matplotlib
-  **3.5.1**), which is **NOT** in `.venv` (see PS2 log). Render figures with a separate
-  matplotlib-equipped interpreter, or run `--check` (prep only, numpy-only, no render) inside
+  **3.11.0**, now installed in `.venv`, matching the version stated in the paper). Byte-identical
+  figures are version-bound to 3.11.0; `--check` runs the numpy-only prep with no render inside
   `.venv`. The extractor and the verifier are numpy-only and run in `.venv`.
 - Launch **one MLX run at a time** (the GPU saturates; concurrent runs contend).
 
@@ -303,8 +303,9 @@ python scripts/extract_paper_results.py --out out/paper_results_extract.json
 ```
 
 **Figures** → `out/figures/*.{pdf,png}` (added-in `aa672ff`). No run block; needs matplotlib
-(3.5.1, out-of-venv). Reuses the extractor's loaders; deterministic (byte-identical on
-re-render). `--check` runs the numpy-only prep with no render. Command asserted by this doc.
+(3.11.0, in `.venv`). Reuses the extractor's loaders; deterministic (byte-identical on
+re-render at the same matplotlib version). `--check` runs the numpy-only prep with no render.
+Command asserted by this doc.
 
 ```
 python scripts/make_paper_figures.py
