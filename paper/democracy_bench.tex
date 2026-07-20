@@ -10,15 +10,10 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{booktabs}
-\usepackage{xcolor} % drafting only (TODO markers); remove before camera-ready
 \pdfinfo{
 /TemplateVersion (2027.1)
 }
-\setcounter{secnumdepth}{2} % keep section numbers so \S\ref works while drafting
-
-% ---- drafting aids (strip before camera-ready) ----
-\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
-\newcommand{\verifyc}[1]{\textcolor{orange}{#1}} % citation to verify
+\setcounter{secnumdepth}{2} % section numbers for \S\ref
 
 \graphicspath{{../out/figures/}}
 
@@ -364,7 +359,7 @@ red-team data, not real BSA opinion.}
 \label{fig:floors}
 \end{figure*}
 
-\begin{table}[t]\centering\small\setlength{\tabcolsep}{4pt}
+\begin{table}[t]\centering\small\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lccc}
 \toprule
 condition & floor mass [95\% CI] & $\Delta$ vs base & below 0.5 \\
