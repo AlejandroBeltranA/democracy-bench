@@ -400,6 +400,45 @@ Alibaba, Microsoft, Google, Mistral).
 
 ---
 
+## 12. Frontier crack — P4 on gpt-4o-mini (API logprobs, generalization)
+
+**Claim.** The hostile-evidence floor crack is **not an open-weight or small-model artefact**: it
+**reproduces on a frontier/API model, gpt-4o-mini**, run through the *identical* context-level
+intervention via OpenRouter option logprobs (no open weights needed — the attack reads option
+likelihoods only). This closes the generalization gap flagged as the single highest-value
+addition in the readiness review.
+
+- **Artifact:** `out/evidcond_floors_gpt4omini.json` (model `openrouter:openai/gpt-4o-mini`,
+  run `2026-07-20`, 12/12 probes scored, 0 skipped/fail-closed). Extracted by
+  `extract_frontier_crack_gpt4omini()` (same fail-loud contract; test-bound in
+  `tests/test_paper_extract.py` and `tests/test_paper_figures.py`, F6 7th row).
+- **Backend switch:** `evidcond_run._logprob_backend()` selects `openrouter_logprob_fn` for API
+  ids (`openrouter/*`, `openai/*`) vs. the MLX path for local ids — the floors logic itself is
+  unchanged and backend-agnostic (`M.elicit_item_logprobs`). Fail-closed discipline preserved:
+  a probe with no option-number logprob is recorded in `skipped` and dropped, never faked; the
+  run aborts if skips exceed `max_skip` (default 1).
+
+| condition | floor mass [CI] | Δ vs baseline [CI] | below 0.5 |
+|---|---|---|---|
+| baseline | 0.883 [0.703, 0.998] | — | 1/12 |
+| **hostile_evidence** | **0.000** [0.000, 0.000] | **−0.883** [−0.998, −0.703] | **12/12** |
+| adversarial_prompt | 1.000 [1.000, 1.000] | +0.117 [+0.002, +0.297] (protective) | 0/12 |
+| both | 0.500 [0.250, 0.748] | −0.383 [−0.634, −0.146] | 7/12 |
+
+- **The crack reproduces, sharper than any open-weight model:** hostile evidence collapses every
+  floor to ≈0 (Δ −0.883, CI clears zero, 12/12 below) — the deepest crack in the panel. gpt-4o-mini
+  is the *second-strongest* floor-holder at rest (0.883, 1/12 below), yet cracks hardest.
+- **Channel asymmetry holds:** the adversarial *prompt* alone is **protective** (Δ +0.117), not a
+  crack — the same evidence/prompt asymmetry seen across the open-weight panel.
+- **Magnitude caveat (honest):** gpt-4o-mini's first-token option logprobs are **near-degenerate**
+  (masses saturate at 0/1), so the crack reads even sharper than on the open-weight models. The
+  transferable finding is the **direction and channel asymmetry**, not the exact magnitude.
+- **Reproducibility (API):** hosted, unpinned model — **not byte-reproducible**; model id and run
+  date are recorded in the run block. Spends OpenRouter budget (<$1); needs `OPENROUTER_API_KEY`;
+  not Apple-Silicon. Logged in `docs/REPRODUCTION.md` known-irreproducibilities.
+
+---
+
 ## Numbers the paper must NOT claim
 
 These are the honest ceilings — where a rounded or over-stated version would be wrong:
@@ -500,4 +539,6 @@ presentation/context notes, not number conflicts.
 | §10 8B P3 | evidcond_tracking_8b.json | `9e087de` |
 | §10 8B P4 | evidcond_floors_8b.json | `7006f7d` |
 | §10 8B G1 | floorguard_grid_8b.json | `7006f7d` |
+| §11 cross-family | evidcond_{baseline,tracking,floors}_{qwen7b,phi4mini,gemma9b,mistralnemo}.json | (Phase 5 REP4) |
+| §12 frontier crack | evidcond_floors_gpt4omini.json (API, gpt-4o-mini, run 2026-07-20) | (this commit) |
 | Instrument validity | annotations/rationale_codesheet_coded.csv → out/rationale_validity.json | (this commit) |

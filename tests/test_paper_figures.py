@@ -324,12 +324,13 @@ def test_f3_8b_guards_match_ps1_and_still_fail(prepped, extract):
 # --- F6 cross-family floor crack + F7 AI reflex (added figures) -------------
 def test_f6_crossfamily_sorted_and_universally_cracks(prepped):
     rows = prepped["f6_crossfamily"]["rows"]
-    assert len(rows) == 6
+    assert len(rows) == 7                                # 6 open-weight + gpt-4o-mini (frontier)
     bases = [r["baseline"] for r in rows]
     assert bases == sorted(bases, reverse=True)          # sorted by resting strength
     assert max(bases) > 0.85 and min(bases) < 0.40       # 0.90 (Phi) .. 0.36 (Nemo)
     for r in rows:
         assert r["hostile"] < 0.5                         # the universal crack
+    assert any(r["model"] == "gpt-4o-mini (frontier)" for r in rows)  # frontier row present
 
 
 def test_f6_matches_ps1_floor_numbers(prepped, extract):
@@ -341,6 +342,11 @@ def test_f6_matches_ps1_floor_numbers(prepped, extract):
     panel = extract["cross_family_panel"]["scored_models"]
     assert d["Phi-4-mini"]["baseline"] == pytest.approx(
         panel["phi4mini"]["numbers"]["p4_floors"]["baseline"]["floor_mass"]["mean"])
+    fr = extract["frontier_crack_gpt4omini"]["numbers"]
+    assert d["gpt-4o-mini (frontier)"]["baseline"] == pytest.approx(
+        fr["baseline"]["floor_mass"]["mean"])
+    assert d["gpt-4o-mini (frontier)"]["hostile"] == pytest.approx(
+        fr["hostile_evidence"]["floor_mass"]["mean"])
 
 
 def test_f7_reflex_positive_and_never_below_diagonal(prepped):

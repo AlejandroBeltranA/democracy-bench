@@ -366,6 +366,34 @@ python -m alignment.evidcond_run --guard-grid
 
 ---
 
+## Frontier crack — P4 floors on gpt-4o-mini (API elicitation, generalization)
+
+`out/evidcond_floors_gpt4omini.json` (code_ref `452168c`; run `2026-07-20`) reproduces the P4
+hostile-evidence floor crack on a **frontier/API model**, `gpt-4o-mini`, via OpenRouter option
+logprobs (numbers in
+[`docs/PAPER_RESULTS.md` §12](PAPER_RESULTS.md#12-frontier-crack--p4-on-gpt-4o-mini-api-logprobs-generalization)).
+The floors logic is unchanged; a backend switch
+(`evidcond_run._logprob_backend`) selects `M.openrouter_logprob_fn` for API model ids
+(`openrouter/*`, `openai/*`) instead of the MLX path. Run with
+`--model openrouter/openai/gpt-4o-mini --out out/evidcond_floors_gpt4omini.json`; as with the 8B,
+the run-block `command` is the canonical string below (the `--model`/`--out` overrides are
+prose-documented, not echoed).
+
+- **NOT MLX / NOT Apple-Silicon.** This spends OpenRouter budget (<$1 for 12 probes × 4
+  conditions × `n_orders=2`) and needs `OPENROUTER_API_KEY` in `.env`. gpt-4o-mini is the only
+  cloud model that exposes option logprobs; the other cloud providers do not.
+- **NOT byte-reproducible.** Hosted, unpinned model — the numbers can drift under the same name;
+  see Known irreproducibilities #7. The run-block records the model id and run date.
+- **Fail-closed preserved.** A probe with no option-number logprob is recorded in `skipped` and
+  dropped (never faked); the run aborts if skips exceed `max_skip` (default 1). This run scored
+  12/12 with 0 skips.
+
+```
+python -m alignment.evidcond_run --floors
+```
+
+---
+
 ## Known irreproducibilities
 
 Byte-identical reproduction is **not** guaranteed for the following; the headline verdicts are
@@ -393,6 +421,11 @@ robust to all of them, but exact floats / bytes may differ:
 6. **Phase-1 provider elicitation.** `--elicit` calls a hosted `gpt-4o-mini`; provider-side
    model updates or logprob availability changes can shift the held-out gains. There is no
    pinned provider snapshot.
+7. **Frontier crack provider elicitation.** `out/evidcond_floors_gpt4omini.json` (§ Frontier
+   crack) elicits option logprobs from a hosted, unpinned `gpt-4o-mini` over OpenRouter — same
+   provider-drift caveat as #6: not byte-reproducible, no snapshot pin, spends budget, needs
+   credentials, not Apple-Silicon. The model id and run date are recorded in the run block; the
+   direction and channel asymmetry are the transferable finding, not the exact (saturated) masses.
 
 ---
 
@@ -408,7 +441,10 @@ nothing in a JSON to check against):
   floors, P5a `lora-build` (design), P5b `lora-eval`, G1 `guard-grid`, and the **four Phase-5
   8B replication** artifacts (`evidcond_{baseline,tracking,floors}_8b`, `floorguard_grid_8b` —
   the run-block `command` is the runner's canonical string, byte-identical to its 3B twin; the
-  `--model` override is prose-documented, not in the command). 19 verified total.
+  `--model` override is prose-documented, not in the command), and the **frontier crack**
+  (`evidcond_floors_gpt4omini.json` — same canonical `--floors` command; the `--model`/`--out`
+  overrides are prose-documented; the COMMAND is verified even though the API numbers are not
+  byte-reproducible, #7). 20 verified total.
 - **asserted-by-doc (no run-block `command`):** the 3 Phase-1 logit-bias artifacts, the
   superseded `activation_steering_3b_4opt.json`, the `mlx_lm lora` training call (checked against
   `adapter_config.json` params), the extractor, and the figures.

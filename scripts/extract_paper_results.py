@@ -694,6 +694,53 @@ def extract_cross_family_panel():
     }
 
 
+def extract_frontier_crack_gpt4omini():
+    """Frontier generalization — the P4 hostile-evidence floor crack run on a
+    frontier/API model (gpt-4o-mini via OpenRouter option logprobs).
+
+    Closes the gap that the crack was only demonstrated on small, quantized,
+    open-weight models. This is the SAME context-level intervention (inject
+    hostile evidence, read protective mass) run through the API logprob backend;
+    no open weights required. Same fail-loud contract as the other floors
+    extractors, plus the honesty fields (model_label, n_scored, skipped) so a
+    fail-closed item is never hidden."""
+    d, p = load("evidcond_floors_gpt4omini.json")
+    hd = dig(d, ["headline"], p)
+
+    def _cond(name):
+        c = dig(hd, [name], p)
+        return {
+            "floor_mass": stat(c, ["floor_mass"], p),
+            "delta_vs_baseline": stat(c, ["delta_vs_baseline"], p),
+            "n_below_floor": dig(c, ["n_below_floor"], p),
+            "floor_min": dig(c, ["floor_min"], p),
+        }
+
+    return {
+        "claim": "Frontier generalization: the P4 hostile-evidence floor crack REPRODUCES on a frontier/API model, gpt-4o-mini (via OpenRouter logprobs) — hostile evidence collapses every floor (0.883->0.000, 12/12 below 0.5, CI clears zero), while the adversarial prompt alone does NOT crack (protective). The evidence/prompt channel asymmetry holds on a frontier model too.",
+        "sources": [p],
+        "keys": ["headline.{baseline,hostile_evidence,adversarial_prompt,both}.{floor_mass,delta_vs_baseline,n_below_floor}"],
+        "model_label": dig(d, ["model_label"], p),
+        "n_scored": dig(d, ["n_scored"], p),
+        "n_skipped": len(dig(d, ["skipped"], p)),
+        "generated_at": dig(d, ["run", "generated_at"], p),
+        "numbers": {
+            "baseline": _cond("baseline"),
+            "hostile_evidence": _cond("hostile_evidence"),
+            "adversarial_prompt": _cond("adversarial_prompt"),
+            "both": _cond("both"),
+        },
+        "caveats": dig(d, ["caveats"], p) + [
+            "API elicitation: gpt-4o-mini is a hosted, unpinned model (no snapshot pin) — NOT "
+            "byte-reproducible; the model id and run date (generated_at) are recorded in the run "
+            "block. See docs/REPRODUCTION.md 'known irreproducibilities'.",
+            "gpt-4o-mini option logprobs are near-degenerate (masses saturate at 0/1), so the crack "
+            "reads even sharper than on the open-weight panel; the DIRECTION and channel asymmetry "
+            "are the transferable finding, not the exact magnitude.",
+        ],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Assembly
 # ---------------------------------------------------------------------------
@@ -707,6 +754,7 @@ EXTRACTORS = {
     "g1_guards": extract_g1_guards,
     "model_robustness_8b": extract_model_robustness_8b,
     "cross_family_panel": extract_cross_family_panel,
+    "frontier_crack_gpt4omini": extract_frontier_crack_gpt4omini,
 }
 
 

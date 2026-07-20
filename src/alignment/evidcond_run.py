@@ -1093,10 +1093,35 @@ def hostile_evidence_conditioning(si, hostile_mass: float = 0.75) -> str:
     return T2.preference("the United Kingdom", 2024, item, dist)
 
 
+def _logprob_backend(model_name: str):
+    """Return `(logprob_fn, model_label, cleanup)` for a model string, switching backend by id.
+
+    The P4/P2 elicitation logic (`M.elicit_item_logprobs`) is backend-agnostic, so this is the ONE
+    place the backend is chosen:
+
+    - API ids (`openrouter/*` or a bare OpenRouter id like `openai/gpt-4o-mini`): use
+      `M.openrouter_logprob_fn` over the bare OpenRouter id (the `openrouter/` prefix, if present,
+      is stripped). No MLX load, no cleanup. Fails closed per item if the provider returns no
+      option-number logprobs.
+    - anything else (local MLX id, e.g. `mlx-community/*`): `A.load_model` + `A.mlx_logprob_fn`;
+      cleanup frees the model/tokenizer.
+    """
+    if model_name.startswith("openrouter/") or model_name.startswith("openai/"):
+        name = model_name[len("openrouter/"):] if model_name.startswith("openrouter/") else model_name
+        return M.openrouter_logprob_fn(name), f"openrouter:{name}", (lambda: None)
+    from alignment.steer import activation_steer as A  # MLX-touching; imported lazily
+    model, tok = A.load_model(model_name)
+
+    def _cleanup():
+        del model, tok
+
+    return A.mlx_logprob_fn(model, tok), model_name, _cleanup
+
+
 def run_floors(model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit",
                n_orders: int = 2, seed: int = 0, primary: str = "ENG",
                floors: list | None = None, hostile_mass: float = 0.75,
-               boot: int = 2000) -> dict:
+               boot: int = 2000, max_skip: int = 1) -> dict:
     """P4: floors under majoritarian evidence. On each floor probe, elicit the option distribution
     under a 2x2 plus baseline of {hostile synthetic evidence?} x {adversarial-majority prompt?}:
 
@@ -1110,8 +1135,6 @@ def run_floors(model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit",
     below FLOOR_MIN, and a per-item crack table. The hostile evidence is a red-team stress test, NOT
     a claim about real UK public opinion.
     """
-    from alignment.steer import activation_steer as A  # MLX-touching; imported lazily
-
     bank = load_phase3(primary)
     floor_items = bank["floors"] if floors is None else floors
 
@@ -1121,15 +1144,16 @@ def run_floors(model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit",
                                        primary_label="the United Kingdom", year=2024,
                                        constitution=constitution)
 
-    model, tok = A.load_model(model_name)
-    logprob_fn = A.mlx_logprob_fn(model, tok)
+    logprob_fn, model_label, cleanup = _logprob_backend(model_name)
 
     def elicit(item, conditioning):
         return M.elicit_item_logprobs(logprob_fn, item, conditioning=conditioning,
                                       n_orders=n_orders, seed=seed)
 
     floor_rows = []
-    for si in floor_items:
+    skipped: list = []
+    try:
+      for si in floor_items:
         item = si.item
         fdir = int(item["floor_dir"])
         hostile = hostile_evidence_conditioning(si, hostile_mass=hostile_mass)
@@ -1143,7 +1167,14 @@ def run_floors(model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit",
             "adversarial_prompt": pressure_prompt,
             "both": both,
         }
-        dists = {c: np.asarray(elicit(item, cond), dtype=float) for c, cond in conds.items()}
+        # Fail-closed: if the backend returns no option-number logprobs for ANY condition of this
+        # probe (API models can), drop the WHOLE probe (the conditions must be paired for the
+        # bootstrap/delta) and record it — never fabricate a distribution to complete the run.
+        try:
+            dists = {c: np.asarray(elicit(item, cond), dtype=float) for c, cond in conds.items()}
+        except M.ElicitationError as e:
+            skipped.append({"id": item["id"], "reason": str(e)})
+            continue
         row = {
             "id": item["id"],
             "domain": item.get("domain"),
@@ -1157,10 +1188,23 @@ def run_floors(model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit",
             row[f"dist_{c}"] = [round(float(x), 4) for x in d]
             row[f"protective_mass_{c}"] = drift.protective_mass(d, fdir)
         floor_rows.append(row)
+    finally:
+        cleanup()
+
+    # Fail-closed discipline: refuse to score the P4 headline on partial data. A few skipped probes
+    # are recorded (not faked); too many and we stop rather than publish a biased subset.
+    if len(skipped) > max_skip:
+        raise RuntimeError(
+            f"P4 floors [{model_label}]: {len(skipped)}/{len(floor_items)} probes fail-closed "
+            f"(no option logprobs) — exceeds max_skip={max_skip}; refusing to score on partial "
+            f"data. Skipped: {[s['id'] for s in skipped]}")
 
     report = {
         "run": _floors_run_block(model_name, primary, n_orders, seed, boot,
                                  len(floor_items), hostile_mass),
+        "model_label": model_label,
+        "n_scored": len(floor_rows),
+        "skipped": skipped,
         "headline": floor_condition_summary(floor_rows, seed=seed),
         "crack_table": crack_table(floor_rows),
         "floor_items": floor_rows,

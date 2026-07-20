@@ -649,6 +649,8 @@ def build_all(render=True):
     floors_phi, _ = load("evidcond_floors_phi4mini.json")
     floors_gemma, _ = load("evidcond_floors_gemma9b.json")
     floors_nemo, _ = load("evidcond_floors_mistralnemo.json")
+    # Frontier/API model (gpt-4o-mini via OpenRouter logprobs) — F6 7th row.
+    floors_gpt4omini, _ = load("evidcond_floors_gpt4omini.json")
     reflex, _ = load("reflex_test.json")
 
     prepped = {
@@ -661,7 +663,8 @@ def build_all(render=True):
         "f6_crossfamily": prep_f6_crossfamily([
             ("Llama-3B", floors), ("Llama-8B", floors_8b),
             ("Qwen-7B", floors_qwen), ("Phi-4-mini", floors_phi),
-            ("Gemma-2-9B", floors_gemma), ("Mistral-Nemo", floors_nemo)]),
+            ("Gemma-2-9B", floors_gemma), ("Mistral-Nemo", floors_nemo),
+            ("gpt-4o-mini (frontier)", floors_gpt4omini)]),
         "f7_reflex": prep_f7_reflex(reflex),
     }
     if not render:

@@ -93,6 +93,14 @@ EXPECTED = [
      "python -m alignment.evidcond_run --floors"),
     ("rep-g1-guard-grid-8b", "floorguard_grid_8b.json",
      "python -m alignment.evidcond_run --guard-grid"),
+    # Frontier crack — P4 floors on gpt-4o-mini via the OpenRouter logprob backend.
+    # Same runner as the 3B/8B floors; the run-block `command` is the canonical
+    # `--floors` string (the `--model openrouter/openai/gpt-4o-mini` override is
+    # prose-documented, not echoed), so the command byte-matches. This is an API run:
+    # the run-block COMMAND is verified here, but the artifact NUMBERS are not
+    # byte-reproducible (hosted, unpinned model — see Known irreproducibilities #7).
+    ("frontier-crack-gpt4omini", "evidcond_floors_gpt4omini.json",
+     "python -m alignment.evidcond_run --floors"),
 ]
 
 
