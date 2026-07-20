@@ -1,34 +1,46 @@
 #!/usr/bin/env bash
-# One entrypoint: validate data, run tests, run the drivers (+ optional real model via the
-# Inspect harness), and rebuild the demo page. Falls back to the labelled SIMULATION when no
-# model is given. Usage:  ./scripts/run_all.sh            (simulation)
-#                          MODEL=ollama/llama3 ./scripts/run_all.sh   (real model)
+# One entrypoint: run tests, run the Policy Delegate Stress Test (simulated by default,
+# real via MODEL=...), and point at the deployed demo. The legacy WVS layer runs only
+# with LEGACY_WVS=1.
+#
+# Usage:
+#   ./scripts/run_all.sh                                        # simulation, no keys needed
+#   MODEL=openrouter/openai/gpt-4o-mini ./scripts/run_all.sh    # real model (needs .env key)
+#   MODEL=ollama/llama3 ./scripts/run_all.sh                    # real local model
+#   LEGACY_WVS=1 ./scripts/run_all.sh                           # also run the WVS layer
 set -euo pipefail
 cd "$(dirname "$0")/.."
 [ -f .venv/bin/activate ] && source .venv/bin/activate
 MODEL="${MODEL:-}"
-ARGS=""; [ -n "$MODEL" ] && ARGS="--model $MODEL"
-
-echo "== Gate 1 validation (read-only) =="
-python scripts/apply_gate1.py
 
 echo "== tests =="
 python -m pytest -q
 
-echo "== drivers ${MODEL:+(model: $MODEL)}${MODEL:-(SIMULATED — set MODEL=ollama/llama3 for a real model)} =="
-python src/alignment/loop.py --country USA $ARGS
-python src/alignment/loop.py --country GBR $ARGS
-python src/alignment/scenario.py $ARGS
-python src/alignment/compare_tiers.py $ARGS
+echo "== Policy Delegate Stress Test ${MODEL:+(model: $MODEL)}${MODEL:-(SIMULATED — set MODEL=... for a real model)} =="
+if [ -n "$MODEL" ]; then
+  python -m alignment.policy_delegate_stress --models "$MODEL" --out out/_stress_run.json
+else
+  python -m alignment.policy_delegate_stress --out out/_stress_sim.json
+fi
 
-echo "== canonical harness (Inspect — policy-delegate axis) =="
+echo "== canonical harness (Inspect) =="
 case "$MODEL" in
   ollama/*|openrouter/*) inspect eval src/alignment/policy_inspect.py@policy_delegate --model "$MODEL" -T mode=default ;;
   "")       echo "  (skipped — set MODEL=openrouter/... or ollama/... to run a real model)" ;;
-  *)        echo "  (skipped — Inspect has no MLX provider; the drivers above measured $MODEL via mlx-lm)" ;;
+  *)        echo "  (skipped — Inspect has no MLX provider; the stress driver above measured $MODEL via mlx-lm)" ;;
 esac
 
-echo "== build demo =="
-python src/alignment/build_demo.py
+if [ -n "${LEGACY_WVS:-}" ]; then
+  echo "== LEGACY WVS layer =="
+  python scripts/apply_gate1.py
+  ARGS=""; [ -n "$MODEL" ] && ARGS="--model $MODEL"
+  python src/alignment/loop.py --country USA $ARGS
+  python src/alignment/loop.py --country GBR $ARGS
+  python src/alignment/scenario.py $ARGS
+  python src/alignment/compare_tiers.py $ARGS
+  python src/alignment/build_demo.py
+  echo "Legacy WVS demo rebuilt: demo/app.html"
+fi
+
 echo ""
-echo "Done. Open demo/app.html in a browser."
+echo "Done. Deployed demo: demo/whose_values_live.html"
