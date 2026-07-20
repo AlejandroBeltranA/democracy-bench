@@ -1,292 +1,372 @@
-# AAAI Submission Readiness Review
+# AAAI AISI Submission Readiness
 
 Date: 2026-07-20  
-Reviewed draft: `paper/democracy_bench.pdf` / `paper/democracy_bench.tex`  
-Likely target checked: AAAI-27, especially AISI and AI Alignment fit
+Current draft: `paper/democracy_bench.pdf` / `paper/democracy_bench.tex`  
+Target: AAAI-27 Special Track on AI for Social Impact (AISI)
 
-## Verdict
+## Current Verdict
 
-Not ready for full AAAI submission yet.
+The paper is now close to submission-ready for AISI. The major conceptual issues from the first review have been addressed: the paper is framed as a public-sector assurance/evaluation contribution, the bibliography placeholders were fixed, the checklist was cleaned up, the release language was qualified, and the routing remedy was narrowed from a cure to a design principle.
 
-The draft is probably ready for an AAAI-27 abstract submission by the July 21, 2026 abstract deadline if the title and abstract are stable. I would not upload the full paper as-is for the July 28, 2026 full-paper deadline.
+What remains is final submission hygiene: clean source/logs, package the anonymous supplement, rerun verification, and keep the claims disciplined.
 
-## What Is Working
+## Contribution Assessment
 
-- The compiled PDF is 6 pages, US Letter, anonymous in the rendered author block, and uses embedded Type 1 / TrueType fonts.
-- The PDF metadata does not expose an author identity.
-- The paper-specific validation tests passed: `88 passed`.
-- The full local test suite passed: `401 passed, 1 skipped`.
-- The reproduction verifier completed successfully: 19 run-block-verified commands plus 7 asserted-by-doc entries.
-- The rendered figures are legible enough for review, though Figure 2 is dense.
+This is a real AISI contribution, but its contribution type is specific:
 
-## Objective AISI Contribution Critique
+- It is a problem-modeling and evaluation paper.
+- It is not a new algorithm paper.
+- It is not a deployment paper.
+- It is not evidence that LLMs should serve as democratic policy delegates.
 
-This is a real contribution, but it should be framed as an AISI problem-modeling and evaluation paper, not as a new algorithm paper or a deployment paper.
+The strongest contribution is the policy-delegate evaluation formulation. Existing opinion-alignment benchmarks mostly ask whether a model resembles a population snapshot. Democracy Bench asks whether a model can represent a public, be steered, track public preference change over time, and hold rights floors when majority pressure points the other way.
 
-The strongest contribution is the policy-delegate evaluation formulation: a deployed public-sector model should not be evaluated only by whether it resembles a population snapshot. It should be evaluated on whether it can represent a public, be steered, track public preference change over time, and hold rights floors when majority pressure points the other way.
+The central scientific result is the evidence-channel asymmetry:
 
-The paper's central scientific result is the "tracks and cracks" asymmetry:
-
-- Evidence-in-context is the only rung that lets the model track a real 2022 to 2024 public-opinion shift.
+- Evidence-in-context is the only rung that enables limited tracking of a real 2022 to 2024 public-opinion shift.
 - The same evidence channel is also the attack surface: hostile synthetic "public opinion" evidence cracks rights floors.
-- Prompt guards and the tested lightweight fine-tuning recipe do not close that channel.
+- The adversarial prompt alone does not produce the same effect.
+- Prompt guards and the tested lightweight fine-tuning recipe do not close the channel.
 - The pattern replicates across model scale and family.
 
-That is the paper's most defensible and memorable contribution. It is policy-relevant because it turns a vague governance question - can a model follow the public without abandoning rights? - into a measurable failure mode.
+This should be framed as an assurance result: a plausible public-sector governance mechanism has a measurable failure mode that simple prompt- and weight-level fixes do not close.
 
-### AISI Scorecard
+## AISI Fit
 
-| AISI criterion | Current strength | Assessment |
-|---|---:|---|
-| Significance of the problem | Good / Excellent | Public-sector LLM delegation is significant and under-specified. The policy-delegate framing is timely. |
-| Engagement with literature | Fair | Strong on LLM alignment and benchmarks; thin on public administration, democratic theory, social choice, policy legitimacy, and survey methodology. This is the biggest AISI weakness. |
-| Significance to the AI community | Good | The tracking/floor split and evidence-channel failure are useful scientific insights for AI evaluation in societal settings. |
-| Soundness | Fair / Good | The empirical artifact is strong, but some claims are too broad given one polity, one time interval, synthetic hostile evidence, single-seed local runs, and pending item-class review. |
-| Facilitation of follow-up work | Good | Harness, artifacts, tests, and derived targets are a strong point, assuming the anonymous supplement is clean and complete. |
-| Scope and promise for social impact | Fair / Good | Clear path to assurance/evaluation practice, but no real deployment, stakeholder study, or field validation. |
+The current framing is much better for AISI than the first draft. The paper now has a clearer social-impact claim: it helps public-sector deployers test and block unsafe delegation before deployment.
 
-### What The Paper Is Not
+Reviewer-facing strengths:
 
-The draft needs to be disciplined about what it is not claiming:
+- Significant problem: public-sector LLM delegation is timely and under-specified.
+- Clear evaluation contribution: representation, steerability, tracking, and rights floors are separated instead of collapsed into one alignment score.
+- Judge-free measurement: human survey distributions are used rather than LLM judges.
+- Useful failure mode: the evidence channel that enables tracking can also erode rights floors.
+- Follow-up potential: harness, item banks, derived targets, figures, tests, and reproduction scripts support extension.
 
-- It is not proving that LLMs should serve as democratic policy delegates.
-- It is not validating a deployable governance system.
-- It is not showing social impact in practice.
-- It is not establishing a universal democratic-legitimacy benchmark across countries.
-- It is not proving that class-aware routing is complete or robust unless item classification is independently validated.
+Reviewer-facing risks:
 
-The paper is instead showing that a plausible governance mechanism has a measurable failure mode, and that simple prompt-level or lightweight weight-level fixes do not solve it.
+- The flagship positive is statistically fragile: elasticity `+0.395`, CI `[+0.020, +0.811]`, 10 items, one polity, one interval.
+- The bare hostile-evidence crack is partly definitional; the novelty is the asymmetry plus guard/fine-tune failures.
+- The floor/contestable boundary is a normative choice, not a settled fact.
+- There is no live deployment, stakeholder study, or field validation.
+- Single-seed 4-bit local model results and API/provider dependencies need to stay visible as limitations.
 
-### Best AISI Framing
+## Claim Discipline
 
-The contribution should be stated as:
+Keep these claims:
 
-1. A problem formulation for public-sector LLM assurance: representation, steerability, temporal tracking, and rights floors.
-2. A survey-grounded evaluation harness that uses human public-opinion distributions rather than LLM judges.
-3. An empirical safety finding: the evidence channel that enables public-preference tracking also creates a rights-floor attack surface.
-4. A deployment-relevant design principle: public-opinion evidence should be routed by item class, while treating the item classifier as a security and legitimacy boundary.
+- "Evidence-in-context enables limited temporal tracking."
+- "The same evidence channel creates a rights-floor attack surface."
+- "The asymmetry is deployment-relevant: evidence cracks floors while the adversarial prompt alone does not."
+- "Class-aware routing is a design principle / necessary control for this channel."
+- "The harness is an assurance instrument, not a deployed governance system."
 
-Suggested contribution paragraph:
+Avoid or soften these claims:
 
-> Democracy Bench contributes a problem formulation and evaluation harness for public-sector LLM assurance. Rather than asking whether a model matches a static public-opinion snapshot, it asks whether a model can track a changing public on contestable policy questions while holding rights floors that should not be overridden by majority pressure. The core empirical finding is an asymmetry: evidence-in-context enables limited temporal tracking, but the same channel can be exploited to erode rights floors, and prompt or lightweight fine-tuning guards do not close the channel. The result reframes "democratic alignment" as an assurance problem about evidence routing, item classification, and institutional control.
+- Do not imply that tracking is solved.
+- Do not headline the hostile-evidence crack alone as if it were surprising by itself.
+- Do not describe class-aware routing as a complete or independently validated governance cure.
+- Do not imply demonstrated social impact in practice.
+- Do not call the artifact "fully reproducible" without qualifying raw microdata, provider credentials, MLX/Apple Silicon, and asserted-by-doc entries.
 
-### Main Reviewer Risk
+## Already Resolved
 
-The biggest objective risk is that AISI reviewers see the draft as "an LLM benchmark using political survey data" rather than "AI for societal governance assurance." To avoid that, the paper needs stronger non-CS grounding and a clearer explanation of how the evaluation would change public-sector AI practice.
+- Bibliography draft notes were removed from reviewer-visible references.
+- BSA and SSA citations were replaced with exact UK Data Service study numbers and DOIs.
+- Recent arXiv/workshop/proceedings metadata were updated for PoliticsBench and ParliaBench.
+- AISI grounding was added through democratic theory and public-sector assurance framing.
+- The routing claim was scoped to closing the evidence channel under current item labels.
+- Concrete classifier failure modes were added.
+- The reproducibility checklist now explains partial answers and login-gated data.
+- Release language now distinguishes committed derived artifacts from raw survey microdata.
+- The discussion now includes an assurance workflow and a "What we do not claim" paragraph.
 
-Concrete revision goals:
+## Remaining Work
 
-- Add non-CS related work on public administration, administrative justice, democratic legitimacy, public opinion measurement, and social choice / majority constraints.
-- Explain why the rights-floor boundary is a social-impact problem-modeling choice, not just a benchmark design detail.
-- Make the public-sector assurance workflow explicit: what a deployer would test, what failure would block deployment, and what routing/classification controls would be required.
-- Treat item-class labeling as a legitimacy bottleneck and open governance problem, not as a solved internal benchmark choice.
-- Soften "demonstrably sufficient" language unless the independent class review is complete.
-- Make the social-impact claim about preventing unsafe delegation and improving assurance practice, not about deploying an autonomous policy delegate.
+### 1. Clean the final PDF and LaTeX logs
 
-## Submission Blockers
+Required:
 
-### 1. Visible Bibliography Draft Notes
+- Strip drafting aids from `paper/democracy_bench.tex`: `xcolor`, `\todo`, `\verifyc`, and associated drafting comments.
+- Fix the small overfull Table 1 warning.
+- Rebuild from scratch.
+- Confirm no undefined citations, no unresolved references, no reviewer-visible draft notes, and embedded fonts.
 
-The reference page still prints draft notes such as:
+Current known state:
 
-- `Recent preprint; confirm affiliations/venue before camera-ready`
-- `Confirm series/edition numbers for the 2022--2024 waves used`
-- `use the version matching the data actually used`
+- `paper/democracy_bench.pdf` is 7 pages.
+- Fonts are embedded.
+- Paper tests pass.
+- One small overfull table warning remains.
+- Drafting macros remain in source but do not appear in the rendered PDF.
 
-These originate in `paper/references.bib` and are visible in `paper/democracy_bench.pdf`. This is a submission blocker, not polish.
+### 2. Package the anonymous supplement
 
-Required fixes:
+Include:
 
-- Replace the BSA placeholder citation with exact UK Data Service citations for the 2022, 2023, and 2024 collections.
-- Update PoliticsBench and ParliaBench metadata from their current arXiv records.
-- Remove all reviewer-visible reminder notes from bibliography entries.
+- Code needed to regenerate reported derived results.
+- Derived aggregate targets.
+- Run artifacts under `out/` that support reported claims.
+- Figures and figure-generation scripts.
+- Reproduction instructions.
+- Citation and data-provenance manifests.
+- Reproducibility checklist PDF.
 
-Relevant verified sources:
+Exclude:
 
-- BSA 2022: UKDS SN 9283, DOI `10.5255/UKDA-SN-9283-2`
-- BSA 2023: UKDS SN 9363, DOI `10.5255/UKDA-SN-9363-2`
-- BSA 2024: UKDS SN 9478, DOI `10.5255/UKDA-SN-9478-2`
-- PoliticsBench arXiv page now notes acceptance to the ICML 2026 Trustworthy AI for Good Workshop.
-- ParliaBench arXiv page now lists an LREC 2026 proceedings reference.
+- Raw UKDS/GESIS microdata.
+- Provider credentials or `.env`.
+- Local user paths.
+- Author names, institution names, acknowledgements, or non-anonymous metadata.
+- Anything that violates data-provider terms.
 
-### 2. Track Fit Is Unresolved
+Check that the supplement wording matches the paper and checklist: derived artifacts are released; raw survey microdata must be obtained separately.
 
-The TeX source labels the submission as AISI, but the current related-work section is mostly LLM benchmark and steering work. AAAI-27 AISI review criteria explicitly include engagement with literature within and outside computer science, significance of the social-impact problem, facilitation of follow-up work, and likely impact on practice.
+### 3. Rerun verification after final rebuild
 
-Current risk: an AISI reviewer may see the paper as technically interesting but under-grounded in public administration, public opinion measurement, political theory, social choice, public-sector AI governance, or democratic legitimacy literature.
+Run:
 
-Action:
+```bash
+python -m pytest tests/test_paper_extract.py tests/test_repro_reference.py tests/test_paper_figures.py
+python scripts/verify_repro_reference.py
+python -m pytest -q
+```
 
-- Decide whether this is primarily an AISI paper or an AI Alignment paper.
-- If AISI: add non-CS context and make the public-sector deployment/social-impact contribution explicit.
-- If AI Alignment: frame it around governance frameworks, institutional accountability, pluralistic coordination, and evaluation tools. The current contribution may fit that track more naturally.
-
-### 3. The Architectural Remedy Is Overclaimed
-
-The manuscript says class-aware evidence routing is the "demonstrably sufficient" guard, but the same draft admits that the second-person item-class review is still pending. Since the item classifier is the new security boundary, the pending legitimacy review directly weakens the main remedy.
-
-Current risk: reviewers can fairly object that the paper's proposed fix depends on a classifier whose legitimacy and robustness are not yet independently validated.
-
-Action:
-
-- Either complete and document the independent item-class review before submission, or soften the claim.
-- Replace "demonstrably sufficient" with language such as "necessary architectural control under the current item labels" unless the review is completed.
-- Add a concrete failure-mode discussion for misclassification, contested rights labels, and adversarial item framing.
-
-### 4. Reproducibility Checklist Is Not Submission-Clean
-
-`paper/ReproducibilityChecklist.pdf` exists as a separate 2-page PDF, which matches AAAI-27's separate-upload requirement. It is not clean yet:
-
-- It still includes the template "Instructions for Authors" block.
-- Several answers are `partial` with no explanatory text.
-- It does not clearly explain non-redistributable raw survey data, provider credentials, Apple Silicon / MLX requirements, or asserted-by-doc entries.
-
-Action:
-
-- Remove template instructions from the rendered checklist if the official kit permits.
-- Add concise explanations for every `partial`.
-- Make the checklist consistent with the main paper's limitations and the actual reproduction path.
-
-### 5. Release / Reproducibility Language Is Too Strong
-
-The paper repeatedly says the harness, targets, figures, and results pipeline are released and fully reproducible. The local checks support a strong artifact story, but not an unconditional one:
-
-- Raw BSA/WVS microdata are not redistributable.
-- Some reproduction entries are `asserted-by-doc`, not run-block verified.
-- Provider credentials are required for cloud/API runs.
-- MLX / Apple Silicon and 4-bit quantized checkpoints are part of the local reproduction path.
-- Some known irreproducibilities are documented in `docs/REPRODUCTION.md`.
-
-Action:
-
-- Keep the artifact claim, but qualify it precisely.
-- Prefer "the released package regenerates the reported numbers from committed derived artifacts; raw survey microdata must be obtained separately" over "fully reproducible" unless all required supplements are packaged and upload-ready.
-- Ensure the anonymous code/data supplement actually includes the derived targets, run artifacts, scripts, and reproduction instructions at submission time.
-
-## Minor Issues
-
-- LaTeX reports one small overfull box in Table 1.
-- Figure 2 is dense and could be enlarged or simplified if space allows.
-- `paper/ReproducibilityChecklist.pdf` is older than the current manuscript PDF.
-- The first-page anonymous submission notice comes from the AAAI style file, so it is not a custom anonymity problem.
-
-## Evidence Checked
-
-Commands run during review:
+Also run PDF checks:
 
 ```bash
 pdfinfo paper/democracy_bench.pdf
 pdffonts paper/democracy_bench.pdf
 pdftotext -layout paper/democracy_bench.pdf -
-pdftoppm -r 160 -png paper/democracy_bench.pdf /private/tmp/democracy_bench_pdf_review/main
+```
+
+Render and inspect:
+
+- `paper/democracy_bench.pdf`
+- `paper/ReproducibilityChecklist.pdf`
+
+### 4. Final submission-form choices
+
+Deadlines checked:
+
+- Abstract deadline: July 21, 2026
+- Full paper deadline: July 28, 2026
+- Supplement/code deadline: July 31, 2026
+
+Recommended AISI keywords:
+
+- Policy and Social Development
+- Computational Social Science and Humanities
+- Philosophical and Ethical Issues
+
+## Repo Submission Preparation Plan
+
+Goal: produce two clean submission artifacts from the repo:
+
+1. `paper/democracy_bench.pdf` plus `paper/ReproducibilityChecklist.pdf`
+2. An anonymous supplement archive containing only code, derived data, run artifacts, figures, and reproduction instructions that can be shared under the stated license and data-provider constraints.
+
+### Step 0. Freeze the intended submission state
+
+Before packaging, decide exactly which working-tree changes belong in the submission state.
+
+Current caution:
+
+- `README.md`, `scripts/run_all.sh`, and `tests/test_repro_reference.py` are modified in the working tree.
+- Do not package from an ambiguous dirty tree unless those changes are intentionally part of the submission state.
+
+Recommended workflow:
+
+```bash
+git status --short --branch
+git diff --stat
+git diff -- README.md scripts/run_all.sh tests/test_repro_reference.py
+```
+
+Then either commit the intended changes or make a written note that the supplement was built from a dirty tree. The cleaner option is to commit a final "submission prep" commit after verification.
+
+### Step 1. Clean paper source and rebuild PDFs
+
+Source cleanup:
+
+- Remove drafting-only LaTeX aids from `paper/democracy_bench.tex`: `xcolor`, `\todo`, `\verifyc`, and associated comments.
+- Fix the remaining small overfull Table 1 warning.
+- Keep `\usepackage[submission]{aaai2027}` for double-blind review.
+- Do not edit `paper/aaai2027.sty` or `paper/aaai2027.bst`.
+
+Build:
+
+```bash
+cd paper
+latexmk -pdf democracy_bench.tex
+latexmk -pdf ReproducibilityChecklist.tex
+cd ..
+```
+
+Log checks:
+
+```bash
+rg -n "Undefined|undefined|Citation|Reference|Overfull|Error|Emergency|rerun|There were|Package natbib Warning" \
+  paper/democracy_bench.log paper/ReproducibilityChecklist.log
+```
+
+PDF checks:
+
+```bash
+pdfinfo paper/democracy_bench.pdf
+pdffonts paper/democracy_bench.pdf
+pdftotext -layout paper/democracy_bench.pdf - | rg -n "TODO|TBD|confirm|camera-ready|placeholder|author|affiliation|acknowledg"
+```
+
+Expected final state:
+
+- No undefined citations or references.
+- No reviewer-visible draft notes.
+- Fonts embedded.
+- Main PDF stays within AAAI page limits.
+- Checklist PDF is separate and clean.
+
+### Step 2. Create a supplement staging directory
+
+Build the supplement in a staging directory rather than zipping the repo root directly.
+
+Suggested layout:
+
+```text
+submission_supplement/
+  README.md
+  LICENSE
+  CITATION.cff
+  DATA.md
+  pyproject.toml
+  src/
+  scripts/
+  tests/
+  data/
+  annotations/
+  out/
+  docs/
+  paper/
+```
+
+Include from `paper/`:
+
+- `democracy_bench.tex`
+- `references.bib`
+- `ReproducibilityChecklist.tex`
+- `ReproducibilityChecklist.pdf`
+- final figure PDFs/PNGs if needed for rebuild
+
+Do not include from `paper/` unless required:
+
+- LaTeX temporary files: `.aux`, `.bbl`, `.blg`, `.log`, `.fls`, `.fdb_latexmk`, `.synctex.gz`
+- AAAI style files if redistribution is prohibited by the author kit/license. If excluded, state in supplement README that the AAAI-27 author kit is required to rebuild the PDF.
+
+### Step 3. Exclude sensitive or non-redistributable files
+
+Hard exclusions:
+
+- `.git/`
+- `.env` and any credential/config secret
+- raw UKDS/GESIS microdata, especially `data/bsa microdata/`
+- local virtualenvs and caches: `.venv/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`
+- local app/plugin files: `.claude/`, `.codex/`, editor settings if they identify the author
+- generated logs that expose local paths or usernames
+- any file containing `/Users/`, personal names, emails, API keys, or provider tokens
+
+Large-file decision:
+
+- Do not include base model checkpoints.
+- Include derived JSON artifacts that support claims.
+- For LoRA adapter weights (`out/lora_deference_adapter/*.safetensors`), make an explicit decision:
+  - Include only if size and licensing permit and the adapter is needed for reproduction.
+  - Otherwise include the training recipe, design split, eval artifact, and instructions to regenerate the adapter.
+
+Audit commands:
+
+```bash
+rg -n "OPENROUTER|OPENAI|ANTHROPIC|API_KEY|TOKEN|SECRET|/Users/|abeltran|gmail|@|\\.env|bsa microdata|UKDA.*\\.tab|\\.zip" \
+  submission_supplement
+
+find submission_supplement -name ".git" -o -name ".env" -o -name "__pycache__" -o -name ".pytest_cache"
+```
+
+Any hit must be inspected manually; not every `@` is a leak, but every credential/path hit is a blocker.
+
+### Step 4. Write supplement README instructions
+
+The supplement README should be short and direct. It should include:
+
+- What is included: code, derived targets, run artifacts, figures, tests.
+- What is not included: raw BSA/SSA/WVS microdata, provider credentials, base model weights.
+- Data access note: raw survey microdata must be obtained from UK Data Service / WVS or GESIS directly.
+- Environment note: local model reproduction uses Apple Silicon + MLX / `mlx-lm`; cloud-panel reproduction requires provider credentials.
+- Minimal verification commands:
+
+```bash
 python -m pytest tests/test_paper_extract.py tests/test_repro_reference.py tests/test_paper_figures.py
 python scripts/verify_repro_reference.py
-python scripts/extract_paper_results.py
 python -m pytest -q
 ```
 
-Observed results:
+- Full rebuild note: PDF rebuild requires AAAI-27 author-kit style files if they are not redistributed in the supplement.
 
-- `paper/democracy_bench.pdf`: 6 pages, US Letter, embedded fonts, no visible author metadata.
-- Paper-specific tests: `88 passed`.
-- Full suite: `401 passed, 1 skipped`.
-- Reproduction verifier: 26 fenced commands parsed; 19 run-block verified; 7 asserted-by-doc.
-- Build logs: no undefined citations or references; one small overfull hbox in the rights-floor table.
+Suggested README wording:
 
-## Official Sources Consulted
+> This supplement contains the code, derived aggregate targets, run artifacts, figures, and tests needed to regenerate the reported quantitative claims from committed derived artifacts. It does not redistribute raw survey microdata or base model weights. Raw survey data must be obtained from the UK Data Service and WVS/GESIS under their terms. Some cloud-model reproduction requires provider credentials; local open-weight runs require Apple Silicon and MLX/`mlx-lm`.
 
-- AAAI-27 submission instructions: https://aaai.org/conference/aaai/aaai-27/submission-instructions/
-- AAAI-27 main technical call: https://aaai.org/conference/aaai/aaai-27/main-technical-track-call/
-- AAAI-27 supplementary material page: https://aaai.org/conference/aaai/aaai-27/supplementary-material/
-- AAAI-27 AISI call: https://aaai.org/conference/aaai/aaai-27/aisi-call/
-- BSA 2022 UKDS page: https://doc.ukdataservice.ac.uk/doc/9283/mrdoc/UKDA/UKDA_Study_9283_Information.htm
-- BSA 2023 UKDS page: https://doc.ukdataservice.ac.uk/doc/9363/mrdoc/UKDA/UKDA_Study_9363_Information.htm
-- BSA 2024 UKDS page: https://doc.ukdataservice.ac.uk/doc/9478/mrdoc/UKDA/UKDA_Study_9478_Information.htm
-- PoliticsBench arXiv page: https://arxiv.org/abs/2603.23841
-- DeliberationBench arXiv page: https://arxiv.org/abs/2603.10018
-- ParliaBench arXiv page: https://arxiv.org/abs/2511.08247
+### Step 5. Produce the archive
 
-## Recommended Priority Order
+After staging and auditing:
 
-1. Fix bibliography placeholders and exact data citations.
-2. Decide AISI vs AI Alignment and rewrite framing accordingly.
-3. Complete or soften the class-aware-routing remedy claim.
-4. Clean and explain the reproducibility checklist.
-5. Package anonymous code/data supplement and align release language with what is actually included.
-6. Rebuild PDFs, rerun paper tests and full tests, and re-render pages for final visual inspection.
+```bash
+zip -r democracy_bench_aaai27_supplement.zip submission_supplement
+```
 
----
+Then inspect the archive contents:
 
-## Response and Completion Log (Claude, 2026-07-20)
+```bash
+unzip -l democracy_bench_aaai27_supplement.zip | rg -n "\.git|\.env|bsa microdata|__pycache__|pytest_cache|/Users|\.zip$"
+```
 
-Second independent read of the same draft, plus the fixes actually applied. The two
-reviews converge on the big picture, which is the useful signal: **the contribution is a
-problem formulation + evaluation, not an algorithm or a deployment; the "tracks and
-cracks" asymmetry is the memorable result; literature grounding and scope are the
-weaknesses; the remedy is a diagnosis's argument, not a validated cure.**
+Do not upload until this inspection is clean.
 
-### Where the two reviews differ
+### Step 6. Final verification record
 
-- **Statistical fragility of the flagship (Claude adds).** The one positive rung, tracking,
-  is elasticity +0.395 with a CI of [+0.020, +0.811] that *barely* clears zero, on 10
-  items, single seed, one 2022->2024 interval. The whole "tracks and cracks" arc pivots on
-  it. Codex's soundness row flags breadth (one polity, one interval) but not this
-  within-result fragility, which is what a statistically-minded reviewer will actually
-  press. Addressed by framing, not new data (see below); author judged flagship-thickening
-  low-value at this stage.
-- **The crack is partly definitional (Claude adds).** A channel built to *track* a
-  distribution tracks a hostile one near-tautologically. The defensible novelty is the
-  *asymmetry* (evidence cracks, identical prompt is inert) plus the guard/fine-tune
-  failures, not the bare crack. Codex bills the crack itself as the headline; the paper now
-  narrows the claim explicitly.
-- **Codex is sharper on AISI positioning.** Its assurance-workflow framing, the "What The
-  Paper Is Not" discipline list, and the AISI-rubric scorecard are better than Claude's
-  free-form critique and were adopted largely as proposed.
+Create a short final record, either in a commit message or a local note, containing:
 
-### Completed (this session)
+- Git commit SHA used for the final PDF and supplement.
+- Main PDF page count.
+- Checklist PDF page count.
+- Paper-specific test result.
+- Repro verifier result.
+- Full test-suite result.
+- Supplement archive filename and size.
+- Statement that raw microdata and credentials were excluded.
 
-All five mechanical blockers are resolved, and the framing is reworked to the reviews'
-shared recommendation. Verified: paper compiles clean, content within the 7-page limit
-(references on pp. 6-7 do not count), no undefined citations, no reviewer-visible draft
-notes; 88 paper tests pass; repro verifier 19 run-block-verified + 7 asserted-by-doc.
+Recommended final commands:
 
-- **Blocker 1 (bibliography):** removed every reviewer-visible reminder note; replaced the
-  placeholder survey cite with verified UK Data Service entries. **Correction to this
-  audit:** Scotland coverage is Scottish Social Attitudes (ScotCen), a series separate from
-  BSA that the audit omitted; added `@ssa` (SN 9296/9364/9557, DOIs verified) alongside
-  `@bsa` (SN 9283/9363/9478) and fixed the in-text attribution. PoliticsBench -> ICML 2026
-  Trustworthy AI for Good Workshop; ParliaBench -> LREC 2026 pp. 4797-4818 (both arXiv-verified).
-- **Blocker 2 (track fit):** author chose **keep AISI + add grounding.** New democratic-theory
-  Related Work paragraph (Pitkin mandate-independence; Dahl majority rule + inclusion; Page &
-  Shapiro policy responsiveness; Binns political philosophy for ML), all four web-verified.
-- **Blocker 3 (overclaim):** "demonstrably sufficient" scoped to *closing the evidence
-  channel* in abstract and Sec. Routing; added the concrete classifier failure modes
-  (misclassification, contested labels, adversarial framing). Contribution (4) reframed
-  "architectural remedy" -> "design principle."
-- **Blocker 4 (checklist):** removed the template instructions block; a justification added
-  to every `partial` and the login-gated data answers (non-redistributable microdata,
-  provider credentials, MLX/Apple Silicon, asserted-by-doc). 2 pages, clean.
-- **Blocker 5 (release language):** qualified to "regenerates every number from committed
-  *derived* artifacts; raw microdata login-gated, obtained separately."
-- **Assurance/diagnosis reframing (both reviews):** Discussion now opens by casting the
-  harness as an assurance instrument with an explicit deployer workflow, including "treat a
-  floor crack under hostile evidence as a deployment blocker, not a tuning target"; the
-  crack novelty is narrowed to the asymmetry; a "What we do not claim" paragraph was added.
+```bash
+git rev-parse HEAD
+pdfinfo paper/democracy_bench.pdf | rg "Pages|Page size|File size"
+pdfinfo paper/ReproducibilityChecklist.pdf | rg "Pages|Page size|File size"
+python -m pytest tests/test_paper_extract.py tests/test_repro_reference.py tests/test_paper_figures.py
+python scripts/verify_repro_reference.py
+python -m pytest -q
+du -h democracy_bench_aaai27_supplement.zip
+```
 
-### Superseded by an author decision
+## Verification Status
 
-- The **second-person item-class review** that this audit treats as a legitimacy bottleneck
-  (Blocker 3, the soundness row, "What The Paper Is Not" #5) is **not a requirement** per the
-  author; it was removed as a stated pending obligation and replaced with the honest framing
-  that the floor/contestable labels are a stated, revisable normative choice a deployer can
-  adapt. The reviewer *question* ("what legitimates these labels?") does not vanish; the
-  grounding paragraph plus the "revisable choice" framing now carry it.
+Most recent checks observed:
 
-### Not done (by choice)
+- Paper-specific tests: `88 passed`
+- Reproduction verifier: 19 run-block verified, 7 asserted-by-doc
+- Full suite from earlier review: `401 passed, 1 skipped`
+- Current PDF: 7 pages, US Letter, embedded fonts
 
-- **Flagship-thickening** (more items / intervals / a frontier-model crack) is deferred:
-  author judged it low-value versus the framing work with the deadline in view. The abstract
-  can be registered (07-21) to keep the 07-28 full-paper option open, but the plan is to
-  finish fully.
-- Remaining human-only: pick the AISI keyword on the submission form; package and check the
-  anonymous code/data supplement for upload.
+Rerun all checks after any final edits or supplement packaging.
+
+## Bottom Line
+
+Do not spend deadline time adding new experiments unless one is already essentially complete. The remaining risk is presentation, claim calibration, source/log cleanliness, and anonymous packaging. The contribution is now clear enough for AISI if the final submission makes the assurance framing explicit and does not overstate the fragile tracking result or the routing remedy.
