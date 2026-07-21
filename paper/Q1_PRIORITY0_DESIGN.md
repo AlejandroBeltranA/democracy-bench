@@ -7,6 +7,10 @@ Per PROTOCOL_CONSENSUS.md, conditions, models, and reported contrasts are chosen
 before results exist. No wording decisions remain open: D1 is resolved by R2 (Sol's
 text), D2 by R3.
 
+**Sol v2 vote (2026-07-21): AGREE on the frozen experimental design.** R1--R6 are
+incorporated correctly. This approves the design, not an unimplemented runner. The
+pre-run engineering gates in the Sol v2 sign-off below remain mandatory.
+
 ## Measurement (R1 incorporated: summed exact estimator)
 
 Q1 cells use the exact full-vocabulary option scorer with SUMMED variant aggregation:
@@ -21,9 +25,37 @@ committed historical artifacts (max-variant, pre-Q1) are unaffected and not rest
 Regression rule: the summed estimator must reproduce the committed 3B/8B headline cells
 (regr_sum_* artifacts) before any Q1 cell is scored; a material change triggers
 rerunning affected headline cells, never reverting the estimator.
-**Result (2026-07-21): PASSED — 8B bit-identical (max per-item delta 0.0000), 3B within
+**Result (2026-07-21): PASSED.** 8B bit-identical (max per-item delta 0.0000), 3B within
 +-0.006 headline / 0.0104 per-item, every below-floor count unchanged; artifacts
-`out/regr_sum_{baseline,tracking,floors}_{3b,8b}.json`, 410 tests green.**
+`out/regr_sum_{baseline,tracking,floors}_{3b,8b}.json`. A clean repository test run at
+Sol sign-off produced **404 passed, 1 skipped**.
+
+## Sol v2 sign-off — mandatory engineering gates
+
+The six summed-regression artifacts are numerically identical to their corresponding
+full-vocabulary max-regression artifacts after removing run metadata. The following
+provenance and implementation checks must nevertheless complete before results are
+viewed:
+
+1. **Regression provenance:** every current `regr_sum_*` artifact records
+   `code_ref: 2b6369e`, although the summed scorer was committed in `19a7ab2`. The runs
+   were made from a modified working tree based on `2b6369e`. Either rerun them from a
+   clean committed scorer or add an explicit, truthful post-hoc provenance record stating
+   the base commit, dirty state, and scorer patch later committed as `19a7ab2`. Do not
+   silently replace `code_ref` with a commit that did not exist when the run occurred.
+2. **Scorer unit test:** add a direct local-scorer test with at least two accepted token
+   variants for one option and assert that their probabilities are summed, the vector is
+   renormalised correctly, and coverage fields agree. The existing suite exercises
+   generic token parsing but does not directly test this new local-scorer branch.
+3. **Runner implementation:** before the local run, tests must verify the exact frozen
+   prompt strings, Williams orders, structural baseline deduplication, per-order
+   persistence, paired-bootstrap implementation, and a real system-role passthrough for
+   both Llama templates. Before API spend, separately verify hosted sum-over-returned-
+   variants, complete option coverage or sampling fallback, and preservation of the
+   system role at the selected endpoint.
+
+These gates may reveal implementation defects but may not change prompts, contrasts,
+decision thresholds, model order, or interpretation rules after outcomes are observed.
 
 ## Factors
 

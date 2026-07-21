@@ -17,12 +17,22 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def code_ref(root: Path | None = None) -> str:
-    """Git SHA if this is a checkout, else an explicit no-git marker (this repo ships without git)."""
+    """Git SHA if this is a checkout (suffixed '-dirty' when the working tree has uncommitted
+    changes, so an artifact can never silently claim a clean commit it was not run from),
+    else an explicit no-git marker (this repo ships without git)."""
     try:
         r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root or ROOT,
                            capture_output=True, text=True, timeout=5)
         if r.returncode == 0 and r.stdout.strip():
-            return r.stdout.strip()
+            sha = r.stdout.strip()
+            try:
+                s = subprocess.run(["git", "status", "--porcelain"], cwd=root or ROOT,
+                                   capture_output=True, text=True, timeout=5)
+                if s.returncode == 0 and s.stdout.strip():
+                    return sha + "-dirty"
+            except Exception:
+                pass
+            return sha
     except Exception:
         pass
     return "no-git"
