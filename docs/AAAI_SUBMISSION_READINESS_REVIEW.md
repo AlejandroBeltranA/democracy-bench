@@ -1,200 +1,241 @@
 # AAAI AISI Submission Readiness
 
-Date: 2026-07-20  
-Current draft: `paper/democracy_bench.pdf` / `paper/democracy_bench.tex`  
-Target: AAAI-27 Special Track on AI for Social Impact (AISI)
+Date: 2026-07-21
+
+Current draft:
+
+- Main paper: `paper/democracy_bench.pdf` / `paper/democracy_bench.tex`
+- Checklist: `paper/ReproducibilityChecklist.pdf` / `paper/ReproducibilityChecklist.tex`
+- Target: AAAI-27 Special Track on AI for Social Impact (AISI)
+
+Official AAAI pages checked:
+
+- Submission instructions: https://aaai.org/conference/aaai/aaai-27/submission-instructions/
+- AISI call: https://aaai.org/conference/aaai/aaai-27/aisi-call/
+- Supplementary material: https://aaai.org/conference/aaai/aaai-27/supplementary-material/
 
 ## Current Verdict
 
-The paper is now close to submission-ready for AISI. The major conceptual issues from the first review have been addressed: the paper is framed as a public-sector assurance/evaluation contribution, the bibliography placeholders were fixed, the checklist was cleaned up, the release language was qualified, and the routing remedy was narrowed from a cure to a design principle.
+The paper itself is close to submission-ready for AISI. The extensive edits materially improved the
+track fit: the paper now reads as a public-sector assurance and evaluation contribution, not as a
+generic alignment benchmark or a premature deployment claim.
 
-What remains is final submission hygiene: clean source/logs, package the anonymous supplement, rerun verification, and keep the claims disciplined.
+Do not submit the current supplement zip. The remaining blocker is packaging, not the core
+manuscript. `democracy_bench_aaai27_supplement.zip` is stale relative to `HEAD`, includes
+reviewer-facing stale/internal material, and needs to be rebuilt from a strict allowlist.
 
-## Contribution Assessment
+## Current Verification Snapshot
 
-This is a real AISI contribution, but its contribution type is specific:
+Observed on 2026-07-21:
 
-- It is a problem-modeling and evaluation paper.
-- It is not a new algorithm paper.
-- It is not a deployment paper.
-- It is not evidence that LLMs should serve as democratic policy delegates.
+- Git branch: `phase4-floor-guards`
+- Worktree: clean
+- `HEAD`: `0c1a8ca2046cce57b818019623fedaff3cd349c9`
+- Main PDF: 8 pages, US Letter, anonymous author line, embedded fonts, no Type 3 fonts
+- Checklist PDF: 2 pages, US Letter, embedded fonts
+- Current LaTeX logs: no undefined citations/references and no overfull boxes in
+  `paper/democracy_bench.log` or `paper/ReproducibilityChecklist.log`
+- Stale log warning: `paper/build.log` still contains old undefined `ssa` and overfull warnings;
+  exclude or regenerate it
+- Paper-specific tests: `91 passed`
+- Reproduction verifier: `20` run-block verified, `7` asserted-by-doc
+- Full test suite: `404 passed, 1 skipped`
 
-The strongest contribution is the policy-delegate evaluation formulation. Existing opinion-alignment benchmarks mostly ask whether a model resembles a population snapshot. Democracy Bench asks whether a model can represent a public, be steered, track public preference change over time, and hold rights floors when majority pressure points the other way.
-
-The central scientific result is the evidence-channel asymmetry:
-
-- Evidence-in-context is the only rung that enables limited tracking of a real 2022 to 2024 public-opinion shift.
-- The same evidence channel is also the attack surface: hostile synthetic "public opinion" evidence cracks rights floors.
-- The adversarial prompt alone does not produce the same effect.
-- Prompt guards and the tested lightweight fine-tuning recipe do not close the channel.
-- The pattern replicates across model scale and family.
-
-This should be framed as an assurance result: a plausible public-sector governance mechanism has a measurable failure mode that simple prompt- and weight-level fixes do not close.
-
-## AISI Fit
-
-The current framing is much better for AISI than the first draft. The paper now has a clearer social-impact claim: it helps public-sector deployers test and block unsafe delegation before deployment.
-
-Reviewer-facing strengths:
-
-- Significant problem: public-sector LLM delegation is timely and under-specified.
-- Clear evaluation contribution: representation, steerability, tracking, and rights floors are separated instead of collapsed into one alignment score.
-- Judge-free measurement: human survey distributions are used rather than LLM judges.
-- Useful failure mode: the evidence channel that enables tracking can also erode rights floors.
-- Follow-up potential: harness, item banks, derived targets, figures, tests, and reproduction scripts support extension.
-
-Reviewer-facing risks:
-
-- The flagship positive is statistically fragile: elasticity `+0.395`, CI `[+0.020, +0.811]`, 10 items, one polity, one interval.
-- The bare hostile-evidence crack is partly definitional; the novelty is the asymmetry plus guard/fine-tune failures.
-- The floor/contestable boundary is a normative choice, not a settled fact.
-- There is no live deployment, stakeholder study, or field validation.
-- Single-seed 4-bit local model results and API/provider dependencies need to stay visible as limitations.
-
-## Claim Discipline
-
-Keep these claims:
-
-- "Evidence-in-context enables limited temporal tracking."
-- "The same evidence channel creates a rights-floor attack surface."
-- "The asymmetry is deployment-relevant: evidence cracks floors while the adversarial prompt alone does not."
-- "Class-aware routing is a design principle / necessary control for this channel."
-- "The harness is an assurance instrument, not a deployed governance system."
-
-Avoid or soften these claims:
-
-- Do not imply that tracking is solved.
-- Do not headline the hostile-evidence crack alone as if it were surprising by itself.
-- Do not describe class-aware routing as a complete or independently validated governance cure.
-- Do not imply demonstrated social impact in practice.
-- Do not call the artifact "fully reproducible" without qualifying raw microdata, provider credentials, MLX/Apple Silicon, and asserted-by-doc entries.
-
-## Already Resolved
-
-- Bibliography draft notes were removed from reviewer-visible references.
-- BSA and SSA citations were replaced with exact UK Data Service study numbers and DOIs.
-- Recent arXiv/workshop/proceedings metadata were updated for PoliticsBench and ParliaBench.
-- AISI grounding was added through democratic theory and public-sector assurance framing.
-- The routing claim was scoped to closing the evidence channel under current item labels.
-- Concrete classifier failure modes were added.
-- The reproducibility checklist now explains partial answers and login-gated data.
-- Release language now distinguishes committed derived artifacts from raw survey microdata.
-- The discussion now includes an assurance workflow and a "What we do not claim" paragraph.
-
-## Remaining Work
-
-### 1. Clean the final PDF and LaTeX logs
-
-Required:
-
-- Strip drafting aids from `paper/democracy_bench.tex`: `xcolor`, `\todo`, `\verifyc`, and associated drafting comments.
-- Fix the small overfull Table 1 warning.
-- Rebuild from scratch.
-- Confirm no undefined citations, no unresolved references, no reviewer-visible draft notes, and embedded fonts.
-
-Current known state:
-
-- `paper/democracy_bench.pdf` is 7 pages.
-- Fonts are embedded.
-- Paper tests pass.
-- One small overfull table warning remains.
-- Drafting macros remain in source but do not appear in the rendered PDF.
-
-### 2. Package the anonymous supplement
-
-Include:
-
-- Code needed to regenerate reported derived results.
-- Derived aggregate targets.
-- Run artifacts under `out/` that support reported claims.
-- Figures and figure-generation scripts.
-- Reproduction instructions.
-- Citation and data-provenance manifests.
-- Reproducibility checklist PDF.
-
-Exclude:
-
-- Raw UKDS/GESIS microdata.
-- Provider credentials or `.env`.
-- Local user paths.
-- Author names, institution names, acknowledgements, or non-anonymous metadata.
-- Anything that violates data-provider terms.
-
-Check that the supplement wording matches the paper and checklist: derived artifacts are released; raw survey microdata must be obtained separately.
-
-### 3. Rerun verification after final rebuild
-
-Run:
+Commands run:
 
 ```bash
+git status --short --branch
+pdfinfo paper/democracy_bench.pdf
+pdffonts paper/democracy_bench.pdf
+pdfinfo paper/ReproducibilityChecklist.pdf
+pdffonts paper/ReproducibilityChecklist.pdf
 python -m pytest tests/test_paper_extract.py tests/test_repro_reference.py tests/test_paper_figures.py
 python scripts/verify_repro_reference.py
 python -m pytest -q
 ```
 
-Also run PDF checks:
+Visual check:
 
-```bash
-pdfinfo paper/democracy_bench.pdf
-pdffonts paper/democracy_bench.pdf
-pdftotext -layout paper/democracy_bench.pdf -
-```
+- Page 1: anonymous and readable.
+- Page 5: cross-family/frontier result is coherent and visually intact.
+- Page 6: social-impact discussion and figures are dense but acceptable.
+- Page 7: technical content, checklist-style reproducibility, conclusion, ethical statement, and
+  start of references fit before the page limit boundary.
+- Page 8: references only.
 
-Render and inspect:
+## Objective Contribution Assessment
 
-- `paper/democracy_bench.pdf`
-- `paper/ReproducibilityChecklist.pdf`
+This is now a credible AISI submission, with a specific contribution type:
 
-### 4. Final submission-form choices
+- Problem modeling for public-sector LLM delegation.
+- Evaluation methodology, not a new model or algorithm.
+- Assurance tooling, not field deployment.
+- Empirical evidence of a channel-specific governance failure mode.
 
-Deadlines checked:
+The core contribution is the policy-delegate evaluation formulation. The paper separates four things
+that ordinary "alignment" or opinion-representation scores collapse:
 
-- Abstract deadline: July 21, 2026
-- Full paper deadline: July 28, 2026
-- Supplement/code deadline: July 31, 2026
+- Representation: does the model match a current public distribution?
+- Steerability: can the model be moved to a target distribution?
+- Tracking: does it move when public opinion moves?
+- Rights floors: does it preserve non-negotiable protections under majority pressure?
 
-Recommended AISI keywords:
+The strongest empirical result is not "hostile evidence cracks floors" by itself. That part is close
+to expected by construction. The contribution is the asymmetry:
 
-- Policy and Social Development
-- Computational Social Science and Humanities
-- Philosophical and Ethical Issues
+- Evidence-in-context is the only rung that gives a real tracking signal.
+- The same evidence channel is the attack surface.
+- The adversarial prompt alone does not have the same effect.
+- Prompt guards and the tested LoRA do not close the channel.
+- The pattern replicates across scale and family.
+- The floor crack reaches a hosted frontier model, `gpt-4o-mini`, even though the frontier result is
+  only a crack reproduction, not a tracking reproduction.
+
+That makes the paper useful as an assurance result: a plausible governance channel for aligning a
+model to public input has a measurable, reproducible failure mode that simple prompt- and
+weight-level fixes do not close.
+
+## AISI Fit
+
+The fit is now substantially stronger than the earlier draft.
+
+Strengths:
+
+- The problem is socially important and concrete: public-sector models making or shaping decisions
+  about real people.
+- The contribution engages problem modeling and social-impact evaluation, which AISI explicitly
+  values.
+- The democratic-theory framing now does real work: representation, responsiveness, and rights are
+  not decorative citations.
+- The artifact is useful beyond the paper: harness, item banks, derived targets, run artifacts,
+  figures, tests, and reproduction mapping.
+- The revised discussion frames deployment consequences without pretending there has been live
+  deployment impact.
+
+Remaining acceptance risks:
+
+- The positive tracking result remains thin: one polity, one 2022->2024 interval, ten trackable
+  items, CIs that barely clear zero for the primary 3B.
+- The rights-floor taxonomy is a normative boundary; the paper now admits this, but reviewers may
+  still disagree with specific floor labels.
+- The hostile-evidence distribution is synthetic red-team data. That is acceptable, but the paper
+  must keep saying it.
+- The frontier result strengthens transfer, but it is hosted, unpinned, and API-dependent. The
+  limitation paragraph is necessary and should stay.
+- This is not a stakeholder-engagement or deployment study. Submit it as an assurance benchmark,
+  not as evidence of realized social impact.
+
+## Resolved Since Earlier Reviews
+
+- Title and abstract now carry the public/rights framing.
+- Related work now includes democratic representation, responsiveness, and rights.
+- The "only local open-weight models" generalization gap is partly closed by the `gpt-4o-mini`
+  floor-crack reproduction.
+- The paper correctly says the frontier result is a crack reproduction, not full tracking.
+- The BSA-only results path is clearer; SSA is no longer implied as used in the paper.
+- Class-aware routing is scoped as a necessary architectural control under current labels, not a
+  complete governance system.
+- The limitations section now explicitly covers single-seed quantized local results, synthetic
+  hostile evidence, normative floor labels, BSA non-redistribution, and hosted model drift.
+- The reproducibility checklist now states that code/data are included in the supplement rather than
+  deferred to publication.
+
+## Remaining Blockers
+
+### P1. Rebuild the Supplement From a Strict Allowlist
+
+Current `democracy_bench_aaai27_supplement.zip` should not be uploaded.
+
+Observed issues:
+
+- It was produced around commit `6b6826f`, while current `HEAD` is `0c1a8ca`.
+- It includes `submission_supplement/paper/README.md`, which says:
+  `Mistral/Gemma dropped, see paper text`; that is stale and contradicts the current paper.
+- It includes `submission_supplement/CITATION.cff` with a placeholder GitHub URL.
+- It includes internal "Codex" language in data/provenance files.
+- It includes `submission_supplement/data/targets/public_opinion_counterargument.md`, which still
+  has a section titled "Open Questions For Claude".
+- It includes legacy/superseded artifacts such as `out/policy_drift.json` and WVS scenario files
+  that are not needed for the current BSA-only paper claims and create avoidable confusion.
+
+The current zip does avoid raw microdata and `.env`, but that is not enough. Rebuild it.
+
+### P1. Do Not Zip the Repo Root
+
+The live workspace contains files that must not enter an anonymous supplement:
+
+- `.env`
+- `data/bsa microdata/`
+- `data/wvs microdata/`
+- `.venv/`
+- `.claude/`
+- `.inspect-traces/`
+- logs and caches
+- root docs with personal/internal/build-history context
+- ignored `democracy_bench_aaai27_supplement.zip`
+
+The raw microdata directories are present locally and ignored by git. A manual zip of the workspace
+would violate the data-provider and anonymity constraints.
+
+### P1. Sanitize Reviewer/Author Metadata in Included Data Files
+
+If `data/policy_items.jsonl`, `data/floor_review_signoff.json`, `DATA.md`, or provenance manifests
+are included, they need an anonymization pass. In the live repo these files contain reviewer names
+or local provenance language. Either remove those fields from the supplement or rewrite them to
+anonymous role labels such as `reviewer_1`.
+
+### P2. Exclude Stale Build Artifacts
+
+Do not include:
+
+- `paper/build.log`
+- `paper/*.aux`
+- `paper/*.bbl`
+- `paper/*.blg`
+- `paper/*.log`
+- `paper/companion.html`
+
+The current main LaTeX log is fine, but `paper/build.log` contains stale warnings from an earlier
+draft. Logs are not needed in the supplement and create avoidable reviewer noise.
+
+### P2. Keep Page Budget Tight
+
+The PDF is 8 pages, with page 8 references only. That is acceptable under the AAAI technical-page
+rule because technical content fits within the first 7 pages and references continue after. Do not
+add technical text unless something else is removed.
+
+### P2. Prepare a Short OpenReview Abstract
+
+The paper abstract is good but dense. The submission form may be easier with a shorter abstract that
+keeps the same spine:
+
+- public-sector delegation problem
+- representation/tracking/rights-floor split
+- evidence-in-context tracks but is the attack surface
+- cracks replicate across scale/family and on `gpt-4o-mini`
+- class-aware routing is necessary but not complete
 
 ## Repo Submission Preparation Plan
 
-Goal: produce two clean submission artifacts from the repo:
+Goal:
 
-1. `paper/democracy_bench.pdf` plus `paper/ReproducibilityChecklist.pdf`
-2. An anonymous supplement archive containing only code, derived data, run artifacts, figures, and reproduction instructions that can be shared under the stated license and data-provider constraints.
+1. Submit `paper/democracy_bench.pdf` as the main paper.
+2. Upload `paper/ReproducibilityChecklist.pdf` separately, as AAAI requires.
+3. Upload a clean anonymous supplement archive that contains only redistributable code, derived
+   data, artifacts, figures, and instructions.
 
-### Step 0. Freeze the intended submission state
+### Step 1. Freeze the Submission Commit
 
-Before packaging, decide exactly which working-tree changes belong in the submission state.
-
-Current caution:
-
-- `README.md`, `scripts/run_all.sh`, and `tests/test_repro_reference.py` are modified in the working tree.
-- Do not package from an ambiguous dirty tree unless those changes are intentionally part of the submission state.
-
-Recommended workflow:
+Use the clean current state or make a final submission-prep commit after packaging fixes.
 
 ```bash
 git status --short --branch
-git diff --stat
-git diff -- README.md scripts/run_all.sh tests/test_repro_reference.py
+git rev-parse HEAD
 ```
 
-Then either commit the intended changes or make a written note that the supplement was built from a dirty tree. The cleaner option is to commit a final "submission prep" commit after verification.
+Record the final SHA in `SUPPLEMENT_README.md`.
 
-### Step 1. Clean paper source and rebuild PDFs
-
-Source cleanup:
-
-- Remove drafting-only LaTeX aids from `paper/democracy_bench.tex`: `xcolor`, `\todo`, `\verifyc`, and associated comments.
-- Fix the remaining small overfull Table 1 warning.
-- Keep `\usepackage[submission]{aaai2027}` for double-blind review.
-- Do not edit `paper/aaai2027.sty` or `paper/aaai2027.bst`.
-
-Build:
+### Step 2. Rebuild/Confirm PDFs
 
 ```bash
 cd paper
@@ -203,41 +244,33 @@ latexmk -pdf ReproducibilityChecklist.tex
 cd ..
 ```
 
-Log checks:
+Check:
 
 ```bash
-rg -n "Undefined|undefined|Citation|Reference|Overfull|Error|Emergency|rerun|There were|Package natbib Warning" \
-  paper/democracy_bench.log paper/ReproducibilityChecklist.log
-```
-
-PDF checks:
-
-```bash
+rg -n "Undefined|undefined|Citation|Reference|Overfull|Error|Emergency|rerun|There were|Package natbib Warning" paper/democracy_bench.log paper/ReproducibilityChecklist.log
 pdfinfo paper/democracy_bench.pdf
 pdffonts paper/democracy_bench.pdf
-pdftotext -layout paper/democracy_bench.pdf - | rg -n "TODO|TBD|confirm|camera-ready|placeholder|author|affiliation|acknowledg"
+pdfinfo paper/ReproducibilityChecklist.pdf
+pdffonts paper/ReproducibilityChecklist.pdf
+pdftotext -layout paper/democracy_bench.pdf - | rg -n "TODO|TBD|placeholder|camera-ready|acknowledg"
 ```
 
-Expected final state:
+Expected:
 
-- No undefined citations or references.
+- Main PDF remains 8 pages with page 8 references only.
+- Checklist remains separate.
+- No Type 3 fonts.
+- No undefined citations/references.
 - No reviewer-visible draft notes.
-- Fonts embedded.
-- Main PDF stays within AAAI page limits.
-- Checklist PDF is separate and clean.
 
-### Step 2. Create a supplement staging directory
+### Step 3. Stage a Fresh Supplement Directory
 
-Build the supplement in a staging directory rather than zipping the repo root directly.
-
-Suggested layout:
+Create a new directory, for example:
 
 ```text
 submission_supplement/
-  README.md
+  SUPPLEMENT_README.md
   LICENSE
-  CITATION.cff
-  DATA.md
   pyproject.toml
   src/
   scripts/
@@ -249,59 +282,54 @@ submission_supplement/
   paper/
 ```
 
-Include from `paper/`:
+Prefer a minimal allowlist over copying entire directories.
 
-- `democracy_bench.tex`
-- `references.bib`
-- `ReproducibilityChecklist.tex`
-- `ReproducibilityChecklist.pdf`
-- final figure PDFs/PNGs if needed for rebuild
+Include:
 
-Do not include from `paper/` unless required:
+- `src/alignment/` code required by paper extraction and reproduction
+- `scripts/extract_paper_results.py`
+- `scripts/verify_repro_reference.py`
+- `scripts/make_paper_figures.py`
+- other scripts directly referenced by `docs/REPRODUCTION.md`
+- tests needed for the paper/repro/figure verification path
+- `docs/REPRODUCTION.md`
+- `docs/PAPER_RESULTS.md`
+- `annotations/rationale_codesheet*.csv` and scorer inputs required by the construct-validity claim
+- `data/public_opinion_bsa_regions.json`
+- current item banks and constitutions, sanitized where needed
+- derived aggregate targets and inventories used by the paper
+- only `out/*.json` artifacts that support reported claims or are required by verifier tests
+- `out/figures/f1_ladder.*`, `f2_tracking.*`, `f3_floors.*`, `f6_crossfamily.*`, `f7_reflex.*`
+- `paper/democracy_bench.tex`
+- `paper/references.bib`
+- `paper/ReproducibilityChecklist.tex`
 
-- LaTeX temporary files: `.aux`, `.bbl`, `.blg`, `.log`, `.fls`, `.fdb_latexmk`, `.synctex.gz`
-- AAAI style files if redistribution is prohibited by the author kit/license. If excluded, state in supplement README that the AAAI-27 author kit is required to rebuild the PDF.
+Strongly consider excluding:
 
-### Step 3. Exclude sensitive or non-redistributable files
+- root `README.md`
+- root `DATA.md`
+- `paper/README.md`
+- `CITATION.cff`
+- WVS legacy demos/scenarios unless a specific test or cited claim requires them
+- `out/policy_drift.json`
+- `paper/companion.html`
 
-Hard exclusions:
+If any of those are included, sanitize and update them first.
 
-- `.git/`
-- `.env` and any credential/config secret
-- raw UKDS/GESIS microdata, especially `data/bsa microdata/`
-- local virtualenvs and caches: `.venv/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`
-- local app/plugin files: `.claude/`, `.codex/`, editor settings if they identify the author
-- generated logs that expose local paths or usernames
-- any file containing `/Users/`, personal names, emails, API keys, or provider tokens
+### Step 4. Write a Supplement README for Reviewers
 
-Large-file decision:
+The supplement README should be the only prose entry point. It should say:
 
-- Do not include base model checkpoints.
-- Include derived JSON artifacts that support claims.
-- For LoRA adapter weights (`out/lora_deference_adapter/*.safetensors`), make an explicit decision:
-  - Include only if size and licensing permit and the adapter is needed for reproduction.
-  - Otherwise include the training recipe, design split, eval artifact, and instructions to regenerate the adapter.
+- This is an anonymous AAAI-27 supplement.
+- It contains code, derived aggregate targets, run artifacts, figures, and tests.
+- It does not contain raw BSA/WVS/GESIS microdata, provider credentials, or model weights.
+- Raw survey microdata must be obtained directly from the UK Data Service and WVS/GESIS.
+- Some cloud-model reproduction requires provider credentials.
+- Local open-weight reproduction assumes Apple Silicon plus MLX / `mlx-lm`.
+- The paper's quantitative claims can be regenerated from committed derived artifacts.
+- The `gpt-4o-mini` frontier result is provider/API-dependent and may drift.
 
-Audit commands:
-
-```bash
-rg -n "OPENROUTER|OPENAI|ANTHROPIC|API_KEY|TOKEN|SECRET|/Users/|abeltran|gmail|@|\\.env|bsa microdata|UKDA.*\\.tab|\\.zip" \
-  submission_supplement
-
-find submission_supplement -name ".git" -o -name ".env" -o -name "__pycache__" -o -name ".pytest_cache"
-```
-
-Any hit must be inspected manually; not every `@` is a leak, but every credential/path hit is a blocker.
-
-### Step 4. Write supplement README instructions
-
-The supplement README should be short and direct. It should include:
-
-- What is included: code, derived targets, run artifacts, figures, tests.
-- What is not included: raw BSA/SSA/WVS microdata, provider credentials, base model weights.
-- Data access note: raw survey microdata must be obtained from UK Data Service / WVS or GESIS directly.
-- Environment note: local model reproduction uses Apple Silicon + MLX / `mlx-lm`; cloud-panel reproduction requires provider credentials.
-- Minimal verification commands:
+Minimal verification commands:
 
 ```bash
 python -m pytest tests/test_paper_extract.py tests/test_repro_reference.py tests/test_paper_figures.py
@@ -309,42 +337,55 @@ python scripts/verify_repro_reference.py
 python -m pytest -q
 ```
 
-- Full rebuild note: PDF rebuild requires AAAI-27 author-kit style files if they are not redistributed in the supplement.
+### Step 5. Audit the Staged Supplement
 
-Suggested README wording:
+Run these against the staged directory before zipping:
 
-> This supplement contains the code, derived aggregate targets, run artifacts, figures, and tests needed to regenerate the reported quantitative claims from committed derived artifacts. It does not redistribute raw survey microdata or base model weights. Raw survey data must be obtained from the UK Data Service and WVS/GESIS under their terms. Some cloud-model reproduction requires provider credentials; local open-weight runs require Apple Silicon and MLX/`mlx-lm`.
+```bash
+rg -n "OPENROUTER|OPENAI|ANTHROPIC|API_KEY|TOKEN|SECRET|/Users/|abeltran|gmail|@|\\.env|bsa microdata|wvs microdata|UKDA.*\\.tab|\\.zip|PLACEHOLDER|Claude|Codex" submission_supplement
+find submission_supplement -name ".git" -o -name ".env" -o -name "__pycache__" -o -name ".pytest_cache" -o -name "*.log" -o -name "*.aux" -o -name "*.blg" -o -name "*.bbl"
+```
 
-### Step 5. Produce the archive
+Every hit needs manual review. Some terms such as `OpenAI`, `Anthropic`, or `Claude` are legitimate
+model/provider names in the paper context; personal names, local paths, placeholders, credentials,
+raw microdata paths, and internal build-agent references are blockers.
 
-After staging and auditing:
+Then test from the staged directory:
+
+```bash
+cd submission_supplement
+python -m pytest tests/test_paper_extract.py tests/test_repro_reference.py tests/test_paper_figures.py
+python scripts/verify_repro_reference.py
+python -m pytest -q
+cd ..
+```
+
+### Step 6. Build and Inspect the Archive
 
 ```bash
 zip -r democracy_bench_aaai27_supplement.zip submission_supplement
+unzip -l democracy_bench_aaai27_supplement.zip
+zipgrep -n "OPENROUTER\\|OPENAI\\|ANTHROPIC\\|API_KEY\\|TOKEN\\|SECRET\\|/Users/\\|abeltran\\|gmail\\|\\.env\\|bsa microdata\\|wvs microdata\\|PLACEHOLDER\\|Claude\\|Codex" democracy_bench_aaai27_supplement.zip
 ```
 
-Then inspect the archive contents:
+Do not upload until the archive inspection is clean or all remaining hits are legitimate model or
+provider references.
 
-```bash
-unzip -l democracy_bench_aaai27_supplement.zip | rg -n "\.git|\.env|bsa microdata|__pycache__|pytest_cache|/Users|\.zip$"
-```
+### Step 7. Final Verification Record
 
-Do not upload until this inspection is clean.
+Record:
 
-### Step 6. Final verification record
+- final git SHA
+- main PDF page count
+- checklist PDF page count
+- paper-specific test result
+- reproduction verifier result
+- full test-suite result
+- supplement archive filename and size
+- statement that raw microdata, credentials, model weights, local paths, and identifying metadata
+  were excluded
 
-Create a short final record, either in a commit message or a local note, containing:
-
-- Git commit SHA used for the final PDF and supplement.
-- Main PDF page count.
-- Checklist PDF page count.
-- Paper-specific test result.
-- Repro verifier result.
-- Full test-suite result.
-- Supplement archive filename and size.
-- Statement that raw microdata and credentials were excluded.
-
-Recommended final commands:
+Suggested commands:
 
 ```bash
 git rev-parse HEAD
@@ -356,17 +397,32 @@ python -m pytest -q
 du -h democracy_bench_aaai27_supplement.zip
 ```
 
-## Verification Status
+## Claim Discipline for Final Submission
 
-Most recent checks observed:
+Keep:
 
-- Paper-specific tests: `88 passed`
-- Reproduction verifier: 19 run-block verified, 7 asserted-by-doc
-- Full suite from earlier review: `401 passed, 1 skipped`
-- Current PDF: 7 pages, US Letter, embedded fonts
+- "Democracy Bench is an assurance harness for public-sector policy-delegate risk."
+- "Evidence-in-context enables limited tracking of a real public-opinion shift."
+- "The same evidence channel is a rights-floor attack surface."
+- "The channel asymmetry is the finding: hostile evidence cracks floors; the adversarial prompt
+  alone does not."
+- "Class-aware evidence routing is a necessary control under current labels, not a complete
+  governance system."
+- "`gpt-4o-mini` reproduces the floor crack; the open-weight families track and crack."
 
-Rerun all checks after any final edits or supplement packaging.
+Avoid:
+
+- "Tracking is solved."
+- "The hostile-evidence crack alone is surprising."
+- "Routing solves governance."
+- "The paper demonstrates live social impact."
+- "The artifact is fully reproducible" without the raw-microdata/provider/model caveats.
+- "Frontier models track and crack" unless also saying only the crack was reproduced on
+  `gpt-4o-mini`.
 
 ## Bottom Line
 
-Do not spend deadline time adding new experiments unless one is already essentially complete. The remaining risk is presentation, claim calibration, source/log cleanliness, and anonymous packaging. The contribution is now clear enough for AISI if the final submission makes the assurance framing explicit and does not overstate the fragile tracking result or the routing remedy.
+Submit the paper after final packaging, not after new experiments. The revised contribution is now
+clear enough for AISI: it offers a concrete assurance benchmark and a channel-specific failure mode
+for public-sector LLM delegation. The remaining work is to make the artifact anonymous,
+redistributable, current, and boring to inspect.
