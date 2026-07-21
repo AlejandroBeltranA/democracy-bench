@@ -26,8 +26,8 @@ def code_ref(root: Path | None = None) -> str:
         if r.returncode == 0 and r.stdout.strip():
             sha = r.stdout.strip()
             try:
-                s = subprocess.run(["git", "status", "--porcelain"], cwd=root or ROOT,
-                                   capture_output=True, text=True, timeout=5)
+                s = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"],
+                                   cwd=root or ROOT, capture_output=True, text=True, timeout=5)
                 if s.returncode == 0 and s.stdout.strip():
                     return sha + "-dirty"
             except Exception:
