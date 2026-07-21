@@ -36,8 +36,7 @@ governs the values instilled into a model that makes decisions about real people
 on alignment tend to fix on abstract statements of what we want these systems to be; less
 examined is how a society can guide a model's choices when its own citizens are affected.
 In democratic settings such preferences are set through elections, consultations, and
-opinion polls that inform policy, but who instills those values into a model's parameters,
-and how? We introduce \textbf{Democracy Bench}, an evaluation harness that measures whether
+opinion polls that inform policy, but who instills those values in a model, and how? We introduce \textbf{Democracy Bench}, an evaluation harness that measures whether
 a language model tracks public attitudes, across waves of the British Social Attitudes
 survey, and whether those attitudes can then be instilled in it. Its central
 design is a boundary between \emph{contestable} policy preferences (tax, public spending,
@@ -50,11 +49,12 @@ erodes \emph{every} rights floor, and neither prompt guards nor a fine-tuning re
 the channel. The result replicates across scale (3B and 8B Llama) and family (Qwen, Phi,
 Gemma, and Mistral all track and crack), and reaches a frontier model: gpt-4o-mini, a
 strong floor-holder at rest, cracks on every floor under the same hostile evidence. The
-only sufficient guard we find is
+only guard we find that closes this channel is
 \emph{architectural}: class-aware evidence routing, injecting public-opinion evidence on
 contestable items but never on floor items, a necessary control under the current item
-labels rather than a complete fix. Built on the Inspect framework and reproducible given
-access to the raw survey microdata, Democracy Bench reframes the question from whether a
+labels rather than a complete fix. Built on the Inspect framework, with every reported
+number regenerating from released derived artifacts (rebuilding the targets requires
+login-gated survey microdata), Democracy Bench reframes the question from whether a
 model can be steered to who controls the channel that steers it. As human agency in these
 systems narrows, giving the public legitimate ways to inject their attitudes is necessary
 for societal assurance without eroding democratic rights.
