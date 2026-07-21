@@ -263,12 +263,14 @@ def _option_token_ids(tok, max_num: int = 9) -> dict:
 
 def mlx_logprob_fn(model, tok, top_k: int | None = None):
     """A Phase-1-compatible LogprobFn over the local model: one forward pass, read the last
-    position's log-softmax row, and score option numbers with the same strip/max rule as
-    `option_logprob_vector`. `top_k=None` (default) is the EXACT path: option tokens are read
-    directly from the full-vocabulary row, so none can fall outside a truncated top-k, and each
-    call appends {option_mass, per_option_found, top1_is_option} to `fn.coverage_log`.
-    `top_k=40` reproduces the legacy truncated estimator. Steering is whatever the installed
-    tap currently holds — set it before calling."""
+    position's log-softmax row, and score option numbers using `option_logprob_vector`'s strip
+    rule for token acceptance. `top_k=None` (default) is the EXACT path: option tokens are read
+    directly from the full-vocabulary row and each option's probability is the SUM over its
+    accepted token variants (mutually exclusive first-token events), so the vector is an exact
+    option-event probability up to renormalisation over options. Each call appends
+    {per_option_mass, option_mass, top1_is_option} to `fn.coverage_log`; the static variant map
+    is exposed as `fn.matched_token_ids`. `top_k=40` reproduces the legacy truncated max-variant
+    estimator. Steering is whatever the installed tap currently holds — set it before calling."""
     import mlx.core as mx
 
     if top_k is not None:
@@ -296,7 +298,7 @@ def mlx_logprob_fn(model, tok, top_k: int | None = None):
             cand = opt_ids.get(str(i + 1))
             if cand is None or len(cand) == 0:
                 continue
-            probs[i] = float(np.exp(row[cand].max()))   # max over variants, as in option_logprob_vector
+            probs[i] = float(np.exp(row[cand]).sum())   # SUM over variants: exclusive first-token events
             all_ids.append(cand)
             found = True
         if not found:
@@ -305,13 +307,14 @@ def mlx_logprob_fn(model, tok, top_k: int | None = None):
         union = np.concatenate(all_ids)
         fn.coverage_log.append({
             "n_options": n,
+            "per_option_mass": [round(float(probs[i]), 6) for i in range(n)],
             "option_mass": float(np.exp(row[union]).sum()),
-            "per_option_found": [int(len(opt_ids.get(str(i + 1), []))) for i in range(n)],
             "top1_is_option": bool(int(row.argmax()) in set(int(x) for x in union)),
         })
         return probs / probs.sum()
 
     fn.coverage_log = []
+    fn.matched_token_ids = {k: [int(i) for i in v] for k, v in opt_ids.items()}
     return fn
 
 
