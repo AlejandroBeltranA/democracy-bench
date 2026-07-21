@@ -241,21 +241,77 @@ def install_tap(model, layer_idx: int):
     return tap, restore
 
 
-def mlx_logprob_fn(model, tok, top_k: int = 40):
-    """A Phase-1-compatible LogprobFn over the local model: one forward pass, read the last position's
-    logits, keep the top-k tokens, and hand them to `option_logprob_vector` (same scoring as the API
-    path). Steering is whatever the installed tap currently holds — set it before calling."""
+def _option_token_ids(tok, max_num: int = 9) -> dict:
+    """Map each option number '1'..'max_num' to every vocab token id that reads as that number
+    under option_logprob_vector's strip rule (tok.strip().strip('.)(:')). Scanned once per
+    tokenizer and cached on it, so the exact scorer never loses an option token to a top-k cut."""
+    cached = getattr(tok, "_option_token_ids", None)
+    if cached is not None:
+        return cached
+    nums = {str(k) for k in range(1, max_num + 1)}
+    out: dict = {n: [] for n in nums}
+    vocab_size = max(getattr(tok, "vocab_size", 0) or 0, len(tok.get_vocab()))
+    for i in range(vocab_size):
+        s = tok.decode([i])
+        key = s.strip().strip(".)(:")
+        if key in nums:
+            out[key].append(i)
+    out = {k: np.array(v, dtype=np.int64) for k, v in out.items()}
+    tok._option_token_ids = out
+    return out
+
+
+def mlx_logprob_fn(model, tok, top_k: int | None = None):
+    """A Phase-1-compatible LogprobFn over the local model: one forward pass, read the last
+    position's log-softmax row, and score option numbers with the same strip/max rule as
+    `option_logprob_vector`. `top_k=None` (default) is the EXACT path: option tokens are read
+    directly from the full-vocabulary row, so none can fall outside a truncated top-k, and each
+    call appends {option_mass, per_option_found, top1_is_option} to `fn.coverage_log`.
+    `top_k=40` reproduces the legacy truncated estimator. Steering is whatever the installed
+    tap currently holds — set it before calling."""
     import mlx.core as mx
+
+    if top_k is not None:
+        def fn(prompt: str, n: int) -> np.ndarray:
+            ids = _chat_ids(tok, prompt)
+            logits = model(ids)
+            row = np.array(logits[0, -1]).astype(np.float64)
+            row = row - (row.max() + np.log(np.exp(row - row.max()).sum()))   # log-softmax
+            top = np.argpartition(row, -top_k)[-top_k:]
+            top_logprobs = {tok.decode([int(i)]): float(row[int(i)]) for i in top}
+            return M.option_logprob_vector(top_logprobs, n)
+        return fn
+
+    opt_ids = _option_token_ids(tok)
 
     def fn(prompt: str, n: int) -> np.ndarray:
         ids = _chat_ids(tok, prompt)
         logits = model(ids)
         row = np.array(logits[0, -1]).astype(np.float64)
         row = row - (row.max() + np.log(np.exp(row - row.max()).sum()))   # log-softmax
-        top = np.argpartition(row, -top_k)[-top_k:]
-        top_logprobs = {tok.decode([int(i)]): float(row[int(i)]) for i in top}
-        return M.option_logprob_vector(top_logprobs, n)
+        probs = np.zeros(n, dtype=float)
+        all_ids = []
+        found = False
+        for i in range(n):
+            cand = opt_ids.get(str(i + 1))
+            if cand is None or len(cand) == 0:
+                continue
+            probs[i] = float(np.exp(row[cand].max()))   # max over variants, as in option_logprob_vector
+            all_ids.append(cand)
+            found = True
+        if not found:
+            raise M.ElicitationError(
+                "no option-number token found in vocabulary; refusing to fabricate a distribution")
+        union = np.concatenate(all_ids)
+        fn.coverage_log.append({
+            "n_options": n,
+            "option_mass": float(np.exp(row[union]).sum()),
+            "per_option_found": [int(len(opt_ids.get(str(i + 1), []))) for i in range(n)],
+            "top1_is_option": bool(int(row.argmax()) in set(int(x) for x in union)),
+        })
+        return probs / probs.sum()
 
+    fn.coverage_log = []
     return fn
 
 

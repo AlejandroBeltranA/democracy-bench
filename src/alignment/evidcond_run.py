@@ -1113,7 +1113,9 @@ def _logprob_backend(model_name: str):
     model, tok = A.load_model(model_name)
 
     def _cleanup():
-        del model, tok
+        nonlocal model, tok
+        model = None
+        tok = None
 
     return A.mlx_logprob_fn(model, tok), model_name, _cleanup
 
