@@ -212,11 +212,15 @@ without an independent human and must not be relabelled as human reliability evi
 
 - [ ] Priority-0 design artifact committed (prompts, panel, orders, estimands,
       outcome-dependent wording, stop rule) — Sol's plan, verbatim.
-- [ ] Measurement gate committed: local scoring reads every relevant option-number token
-      from the full logit vector without top-40 truncation; local and hosted artifacts
-      record option-token coverage; baseline/P3/P4 regression cells are compared with the
-      committed artifacts before Q1 promotion. A material change triggers rerunning the
-      affected headline cells, not silently mixing estimators.
+- [x] Measurement gate PASSED 2026-07-21 (commit `1f92a85` + 8B follow-up): exact
+      full-vocab option scorer with per-call coverage is the default local path
+      (`mlx_logprob_fn`); legacy top-40 retained only as an explicit opt-in. Regression
+      vs committed artifacts — 3B: all headline cells within +-0.006, below-floor counts
+      identical, largest per-item move 0.0104; 8B: BIT-IDENTICAL on every cell (largest
+      per-item move 0.0). No committed headline cell changes materially; the committed
+      artifacts stand. Also fixed en route: latent `_cleanup` UnboundLocalError in
+      `_logprob_backend` (introduced in `6b6826f`, never exercised locally; no committed
+      artifact affected). Artifacts: `out/regr_exact_{baseline,tracking,floors}_{3b,8b}.json`.
 - [ABSTRACT CAN BE EDITED BUT NOT REPLACED] Record what “not replaced” permits before Q1.
       If a preregistered Q1 outcome invalidates the abstract's central evidence-channel
       sentence and the submission system cannot accommodate the necessary correction,
