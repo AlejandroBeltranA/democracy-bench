@@ -664,7 +664,7 @@ def build_all(render=True):
             ("Llama-3B", floors), ("Llama-8B", floors_8b),
             ("Qwen-7B", floors_qwen), ("Phi-4-mini", floors_phi),
             ("Gemma-2-9B", floors_gemma), ("Mistral-Nemo", floors_nemo),
-            ("gpt-4o-mini (frontier)", floors_gpt4omini)]),
+            ("gpt-4o-mini (API)", floors_gpt4omini)]),
         "f7_reflex": prep_f7_reflex(reflex),
     }
     if not render:

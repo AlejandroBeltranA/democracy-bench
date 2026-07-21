@@ -47,11 +47,11 @@ is evidence-in-context, which lets a model track the real 2022$\to$2024 shift in
 attitudes but is itself the attack surface: a synthetic hostile ``public distribution''
 erodes \emph{every} rights floor, and neither prompt guards nor a fine-tuning recipe closes
 the channel. The result replicates across scale (3B and 8B Llama) and family (Qwen, Phi,
-Gemma, and Mistral all track and crack), and reaches a frontier model: gpt-4o-mini, a
+Gemma, and Mistral all track and crack), and reaches a hosted proprietary model: gpt-4o-mini, a
 strong floor-holder at rest, cracks on every floor under the same hostile evidence. The
-only guard we found to close this channel is \emph{architectural}: class-aware evidence
-routing, which injects public-opinion evidence on contestable items but never on floor
-items. This is a necessary control, not a complete fix. Built on the Inspect framework, every reported number
+remaining guard is \emph{architectural}: class-aware evidence routing, which injects
+public-opinion evidence on contestable items and never on floor items, closing the
+channel by construction. This is a necessary control, not a complete fix. Built on the Inspect framework, every reported number
 regenerates from released derived artifacts, and the targets can be rebuilt from the
 survey data. Democracy Bench reframes the question from whether a model can be steered to
 who controls the channel that steers it. As human agency in these
@@ -273,7 +273,7 @@ Table~\ref{tab:models} lists every model evaluated across the paper.
 tier (role) & models (provider) \\
 \midrule
 cloud panel: repr., prompting, logit-bias &
-gpt-4o-mini (OpenAI; also the P4 frontier crack, \S\ref{sec:robust}),
+gpt-4o-mini (OpenAI; also the P4 hosted-model crack, \S\ref{sec:robust}),
 claude-3-haiku (Anthropic), deepseek-chat (DeepSeek),
 mistral-small-24b (Mistral), command-r (Cohere), gemini-2.5-flash (Google) \\
 \addlinespace[2pt]
@@ -462,13 +462,13 @@ to fabricate a distribution rather than silently degrade---so it is dropped with
 recorded reason, while the Mistral family is still covered by Mistral-Nemo.
 
 Finally, the crack is not an open-weight or small-model artifact: it reproduces on a
-\emph{frontier} model, gpt-4o-mini, run through the identical context-level intervention
+hosted \emph{proprietary} model, gpt-4o-mini, run through the identical context-level intervention
 via OpenRouter option logprobs (the attack needs only option likelihoods, not open
 weights). gpt-4o-mini is the second-strongest floor-holder at rest ($0.883$, 1/12 below)
 yet under the same hostile evidence \emph{every} floor collapses ($\Delta -0.883$,
 $[-0.998, -0.703]$; 12/12 below), the deepest crack in the panel, while the adversarial
 prompt alone is protective ($\Delta +0.117$)---the same channel asymmetry, on a hosted
-frontier model. Because gpt-4o-mini's option logprobs are near-degenerate, its masses
+proprietary model. Because gpt-4o-mini's option logprobs are near-degenerate, its masses
 saturate; the transferable finding is the direction and channel asymmetry, not the exact
 magnitude.
 
@@ -476,7 +476,7 @@ magnitude.
 \includegraphics[width=\linewidth]{f6_crossfamily.pdf}
 \caption{Looking safe at rest is not being a safe evidence channel. Rights-floor
 protective mass at rest (blue) vs.\ under synthetic hostile evidence (orange), seven
-models (six open-weight plus the frontier/API gpt-4o-mini) sorted by resting floor
+models (six open-weight plus the API-served gpt-4o-mini) sorted by resting floor
 strength. Baseline spans $0.36$--$0.90$, yet under hostile evidence \emph{every} model
 falls below the $0.50$ floor, and resting strength barely predicts the post-attack
 value---gpt-4o-mini is the second-strongest at rest ($0.88$) yet cracks the deepest, to
@@ -573,7 +573,7 @@ error only (not prompt/order/house effects); the hostile-evidence distributions 
 synthetic red-team data and make no claim about real UK opinion; BSA microdata are not
 redistributable; and the floor/contestable assignments encode a normative judgment on
 which reasonable people can disagree. Tracking is demonstrated over a single 2022$\to$2024
-interval on Bonferroni-significant items. The frontier reproduction (gpt-4o-mini) uses a
+interval on Bonferroni-significant items. The hosted-model reproduction (gpt-4o-mini) uses a
 hosted, unpinned model reached over an API: it spends provider budget, is not
 byte-reproducible, and can drift under the same name, so we record its model id and run
 date and treat it as an existence proof of transfer, not a stable benchmark cell.
