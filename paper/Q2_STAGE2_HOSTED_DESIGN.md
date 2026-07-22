@@ -19,6 +19,13 @@ fully frozen.
 **v3 (Fable, 2026-07-22): R-H6--R-H8 incorporated below. Fresh Alex + Sol sign-off
 required; no OpenRouter call before the v3 freeze commit.**
 
+**Sol v3 vote (2026-07-22): OBJECT pending R-H9--R-H10 below.** No OpenRouter call is
+authorized yet.
+
+**v4 (Fable, 2026-07-22): R-H9--R-H10 incorporated below (both-paths temperature 1.0;
+named provider table from the live OpenRouter endpoint catalog, fetched 2026-07-22).
+Fresh Alex + Sol sign-off required; no API call before the v4 freeze commit.**
+
 ## Questions (fixed, per R-H2)
 
 Do the local findings transfer beyond two quantized Llama checkpoints: instruction
@@ -80,22 +87,46 @@ byte-reproducible and serving providers may change.
   Persist the sent message roles, response/provider metadata, and a role-sensitive smoke
   comparison; describe this as endpoint acceptance and behavioral validation.
 
-## Inference settings and provider consistency (frozen; per R-H7)
+## Inference settings and provider consistency (frozen; per R-H7, R-H9, R-H10)
 
-- **Logprob path:** temperature 0, top_p 1.0, max output tokens 4, `top_logprobs` 20,
-  `seed 0` where the provider supports it, no stop sequences. Scores are the model's
-  returned first-token top-logprobs (a coverage-audited top-k option score).
-- **Sampling path:** temperature 1.0, top_p 1.0, max output tokens 4, `seed` UNSET
-  (independent draws), no stop sequences. Sampling at temperature 1.0 draws from the
-  same distribution the raw logprobs describe, so the two paths estimate the same
-  quantity; this alignment is part of the frozen design, not a post-hoc choice. Replies
-  are parsed by the existing leading-option-number rule and fail closed when unparseable.
-- **Provider routing:** one declared provider per model with OpenRouter fallbacks
-  disabled where permitted (`provider.allow_fallbacks = false`); the actual serving
-  provider is persisted for every response. If the provider changes within a model, the
-  affected calls are NOT combined into one headline estimate: the model is failed and
-  reported, or the two providers are treated as separately declared executions, decided
-  before outcomes are viewed.
+- **Both paths (per R-H9): temperature 1.0, top_p 1.0.** The API contract does not
+  promise that logprobs requested at temperature 0 are untempered temperature-1
+  probabilities, so both paths run at temperature 1.0 and estimate the same quantity by
+  construction of the request, not by assumption about provider internals. If a provider
+  demonstrably transforms logprobs despite identical temperature, the cross-method
+  disagreement is reported; settings are never changed in response to outcomes.
+- **Logprob path:** max output tokens 4, `top_logprobs` 20, `seed 0` where supported
+  (the sampled output token is irrelevant to the returned top-k scores), no stop
+  sequences. Scores are a coverage-audited top-k option score.
+- **Sampling path:** max output tokens 4, `seed` UNSET (independent draws), no stop
+  sequences. Replies are parsed by the existing leading-option-number rule and fail
+  closed when unparseable.
+- **Provider endpoints (per R-H10; OpenRouter endpoint catalog fetched 2026-07-22, all
+  listed endpoints support `logprobs` + `top_logprobs` + `seed`):**
+
+  | model | declared provider | quantization | catalog price in/out per 1M |
+  |---|---|---|---:|
+  | `openai/gpt-4o-mini-2024-07-18` | OpenAI (sole endpoint) | unlisted (first-party) | $0.15 / $0.60 |
+  | `openai/gpt-4o-2024-11-20` | OpenAI (sole endpoint) | unlisted (first-party) | $2.50 / $10.00 |
+  | `x-ai/grok-4.5` | xAI, standard tag (not the priority/zdr variants; resolved tier and pricing persisted per call) | unlisted (first-party) | $2.00--$4.00 / $6.00+ |
+  | `meta-llama/llama-3.3-70b-instruct` | AkashML (cheapest logprob-capable endpoint) | fp8 | $0.13 / $0.40 |
+
+  Llama quantization, disclosed pre-freeze: the catalog's logprob-capable Llama
+  endpoints are AkashML/Parasail/Cloudflare (fp8), Novita (bf16), and WandB (fp16);
+  Groq, Together, DeepInfra, Nebius, SambaNova, and Google Vertex report no logprob
+  support. The declared AkashML endpoint is fp8, so the hosted Llama execution is
+  itself quantized, and any "transfer beyond quantized checkpoints" claim rests on the
+  OpenAI and xAI rows, not on this one; the paper must say so. Swapping to a
+  higher-precision endpoint (Novita bf16) is permitted only by a pre-outcome amendment
+  to this table, never after any result is viewed.
+
+  Requests send the declared provider via `provider.only`, with
+  `allow_fallbacks = false` and `require_parameters = true`; the resolved provider is
+  persisted on every response. If a declared endpoint rejects the frozen parameters, the
+  model is recorded as a pre-run capability failure; no replacement provider or model is
+  chosen after outcomes. If the resolved provider changes within a model, the affected
+  calls are NOT combined into one headline estimate: the model is failed and reported,
+  or the executions treated as separately declared, decided before outcomes are viewed.
 
 ## Sampling validation (per R-H4)
 
@@ -123,7 +154,7 @@ order, then stop before starting the next; a model is never partially run, and n
 selected or dropped because earlier cells look favorable. The reserve completes
 preregistered cells or reruns a documented provider failure only.
 
-## Votes (v3)
+## Votes (v4)
 
 A: [ ] F: [AGREE] S: [ ]
 
@@ -241,3 +272,27 @@ promotion decision remains a separate measurement-validity gate.
 
 Once R-H6--R-H8 are incorporated, issue v3 for fresh sign-off. No OpenRouter call is
 authorized before that freeze.
+
+### R-H9. Align logprob and sampling temperature
+
+The claim that temperature-0 returned logprobs describe the same distribution sampled at
+temperature 1.0 is not guaranteed by the OpenRouter API contract. OpenRouter documents
+temperature as shaping token generation and defaults it to 1.0; it does not promise that
+top logprobs requested at temperature 0 are untempered temperature-1 probabilities.
+
+Set **temperature 1.0, top_p 1.0 on both paths**. Keep `seed=0` on the logprob requests
+where supported because the sampled output token is irrelevant to the returned top-k
+scores; keep sampling seeds unset. If a provider demonstrably transforms logprobs despite
+identical temperature, report the cross-method disagreement rather than changing settings.
+
+### R-H10. Name the provider endpoint for each model before the freeze
+
+“One declared provider per model” is not a freeze unless the provider slugs are actually
+listed. Add a model-to-provider table using current OpenRouter endpoint metadata. Send
+that exact provider through `provider.order` or `provider.only`, set
+`allow_fallbacks=false` and `require_parameters=true`, and persist the resolved provider
+on every call. If no endpoint for a declared model supports all frozen parameters, record
+that model as a pre-run capability failure; do not choose a replacement after outcomes.
+
+After R-H9--R-H10, issue v4 for Alex/Fable/Sol sign-off. No API call may precede the v4
+freeze commit.

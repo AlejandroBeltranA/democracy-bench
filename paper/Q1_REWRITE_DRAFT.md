@@ -25,6 +25,11 @@ Alex + Sol sign-off required before any manuscript edit.**
 reframing now matches Q1. These are two bounded pre-application corrections, not a
 request to reopen the thesis.
 
+**Sol final vote (2026-07-22): AGREE.** R-W6 is incorporated in the applied manuscript;
+R-W7 produced the immutable, hash-pinned secondary extract and its focused extractor/
+paper tests pass (46/46). The Q1 thesis rewrite is approved, subject to final rendered-
+page and whole-paper consistency review.
+
 ---
 
 ## Drafted prose: S5.5, retitled
