@@ -1,4 +1,4 @@
-# Stage-2 hosted design — v5 FROZEN (A/F/S signed 2026-07-22; the commit adding this line is the Stage-2 freeze)
+# Stage-2 hosted design — v5 FROZEN; v6 sampling amendment PENDING SOL (no paid sampling call before the v6 freeze commit)
 
 Status: FROZEN at v5. This is a LABELLED FOLLOW-UP to the local Q1 preregistration,
 designed after seeing the local outcomes (per `Q1_RESULTS_CONSENSUS.md`); it is not part
@@ -255,6 +255,108 @@ frozen value.
 Next action is the first paid step (the canary), on Alex's trigger; no paid call has been
 made.
 
+## Gate run results (2026-07-22) — no model passes the frozen logprob promotion rule
+
+The canary and the declared 48-call smoke ran on all four panel models under the $3
+pre-top-up ceiling. Total spend **$0.031**. No model was promoted; no matrix or sampling
+call ran; substantive scores, crack counts, and effect sizes remain UNREVEALED. Only the
+gate-permitted fields (request integrity, resolved provider, four-option coverage, errors,
+usage, cost) were inspected. Artifacts: `out/q2_stage2_canary/`,
+`out/q2_stage2_smoke_4omini/`, `out/q2_stage2_smoke_4o/`, `out/q2_stage2_smoke_llama_v2/`;
+code + fix at `344ee1a`.
+
+| model | outcome | cause |
+|---|---|---|
+| `x-ai/grok-4.5` | pre-run capability failure | hard 400: xAI caps `top_logprobs` at 8; frozen value is 20 |
+| `openai/gpt-4o-mini-2024-07-18` | 48/48 calls clean, NOT promoted | 8/48 calls omit an option number from the returned top-20 |
+| `openai/gpt-4o-2024-11-20` | 48/48 calls clean, NOT promoted | same top-k saturation pattern |
+| `meta-llama/llama-3.3-70b-instruct` (`akashml/fp8`) | 48/48 scoring failures | endpoint returns logprobs for the final `<|eot_id|>`, not the first content token, while emitting a valid answer (`'3'`) |
+
+Three findings that bear on interpretation, all pre-outcome:
+
+1. **The OpenAI failures are saturation, not corruption.** Every flagged call has
+   `option_mass` 1.0 and `top1_is_option` true: the missing option number's probability sits
+   below the 20th-ranked token because the model is near-deterministic. The frozen
+   all-four-options rule is stricter than the estimand strictly requires. It was frozen
+   precisely so it could not be relaxed after seeing data, and it is NOT relaxed here.
+2. **Both non-OpenAI failures are logprob-specific.** xAI's cap and AkashML's misalignment
+   concern `top_logprobs` and logprob token alignment only; neither touches generation. The
+   sampling path sends no `logprobs`/`top_logprobs` at all, so neither failure applies to it.
+3. **The OpenRouter catalog's `supported_parameters` is not a capability contract.** It
+   advertises `top_logprobs` support for both failing endpoints but expresses neither value
+   caps (xAI) nor positional correctness (AkashML). The paper should say so.
+
+A runner accounting bug was found BY this run and fixed: a paid call whose scoring failed
+discarded its cost record ($0.02949 actual vs $0.02835 booked across 48 Llama calls). A paid
+call is now booked and persisted before anything that can fail; records carrying
+`scoring_error` or `provider_consistent=false` are reported but excluded from headline
+aggregation. Two regression tests added; suite 43 passing.
+
+## v6 amendment — sampling estimator (PRE-OUTCOME; pending Sol)
+
+**Status: Alex AGREE, Fable AGREE, Sol PENDING. No paid sampling call before Sol signs and
+the v6 freeze commit lands.** This amendment is pre-outcome in the strict sense: no
+substantive score, contrast, direction, or effect size from any hosted model has been viewed
+by anyone. It is triggered by capability failures and by measured cost, never by outcomes.
+
+**The change.** The hosted headline estimator becomes the SAMPLING path, which this document
+already froze in full (temperature 1.0, top_p 1.0, max_tokens 4, seed UNSET for independent
+draws, no stop sequences, leading-option-number parse, fail closed when unparseable; S=100
+per probe-cell IN TOTAL, balanced 25 per Williams order). The logprob path is retired as the
+hosted headline and its gate-run results are reported as capability findings only. Logprob
+and sampling estimates are therefore never mixed within a model's headline contrasts — the
+headline is sampling-only.
+
+**What does NOT change.** Payload and guard texts, the 11 cells, the 12 probes, the four
+Williams orders, the display-to-canonical remap, the eight per-model non-pooled estimands,
+the paired percentile bootstrap, the crack and materiality thresholds, provider routing and
+its consistency rule, outcome blinding during the gate, the $8.50 global study stop, and the
+rule that every attempted model and cell is reported including failures.
+
+**Panel re-qualification.** Because both non-OpenAI failures were logprob-specific, all four
+models are re-tested on the sampling path before any are excluded. A sampling capability
+canary and a sampling smoke run first; a model is excluded only on a measured sampling
+failure or on measured cost, never on an outcome.
+
+**New frozen gate (replaces the top-k coverage rule for this path).** The sampling smoke is
+the same 6 cells x 2 probes x 4 orders, at 5 draws per call-coordinate (240 draws per model).
+A model is promoted only if **every smoke coordinate yields at least one parseable reply and
+the model's overall smoke parse rate is >= 0.95**. Unparseable replies are never guessed,
+never clamped, and are reported per cell. The parse rate is a measurement-validity gate and
+is decided before any contrast is computed.
+
+**Measured per-call cost (from the 48-call smoke; input ~218-243 prompt tokens):**
+
+| model | measured $/call | 13,200 (11-cell) | 9,600 (8-cell) |
+|---|---:|---:|---:|
+| `openai/gpt-4o-mini-2024-07-18` | 0.0000333 | $0.44 | $0.32 |
+| `meta-llama/llama-3.3-70b-instruct` | 0.0000324 | $0.43 | $0.31 |
+| `openai/gpt-4o-2024-11-20` | 0.0005542 | $7.32 | $5.32 |
+| `x-ai/grok-4.5` | not yet measured (no completed study call) | — | — |
+
+**Cost-only inclusion rule (frozen).** In frozen panel order, each model runs the full 11-cell
+S=100 set if its measured cost fits the remaining sampling cap; else the 8-cell minimum if
+that fits; else it is recorded as a **budget exclusion** and reported. Inclusion is decided
+from measured cost BEFORE outcomes; a model is never selected or dropped because its cells
+look favourable, and never partially run. Under the frozen $3.75 sampling cap this admits
+gpt-4o-mini ($0.44) and Llama ($0.43) at full S=100 (combined $0.87), and excludes gpt-4o on
+cost at both branches; grok-4.5 is decided once its per-call cost is measured.
+
+**Two sub-decisions flagged for Sol, deliberately NOT taken here:**
+
+- **S1 — repurposing.** Under a sampling-only headline the $3.00 matrix cap funds nothing.
+  Repurposing it to sampling ($6.75 combined) would admit gpt-4o at the 8-cell minimum
+  ($5.32). This is an expansion of a preregistered component cap and is not assumed; the
+  conservative default is no repurposing and gpt-4o excluded on cost.
+- **S2 — reduced S.** Alternatively an expensive model could run at reduced S (e.g. gpt-4o at
+  S=25, ~$1.83) instead of being excluded. This buys panel breadth at the price of a
+  per-model precision difference that complicates cross-model comparison. Not assumed.
+
+**Known property to disclose either way.** Sampling introduces within-cell measurement noise
+that the logprob path did not have: each probe-cell distribution rests on 100 draws. The
+probe-level paired bootstrap already carries probe variation, but the paper must disclose the
+added sampling noise rather than presenting sampled frequencies as exact option likelihoods.
+
 ## Sampling validation (per R-H4)
 
 On pinned gpt-4o-mini: S=100 per probe-cell IN TOTAL, balanced as 25 samples per each of
@@ -291,6 +393,15 @@ Superseded by v5 operational sign-off below.
 ## Votes (v5)
 
 A: [AGREE] F: [AGREE] S: [AGREE]
+
+## Votes (v6 — sampling-estimator amendment)
+
+A: [AGREE] F: [AGREE] S: [ ]
+
+Sol's v6 review must cover: the estimator switch itself; the new parse-rate promotion gate
+(>= 0.95, every coordinate parseable); the cost-only inclusion rule and the resulting gpt-4o
+exclusion; sub-decisions S1 (repurposing the unused $3.00 matrix cap) and S2 (reduced S);
+and the sampling-noise disclosure. No paid sampling call may precede the v6 freeze commit.
 
 ## Sol review — required revisions before Stage-2 freeze
 
