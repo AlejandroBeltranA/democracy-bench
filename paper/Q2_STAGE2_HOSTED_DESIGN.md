@@ -212,6 +212,49 @@ After those tests pass and v5 is committed, paid validation is staged:
   check shows enough headroom to finish the next indivisible preregistered unit under the
   applicable cap.
 
+## Implementation status (Fable, 2026-07-22; not a spec change)
+
+The dedicated runner exists and the five no-network test groups above PASS. This record
+closes the readiness gate the frozen spec opened; it adds no requirement and changes no
+frozen value.
+
+- **Runner:** `src/alignment/q2_hosted.py`. Network is a single injectable seam
+  (`Transport`); every decision about what is sent, how it is scored, what it costs, and
+  when a call is refused is a pure function. Payloads, guards, probes, orders, and the
+  crack/materiality thresholds are imported verbatim from the frozen local design
+  (`alignment.q1_channel`, `alignment.instrument.measure`), not restated.
+- **Tests:** `tests/test_q2_hosted.py`, 42 tests, all passing; full repo suite 474 passing.
+  Group 1 request snapshots -> `test_logprob_request_exact_shape`,
+  `test_sampling_request_has_no_seed_and_no_logprobs`, `test_headers_include_metadata_optin`,
+  `test_panel_slugs_are_frozen`, `test_system_guard_cell_routes_guard_into_system_role`,
+  `test_smoke_request_is_byte_identical_to_matrix_twin`. Group 2 fail-closed ->
+  `test_score_sums_distinct_variants_of_the_same_option`,
+  `test_score_reports_missing_option_numbers`, `test_score_fails_closed_when_no_option_token`,
+  `test_smoke_passes_only_when_every_call_has_all_four`, the transport retry/skip/exhaust
+  tests, and `test_provider_mismatch_blocks_headline_data`. Group 3 accounting ->
+  `test_returned_cost_drives_the_ledger`, the three cap/ceiling/global-stop tests,
+  `test_raw_record_is_immutable_and_atomic`. Group 4 restart ->
+  `test_completed_call_resumes_without_paying`,
+  `test_promoted_smoke_call_reused_once_in_matrix`,
+  `test_independent_sampling_draws_are_not_deduped`,
+  `test_partial_model_cannot_emit_headline`. Group 5 counts ->
+  `test_smoke_and_matrix_counts` (48/528), `test_sampling_counts` (9,600/13,200),
+  `test_manifest_is_hashed_and_stable`.
+- **Two wire-format details the CANARY confirms before the smoke, by design:** the exact
+  `usage` cost field name (the ledger reads `usage.cost`, falling back to `usage.total_cost`)
+  and the exact resolved-provider string. Provider consistency is checked by base-slug
+  normalisation, so the declared `akashml/fp8` matches a served display name `AkashML`; if a
+  provider's display name does not share its slug base, that one normalisation rule may take a
+  single pre-outcome adjustment (the only anticipated change, and it touches no estimand).
+- **Live entry point:** `python -m alignment.q2_hosted --stage {canary,smoke} --out-dir out/...`
+  refuses to run without `--i-have-authorized-paid-spend`, fires the canary and the
+  outcome-blinded smoke only, and never auto-runs matrix or sampling. Ledger starts
+  pre-top-up: canary + smoke only, under the $3 ceiling, matrix/sampling blocked until top-up.
+- **Commit:** runner + suite at `80399d7`; this spec freeze at `8ed6a64`.
+
+Next action is the first paid step (the canary), on Alex's trigger; no paid call has been
+made.
+
 ## Sampling validation (per R-H4)
 
 On pinned gpt-4o-mini: S=100 per probe-cell IN TOTAL, balanced as 25 samples per each of
