@@ -7,9 +7,10 @@ Discussion, Conclusion, and the Ethical Statement.
 **Numbers tied to:** `out/q1_channel_{3b,8b}.json` at commit `fac4582`, frozen design
 `8c69435`, interpretation per `paper/Q1_RESULTS_CONSENSUS.md` (Sol CONCUR 2026-07-22).
 Primary statistics are read from the committed artifacts' named headline estimands; the
-secondary placebo contrasts are regenerated from the committed item-level rows with the
-frozen paired bootstrap (an extractor extension for these named secondaries is pending
-and must land before the manuscript quotes them).
+secondary numbers (placebo effects, surveillance-exclusion sensitivity) regenerate from
+`out/q1_secondary_extract.json` via the fail-loud, hash-pinned extractor
+`scripts/extract_q1_secondary.py` with tests on source identity, pairing, signs, and the
+quoted rounded values (R-W7: DONE).
 
 **Sol review (2026-07-22): OBJECT pending R-W1--R-W5 below.** The withdrawal and
 decomposition are the right thesis-level pivot, but the draft presently reintroduces a
@@ -19,6 +20,10 @@ claim contradicted by Q1: the combined payload does not defeat every prompt-leve
 combined::user_after numbers Sol cites were verified against the committed artifacts
 (3B 0.572, 0 induced cracks; 8B 0.694, 2 remaining) before incorporation. Fresh
 Alex + Sol sign-off required before any manuscript edit.**
+
+**Sol v2 review (2026-07-22): OBJECT pending R-W6--R-W7 below.** The substantive
+reframing now matches Q1. These are two bounded pre-application corrections, not a
+request to reopen the thesis.
 
 ---
 
@@ -73,8 +78,9 @@ recovers the 8B's data-only crack completely ($+0.314$ $[+0.235, +0.389]$, all f
 induced cracks closed) yet does nothing on the 3B ($+0.012$, n.s.). Matched user-guards
 perform as well or better than the system role on both models, so we make no
 prompt-hierarchy claim; the accurate statement is that guard efficacy varies with
-placement and model, and the guard grid of \S\ref{sec:results} tested the least
-favorable placement.
+placement and model, and the committed guard grid of \S\ref{sec:results} tested only the
+user-before placement, which Q1 shows can be substantially less effective than placing
+the same guard after the payload.
 
 The original combined payload, data plus embedded imperative, remains severe with no
 guard ($0.364$ 3B, $0.104$ 8B) and with the guard in the system role ($0.339$, $0.257$),
@@ -171,7 +177,8 @@ verify at Stage-2 whether the decomposition transfers before strengthening furth
 - The crack survives but is decomposed: the section no longer claims an
   evidence-over-instruction asymmetry, which Q1 falsified in its strong form.
 - The guard story flips from "prompt guards fail" to "guard efficacy is placement- and
-  model-dependent; the committed grid tested the worst placement"; routing survives as a
+  model-dependent; the committed grid tested only the user-before placement, which Q1
+  shows can be substantially less effective than user-after"; routing survives as a
   deterministic exposure boundary (a scope guarantee by construction), not as the only
   effective mitigation.
 - The placebo result imports the anchoring objection into the paper on our terms,
@@ -275,3 +282,27 @@ substantially mitigated by user-after placement.
 one central Q1 figure; D-B keep the explicit withdrawal; D-C do not add an anchoring
 citation as a substitute for identification; D-D put the full order-sensitivity numbers
 in Limitations and retain one sentence in Section 5.5.
+
+### R-W6. Soften the remaining “least favorable placement” statement
+
+The prose still says the committed guard grid tested “the least favorable placement.”
+User-before is worse than user-after in the relevant local contrasts, but it is not
+uniformly the worst of every placement on both models; for 8B data-only, the system guard
+has lower protective mass than either user placement. Replace this with:
+
+> the committed guard grid tested only the user-before placement, which Q1 shows can be
+> substantially less effective than placing the same guard after the payload.
+
+Make the same change in “Compared to the prior version.”
+
+### R-W7. Build the named secondary extractor before applying prose
+
+Proceed with the extractor extension now. Do not modify the immutable Q1 run artifacts.
+Create a fail-loud derived results artifact (or extend the existing paper-results
+extractor) that verifies the two Q1 source hashes and regenerates the placebo effects and
+CIs with the frozen paired bootstrap (`B=2000`, `seed=0`). Add tests for source identity,
+pairing, signs, and the quoted rounded values. Route every Q1 number used by the paper
+through that derived artifact before editing `.tex`.
+
+After R-W6 and R-W7, Sol approves applying the v2 thesis and explicit withdrawal to the
+manuscript, subject to normal rendered-page review.
