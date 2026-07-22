@@ -261,7 +261,7 @@ def _option_token_ids(tok, max_num: int = 9) -> dict:
     return out
 
 
-def mlx_logprob_fn(model, tok, top_k: int | None = None):
+def mlx_logprob_fn(model, tok, top_k: int | None = None, system: str | None = None):
     """A Phase-1-compatible LogprobFn over the local model: one forward pass, read the last
     position's log-softmax row, and score option numbers using `option_logprob_vector`'s strip
     rule for token acceptance. `top_k=None` (default) is the EXACT path: option tokens are read
@@ -275,7 +275,7 @@ def mlx_logprob_fn(model, tok, top_k: int | None = None):
 
     if top_k is not None:
         def fn(prompt: str, n: int) -> np.ndarray:
-            ids = _chat_ids(tok, prompt)
+            ids = _chat_ids(tok, prompt) if system is None else _chat_ids(tok, prompt, system=system)
             logits = model(ids)
             row = np.array(logits[0, -1]).astype(np.float64)
             row = row - (row.max() + np.log(np.exp(row - row.max()).sum()))   # log-softmax
@@ -287,7 +287,7 @@ def mlx_logprob_fn(model, tok, top_k: int | None = None):
     opt_ids = _option_token_ids(tok)
 
     def fn(prompt: str, n: int) -> np.ndarray:
-        ids = _chat_ids(tok, prompt)
+        ids = _chat_ids(tok, prompt) if system is None else _chat_ids(tok, prompt, system=system)
         logits = model(ids)
         row = np.array(logits[0, -1]).astype(np.float64)
         row = row - (row.max() + np.log(np.exp(row - row.max()).sum()))   # log-softmax
