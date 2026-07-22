@@ -727,22 +727,34 @@ def execute_call(spec: CallSpec, item: Mapping, transport: Transport, headers: d
         return store.get(key)
     ledger.check(bucket, est_cost)                 # refuse before any paid work
     response = transport(body, headers)
-    prov = resolved_provider(response)
-    if not provider_matches(spec.provider, prov):
-        raise ProviderMismatch(
-            f"declared {spec.provider!r}, served {prov!r} for {spec.cell_id}/{spec.probe_id}")
-    scored = _score_record(spec, response, n_options)
+    # ---- the call is PAID the moment transport returns. Book and persist it BEFORE anything
+    # that can fail, so a scoring failure or provider mismatch can never lose the cost record
+    # (design: "each completed call becomes one immutable raw record"; "every attempted model
+    # and cell is reported, including failures"). Persistence is NOT inclusion: a record
+    # carrying scoring_error or provider_consistent=False is excluded from headline aggregation.
     cost = response_cost(response)
+    prov = resolved_provider(response)
+    consistent = provider_matches(spec.provider, prov)
     record = {
         "key": key, "request_sha256": request_key(body),
         "model": spec.model, "provider": spec.provider, "resolved_provider": prov,
+        "provider_consistent": consistent,
         "path": spec.path, "cell_id": spec.cell_id, "probe_id": spec.probe_id,
         "order_idx": spec.order_idx, "draw": spec.draw, "smoke": spec.smoke,
         "returned_model": response.get("model"), "cost": cost,
-        "usage": response.get("usage") or {}, **scored,
+        "usage": response.get("usage") or {}, "scoring_error": None,
     }
+    try:
+        record.update(_score_record(spec, response, n_options))
+    except ElicitationError as e:
+        record["scoring_error"] = str(e)
     store.put(key, record)                          # atomic; refuses to overwrite
     ledger.record(bucket, cost)
+    if not consistent:
+        raise ProviderMismatch(
+            f"declared {spec.provider!r}, served {prov!r} for {spec.cell_id}/{spec.probe_id}")
+    if record["scoring_error"]:
+        raise ElicitationError(record["scoring_error"])
     return record
 
 
@@ -791,6 +803,10 @@ def aggregate_logprob_mass(records: Sequence[Mapping], items: Mapping[str, Mappi
     by_cp: dict = {}
     for r in records:
         if r["path"] != "logprob":
+            continue
+        # persisted-but-excluded: a paid call that failed scoring or was served by the wrong
+        # provider is on the ledger and in the raw store, but never becomes headline data.
+        if r.get("scoring_error") or r.get("provider_consistent") is False:
             continue
         by_cp.setdefault((r["cell_id"], r["probe_id"]), {})[r["order_idx"]] = r["display"]
     mass: dict = {}

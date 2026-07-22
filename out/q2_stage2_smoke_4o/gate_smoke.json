@@ -1,0 +1,80 @@
+{
+ "run": {
+  "generated_at": "2026-07-22T11:44:51.600853+00:00",
+  "command": "python -m alignment.q2_hosted",
+  "code_ref": "46700ca11b84511e328a37a3455e992529ff4b98",
+  "schema_version": 1,
+  "temperature": 1.0,
+  "models": [
+   "openai/gpt-4o-2024-11-20"
+  ],
+  "kind": "q2_hosted_stage2",
+  "design_doc": "paper/Q2_STAGE2_HOSTED_DESIGN.md",
+  "design_doc_sha256": "642d027f6449bed82f984849d1809a4f297c76e4cd40b6510952d2ec57e51467",
+  "orders": [
+   [
+    0,
+    1,
+    3,
+    2
+   ],
+   [
+    1,
+    2,
+    0,
+    3
+   ],
+   [
+    2,
+    3,
+    1,
+    0
+   ],
+   [
+    3,
+    0,
+    2,
+    1
+   ]
+  ],
+  "top_p": 1.0,
+  "max_tokens": 4,
+  "top_logprobs": 20,
+  "logprob_seed": 0,
+  "caps": {
+   "smoke": 1.0,
+   "matrix": 3.0,
+   "sampling": 3.75,
+   "reserve": 1.5,
+   "canary": 3.0
+  },
+  "global_study_stop": 8.5,
+  "pre_topup_ceiling": 3.0,
+  "stage": "smoke",
+  "spend": {
+   "smoke": 0.02660000000000001,
+   "matrix": 0.0,
+   "sampling": 0.0,
+   "reserve": 0.0,
+   "canary": 0.0
+  }
+ },
+ "results": [
+  {
+   "model": "openai/gpt-4o-2024-11-20",
+   "declared_provider": "openai",
+   "resolved_providers": [
+    "OpenAI"
+   ],
+   "n_calls": 48,
+   "n_scored": 48,
+   "n_errors": 0,
+   "errors": [],
+   "all_calls_full_coverage": false,
+   "promote": false,
+   "smoke_spend": 0.0266,
+   "provider_consistent": true,
+   "manifest_sha256": "289f1565b0219061eb96a58764b0fb9c128d628549b00e957aefd816f0047e8a"
+  }
+ ]
+}

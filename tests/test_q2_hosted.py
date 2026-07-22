@@ -190,21 +190,44 @@ def test_sampling_choice_leading_number_and_fail_closed():
     assert Q.sampling_choice({"choices": []}, 4) is None
 
 
-def test_provider_mismatch_blocks_headline_data(items, tmp_path):
-    """A response served by a different provider than declared raises ProviderMismatch and
-    writes NO raw record (no headline data booked)."""
+def test_provider_mismatch_is_booked_persisted_and_excluded(items, tmp_path):
+    """A response served by the wrong provider still COST money: it must be booked and persisted
+    (flagged), and still raise — persistence is not inclusion. The flagged record is excluded
+    from headline aggregation."""
     it = items["pol_ai_due_process"]
     spec = Q.CallSpec(Q.PANEL[3].model, Q.PANEL[3].provider, "logprob",
                       "data_only::no_guard", it["id"], 0)
     transport = lambda body, headers: _lp_response(
         {"1": math.log(.25), "2": math.log(.25), "3": math.log(.25), "4": math.log(.25)},
-        provider="novita")                          # declared akashml/fp8, served novita
+        cost=0.0009, provider="Novita")             # declared akashml/fp8, served Novita
     store = Q.RawStore(tmp_path / "raw")
     led = Q.Ledger(topped_up=False)
     with pytest.raises(Q.ProviderMismatch):
         Q.execute_call(spec, it, transport, {}, led, store, "smoke", est_cost=0.01)
-    assert store.keys() == []
-    assert led.spent["smoke"] == 0.0
+    assert len(store.keys()) == 1                            # paid call is on the record
+    assert led.spent["smoke"] == pytest.approx(0.0009)       # and on the ledger
+    rec = store.get(store.keys()[0])
+    assert rec["provider_consistent"] is False
+    assert Q.aggregate_logprob_mass([rec], items) == {}      # excluded from headline
+
+
+def test_scoring_failure_still_books_and_persists_the_paid_call(items, tmp_path):
+    """Regression: a response that returns top-k with NO option-number token is a PAID call.
+    It must be booked and persisted with scoring_error set, then raise — never silently lost."""
+    it = items["pol_ai_due_process"]
+    spec = Q.CallSpec("m", "openai", "logprob", "baseline::no_guard", it["id"], 0)
+    transport = lambda body, headers: _lp_response(
+        {"Sure": math.log(.6), "I": math.log(.4)}, cost=0.0002, provider="OpenAI")
+    store = Q.RawStore(tmp_path / "raw")
+    led = Q.Ledger(topped_up=False)
+    with pytest.raises(ElicitationError):
+        Q.execute_call(spec, it, transport, {}, led, store, "smoke", est_cost=0.01)
+    assert len(store.keys()) == 1
+    assert led.spent["smoke"] == pytest.approx(0.0002)       # cost was NOT lost
+    rec = store.get(store.keys()[0])
+    assert rec["scoring_error"] and "no option-number token" in rec["scoring_error"]
+    assert "display" not in rec                              # no fabricated distribution
+    assert Q.aggregate_logprob_mass([rec], items) == {}      # excluded from headline
 
 
 def test_provider_matches_normalizes_slug_vs_display_name():
