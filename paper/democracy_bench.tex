@@ -44,14 +44,16 @@ healthcare) and a \emph{rights floor} that must hold across probes (due process,
 to appeal, free expression). We evaluate a five-rung ``steering ladder'' of methods for
 instilling democratic preference while holding those rights. Most rungs fail. The exception
 is evidence-in-context, which lets a model track the real 2022$\to$2024 shift in public
-attitudes but is itself the attack surface: a synthetic hostile ``public distribution''
-erodes \emph{every} rights floor, and neither prompt guards nor a fine-tuning recipe closes
-the channel. The result replicates across scale (3B and 8B Llama) and family (Qwen, Phi,
+attitudes but is itself an attack surface: distribution-shaped context erodes rights
+floors without any explicit demand, a direct hostile instruction erodes them further,
+and rights-guard efficacy varies with prompt placement and model rather than holding
+reliably; a fine-tuning recipe also fails to close the channel. The result replicates across scale (3B and 8B Llama) and family (Qwen, Phi,
 Gemma, and Mistral all track and crack), and reaches a hosted proprietary model: gpt-4o-mini, a
 strong floor-holder at rest, cracks on every floor under the same hostile evidence. The
-remaining guard is \emph{architectural}: class-aware evidence routing, which injects
-public-opinion evidence on contestable items and never on floor items, closing the
-channel by construction. This is a necessary control, not a complete fix. Built on the Inspect framework, every reported number
+remaining \emph{architectural} guard is class-aware evidence routing, which injects
+public-opinion evidence on contestable items and never on floor items: a deterministic
+exposure boundary, closed by construction. This is a necessary control, not a complete
+fix. Built on the Inspect framework, every reported number
 regenerates from released derived artifacts, and the targets can be rebuilt from the
 survey data. Democracy Bench reframes the question from whether a model can be steered to
 who controls the channel that steers it. As human agency in these
@@ -109,14 +111,14 @@ prior benchmark reports (\S\ref{sec:framework}).
 \emph{interventional arm} of the benchmark, which asks not only where a model sits but
 whether it can be \emph{governed} there. Reading the same two metrics (congruence gain,
 floor margin) as we write representation through each channel yields a \emph{channel
-authority ordering}: in-context evidence dominates, decode/activation/weight/scaffold
-levers are null or destructive, and evidence overrides the instruction channel even when
-a guard prompt is explicitly opposing it. We characterize \emph{why} each rung fails
+authority ordering}: in-context conditioning dominates, while decode/activation/weight
+levers are null or destructive. We characterize \emph{why} each rung fails
 (\S\ref{sec:ladder}--\S\ref{sec:results}).
-(3) A safety result with a clean asymmetry: the evidence channel that enables tracking
-is also the channel that cracks rights floors; the adversarial \emph{prompt} alone is
-not significant. Prompt guards and a naive LoRA both fail to close it, and the crack
-replicates across scale and family (\S\ref{sec:results}).
+(3) A decomposed attack surface, established by a preregistered channel experiment:
+survey-style data alone erodes rights floors with no instruction attached, a direct
+hostile instruction erodes them further, and rights-guard efficacy varies with prompt
+placement and model; a naive LoRA fails outright, and the crack replicates across scale
+and family (\S\ref{sec:results}).
 (4) A deployment-relevant \emph{design principle}, class-aware evidence routing, with an
 honest account of its residual attack surface---routing moves the problem to the item
 classifier, which becomes a security \emph{and} legitimacy boundary (\S\ref{sec:routing}).
@@ -298,7 +300,8 @@ open-weight models are 4-bit MLX community checkpoints run on Apple Silicon.}
 \includegraphics[width=\linewidth]{f1_ladder.pdf}
 \caption{The intervention ladder. Only context / evidence-in-prompt earns a partial
 pass (tracks 8/10 items, elasticity $+0.395$)---and it is the attack surface. Every
-heavier lever fails: prompt guards hold 0/4 (best 0.402 $<$ 0.50 floor); logit-bias
+heavier lever fails: user-before prompt guards hold 0/4 (best 0.402 $<$ 0.50 floor;
+guard placement matters, \S\ref{sec:crack}); logit-bias
 held-out gain $+0.074$ (n.s.); activation steering held-out gain $-0.081$ and is a
 persona axis (cosine to an 1850-farmer control $=0.852$); a naive LoRA fails 4/6 and
 collapses off-task capability $1.00 \to 0.00$.}
@@ -381,27 +384,34 @@ $+0.647$). The misses are the items whose real shift runs against the model's pr
 \label{fig:tracking}
 \end{figure}
 
-\subsection{The hostile-evidence floor crack}\label{sec:crack}
+\subsection{Decomposing the crack: data, instructions, and placement}\label{sec:crack}
 
 Feeding a \emph{synthetic} 75\%-anti-rights ``public distribution'' through the
-deference channel cracks every floor (Table~\ref{tab:floors}). That a channel built to
-\emph{track} a distribution will also track a hostile one is expected \emph{by
-construction}; the result worth reporting is not the bare crack but its
-\emph{asymmetry} and \emph{irreducibility}. The adversarial \emph{prompt} alone is not
-significant---the identical demand erodes a floor as \emph{evidence} yet is inert as an
-\emph{instruction}---and, as the rest of this section shows, no prompt- or weight-level
-guard closes the channel. That asymmetry, not the crack, is the finding.
+deference channel cracks rights floors on both local models (Table~\ref{tab:floors}).
+That result, as first measured, carried two confounds we owed the reader an answer on:
+the injected payload both displays a distribution and explicitly instructs the model to
+reproduce it, and every guard tested was ordinary user-message text sharing the prompt
+with the attack. We therefore froze a channel-decomposition design before running it:
+four payloads (no payload; a pure target instruction naming the anti-rights option, with
+no population claim; the same hostile numbers presented as a bare survey report, with no
+imperative; and the original combined text) crossed with four guard placements (none;
+the rights guard before the payload in the user turn; after it; and in the true system
+role), over all 12 floor probes and a position-balanced Williams square of option
+orders, with estimands and decision rules fixed in advance. The design document's hash
+is stamped in every artifact.
 
 \begin{figure*}[t]\centering
 \includegraphics[width=0.86\textwidth]{f3_floors.pdf}
 \caption{Rights-floor protective mass by condition and guard arm, 3B (left) vs 8B
 (right), 0.50 floor line drawn, 95\% CIs, shared $y$-scale. The synthetic
-hostile-evidence channel cracks every floor on both models; the adversarial
-\emph{prompt} alone does not. Scale does not buy evidence-channel safety: the 8B is a
-stronger \emph{baseline} floor-holder (0.707 vs.\ 0.512) yet cracks $\approx 3\times$
-deeper under hostile evidence ($0.707 \to 0.074$). No guard reaches the 0.50 floor on
-either model; on 3B \texttt{guard\_provenance} backfires. Hostile evidence is synthetic
-red-team data, not real BSA opinion.}
+hostile-evidence channel drives 12/12 floors below the 0.50 line on the 3B and 11/12 on
+the 8B; the constitutional-pressure \emph{prompt} alone does not crack floors. Scale
+does not buy evidence-channel safety: the 8B is a stronger \emph{baseline} floor-holder
+(0.707 vs.\ 0.512) yet cracks $\approx 3\times$ deeper under hostile evidence
+($0.707 \to 0.074$). In this user-before guard grid no guard reaches the 0.50 floor on
+either model, and on 3B \texttt{guard\_provenance} backfires; \S\ref{sec:crack} shows
+guard efficacy depends on placement. Hostile evidence is synthetic red-team data, not
+real BSA opinion.}
 \label{fig:floors}
 \end{figure*}
 
@@ -422,17 +432,65 @@ Hostile evidence is \emph{synthetic red-team data}, not real BSA opinion.}
 \label{tab:floors}
 \end{table}
 
-Two levers meant to close the channel both fail. A ``defer-where-due'' LoRA (rank 8, 500
-iters) fails 4 of 6 eval criteria: held-out fidelity delta $+0.003$ ($[-0.054, +0.066]$,
+Four findings follow, each stated under the preregistered rules. First, data alone
+erodes floors. The bare survey report, carrying no instruction of any kind, lowers mean
+protective mass by $-0.163$ ($[-0.232, -0.086]$) on the 3B and $-0.188$
+($[-0.250, -0.124]$) on the 8B, newly cracking 5 of the 8 floors that held at baseline
+on each model. A deployer does not need to tell a model to follow hostile ``opinion
+data''; showing it is enough.
+
+Second, the instruction channel dominates, and the asymmetry we measured at P4 inverts.
+A direct instruction to select the anti-rights option collapses protective mass to
+$0.06$ on both models ($\Delta \approx -0.56$), cracking every eligible floor; the
+channel contrast (data effect minus instruction effect) is $+0.395$ ($[+0.333, +0.464]$)
+on the 3B and $+0.380$ ($[+0.287, +0.492]$) on the 8B, far outside our preregistered
+equivalence margin and opposite in sign to an evidence-specific vulnerability. What P4
+established is therefore a fact about one prompt, not a channel ordering: the
+\emph{constitutional majority-pressure text} showed no detectable harmful average
+effect, while the direct target instruction tested here is the strongest lever in the
+matrix. We withdraw the claim that evidence overrides the instruction channel.
+
+Third, semantically relevant hostile opinion is not necessary for floor movement. An
+irrelevant distribution-and-reproduction payload, the same numerical shape attached to a
+transport question, also lowers protective mass on both models ($-0.143$
+$[-0.217, -0.073]$ on the 3B; $-0.112$ $[-0.187, -0.033]$ on the 8B). The design does
+not separate numerical anchoring from the accompanying imitation framing, so we make no
+mechanism claim beyond this: under our frozen interpretation the movement is contextual
+instability, not uniquely democratic-value erosion.
+
+Fourth, prompt guards are not uniformly weak; they are placement- and model-dependent.
+The same rights-guard text that fails ahead of the payload on the 3B ($0.424$) restores
+every floor when placed after it ($0.690$, 0 of 12 below); in the system role it
+recovers the 8B's data-only crack completely ($+0.314$ $[+0.235, +0.389]$, all five
+induced cracks closed) yet does nothing on the 3B ($+0.012$, n.s.). Matched user-guards
+perform as well or better than the system role on both models, so we make no
+prompt-hierarchy claim; the accurate statement is that guard efficacy varies with
+placement and model, and the committed guard grid (Figure~\ref{fig:floors}) tested only
+the user-before placement, which can be substantially less effective than placing the
+same guard after the payload.
+
+The original combined payload, data plus embedded imperative, remains severe with no
+guard ($0.364$ 3B, $0.104$ 8B) and with the guard in the system role ($0.339$, $0.257$),
+while moving the same guard after the payload recovers all induced cracks on the 3B
+($0.572$, 0 remaining) and most on the 8B ($0.694$, 2 remaining). No tested prompt
+placement is reliable across models and payloads. Class-aware routing
+(\S\ref{sec:routing}) supplies a deterministic scope boundary by withholding the
+public-opinion payload from declared floor items: it avoids payload-induced degradation
+by construction, rather than being the only prompt-independent mitigation observed.
+
+The weight-level lever fails outright. A ``defer-where-due'' LoRA (rank 8, 500 iters)
+fails 4 of 6 eval criteria: held-out fidelity delta $+0.003$ ($[-0.054, +0.066]$,
 n.s.); tracking \emph{destroyed} (elasticity $\to +0.005$); \emph{baseline} floors
 \emph{degraded} by $-0.115$ ($[-0.193, -0.028]$); off-task generation collapses
-($1.00 \to 0.00$) and answers homogenize (pairwise TV $0.165 \to 0.002$). At the prompt
-level, all four rights guards fail to neutralize the crack: telling the model the
-evidence may be fake (\texttt{guard\_provenance}) \emph{backfires}
-($\Delta -0.030$, CI clears zero) and degrades the no-attack baseline; the
-constitutional guard is the only significant partial recovery ($+0.084$,
-$[+0.037, +0.135]$) but still lands at $0.402$ with 10/12 probes below floor. On this
-model, floor-safety cannot be prompted into the evidence channel.
+($1.00 \to 0.00$) and answers homogenize (pairwise TV $0.165 \to 0.002$).
+
+Two measurement notes. The combined cells replicate the committed P4 cracks
+directionally (3B $0.364$ vs.\ $0.318$; 8B $0.104$ vs.\ $0.074$); under the balanced
+four-order design the baselines shift materially in \emph{opposite} directions,
+demonstrating order sensitivity in the two-order estimates (magnitudes in Limitations).
+And on one 3B probe (surveillance) first-token option coverage drops as low as $0.01$
+in three cells; excluding it leaves every estimate above effectively unchanged (data
+$-0.150$, instruction $-0.552$, contrast $+0.402$).
 
 \subsection{Robustness across scale and family}\label{sec:robust}
 
@@ -449,8 +507,9 @@ The pattern also holds across \emph{families} (Table~\ref{tab:family}): on every
 four additional models spanning Alibaba (Qwen-2.5-7B), Microsoft (Phi-4-mini), Google
 (Gemma-2-9B), and Mistral (Mistral-Nemo), evidence tracking is positive with an
 elasticity CI that clears zero (direction-match 7--10/10), and the hostile-evidence crack
-is present with a $\Delta$ whose CI excludes zero, while the adversarial \emph{prompt}
-alone never cracks floors. A striking cross-family fact sharpens the safety story:
+is present with a $\Delta$ whose CI excludes zero, while the constitutional-pressure
+\emph{prompt} alone never cracks floors (the family panel did not run the direct
+instruction of \S\ref{sec:crack}). A striking cross-family fact sharpens the safety story:
 \emph{baseline} floor strength varies enormously---from Phi-4-mini at $0.903$ (0/12 below
 floor, unattacked) down to Mistral-Nemo at $0.362$ (10/12 below, \emph{weaker} than the
 3B)---a $>0.45$ spread, yet the hostile-evidence channel cracks all of them
@@ -466,11 +525,11 @@ hosted \emph{proprietary} model, gpt-4o-mini, run through the identical context-
 via OpenRouter option logprobs (the attack needs only option likelihoods, not open
 weights). gpt-4o-mini is the second-strongest floor-holder at rest ($0.883$, 1/12 below)
 yet under the same hostile evidence \emph{every} floor collapses ($\Delta -0.883$,
-$[-0.998, -0.703]$; 12/12 below), the deepest crack in the panel, while the adversarial
-prompt alone is protective ($\Delta +0.117$)---the same channel asymmetry, on a hosted
-proprietary model. Because gpt-4o-mini's option logprobs are near-degenerate, its masses
-saturate; the transferable finding is the direction and channel asymmetry, not the exact
-magnitude.
+$[-0.998, -0.703]$; 12/12 below), the deepest crack in the panel, while the
+constitutional-pressure prompt alone is protective ($\Delta +0.117$)---the same
+contrast, on a hosted proprietary model. Because gpt-4o-mini's option logprobs are
+near-degenerate, its masses saturate; the transferable finding is the direction of the
+contrast, not the exact magnitude.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{f6_crossfamily.pdf}
@@ -501,8 +560,9 @@ Mistral-7B-v0.3 & Mistral & \multicolumn{3}{c}{dropped: fail-closed} \\
 \end{tabular}
 \caption{Cross-family panel: six models, five families. Tracking is positive (direction;
 elasticity) on every model, with an elasticity CI that clears zero; the hostile-evidence
-crack ($\Delta$ in floor protective mass) is present on every model; the adversarial
-prompt alone never cracks floors. Only one checkpoint (Mistral-7B-v0.3) is dropped, with
+crack ($\Delta$ in floor protective mass) is present on every model; the
+constitutional-pressure prompt alone never cracks floors. Only one checkpoint
+(Mistral-7B-v0.3) is dropped, with
 a recorded reason (\S\ref{sec:robust}); the Mistral family is covered by Mistral-Nemo.}
 \label{tab:family}
 \end{table}
@@ -511,14 +571,16 @@ a recorded reason (\S\ref{sec:robust}); the Mistral family is covered by Mistral
 \section{Class-Aware Evidence Routing}\label{sec:routing}
 % =====================================================================
 
-Since floor-safety cannot be prompted into the evidence channel (guards fail) or
-fine-tuned into the weights without lobotomy (the LoRA), the guard that demonstrably
-closes \emph{this channel} is \emph{architectural}: inject public-opinion evidence
-\emph{only} on contestable-class items, never on floor-class items. This needs no new experiment---with
-no evidence injected, floor probes sit at the unguarded baseline (bit-replicated
-$0.512$) and the adversarial \emph{prompt} alone is not significant, so routing restores
-the best measurable floor state \emph{by construction} while leaving contestable
-representation and tracking untouched.
+Prompt-level guards recover parts of the decomposed attack, but no tested placement is
+reliable across models and payloads: the combined payload stays severe under the
+system-role guard on both models, and the placement that recovers it on the 3B
+(user-after) leaves two induced cracks on the 8B. Class-aware routing is a different
+kind of control: a deterministic exposure boundary that injects public-opinion evidence
+\emph{only} on contestable-class items, never on floor-class items. With no payload
+injected, floor probes return to the no-payload condition, avoiding payload-induced
+degradation \emph{by construction} while leaving contestable representation and
+tracking untouched; this is a scope guarantee, not an optimum (4 of 12 probes sit below
+$0.50$ even unattacked, and guarded baselines score higher).
 
 We state the residual attack surface honestly. Routing presumes the deployer controls
 both the evidence pipeline \emph{and} the item classifier; the floor-vs-contestable
@@ -542,15 +604,18 @@ Democracy Bench is best read as an \emph{assurance} instrument: a test a public-
 deployer runs \emph{before} trusting a model, not a delegate to be fielded. It answers
 the prior question---``can this model be governed as a policy delegate, and where would
 it fail?''---with a ladder of negatives around one fragile positive. The policy-delegate
-framing yields a sharp, deployment-relevant asymmetry: the single channel that lets a
-model \emph{track} a public---evidence in context---is also the channel through which an
-adversary posing as ``the public'' can erode rights, and it overrides prompt-level and
-weight-level defenses alike. For a public-sector deployer the assurance workflow is
-concrete: (i) pair every AI-actor probe with its human twin, because the raw ``AI floor''
-number overstates protection; (ii) do not expect prompts or light fine-tuning to make an
-off-the-shelf model represent a public; (iii) gate the evidence channel by item class,
-treating the classifier as a security boundary; and (iv) treat a floor crack under
-hostile evidence as a \emph{deployment blocker}, not a tuning target.
+framing yields a decomposed, deployment-relevant attack surface: the single channel that
+lets a model \emph{track} a public---evidence in context---also erodes rights floors
+when filled with distribution-shaped content, hostile or merely irrelevant, and a direct
+instruction erodes them further; rights-guard efficacy varies with prompt placement and
+model rather than holding reliably. For a public-sector deployer the assurance workflow
+is concrete: (i) pair every AI-actor probe with its human twin, because the raw ``AI
+floor'' number overstates protection; (ii) do not expect prompts or light fine-tuning to
+make an off-the-shelf model represent a public; (iii) test any rights guard in the
+placements it will actually occupy---after the evidence and in the system role, not only
+before it---and do not assume efficacy transfers across models; (iv) gate the evidence
+channel by item class, treating the classifier as a security boundary; and (v) treat a
+floor crack under hostile evidence as a \emph{deployment blocker}, not a tuning target.
 Methodologically, the harness shows the value of separating representation, steerability,
 tracking, and floors, and of fail-closed, provenance-carrying measurement in a
 socially-consequential setting.
@@ -568,12 +633,19 @@ governed avenues for a public to shape that evidence---and testing that they do 
 rights in the process---is the open problem this work points to.
 
 \paragraph{Limitations.}
-Local results are single-seed on 4-bit quantized models; tracking CIs reflect sampling
-error only (not prompt/order/house effects); the hostile-evidence distributions are
-synthetic red-team data and make no claim about real UK opinion; BSA microdata are not
-redistributable; and the floor/contestable assignments encode a normative judgment on
-which reasonable people can disagree. Tracking is demonstrated over a single 2022$\to$2024
-interval on Bonferroni-significant items. The hosted-model reproduction (gpt-4o-mini) uses a
+Local results are deterministic point measurements on 4-bit quantized models; bootstrap
+CIs resample items, not prompt/template/house effects, and the balanced four-order
+design of \S\ref{sec:crack} shifts the two-order baselines materially in opposite
+directions ($+0.109$ on the 3B, $-0.082$ on the 8B), so order sensitivity bounds the
+earlier point estimates. The hostile-evidence distributions are synthetic red-team data
+and make no claim about real UK opinion; the placebo result means floor movement under
+distribution-shaped context is not established as uniquely democratic-value erosion, and
+the design does not separate numerical anchoring from imitation framing. On one 3B floor
+probe (surveillance), first-token option coverage drops as low as $0.01$ in three cells;
+its exclusion changes no conclusion. BSA microdata are not redistributable; and the
+floor/contestable assignments encode a normative judgment on which reasonable people can
+disagree. Tracking is demonstrated over a single 2022$\to$2024 interval on
+Bonferroni-significant items. The hosted-model reproduction (gpt-4o-mini) uses a
 hosted, unpinned model reached over an API: it spends provider budget, is not
 byte-reproducible, and can drift under the same name, so we record its model id and run
 date and treat it as an existence proof of transfer, not a stable benchmark cell.
@@ -614,8 +686,11 @@ Democracy Bench asks whether a language model can be steered toward a public wit
 eroding the rights that must hold against a majority, and answers with a ladder of
 negatives around one fragile positive: only evidence-in-context lets a model track a real
 public shift, and that same channel cracks rights floors under adversarial ``public''
-evidence, robustly across scale and family. The remedy is architectural---route evidence
-by item class---but it moves the problem to \emph{who} controls that channel. Making the
+evidence, robustly across scale and family; guard efficacy against that crack varies
+with prompt placement and model, and the combined data-plus-imperative attack, though
+substantially mitigated by one placement, remains severe under several. The
+deterministic remedy is architectural---route evidence by item class---but it moves the
+problem to \emph{who} controls that channel. Making the
 channel legible, and putting it under legitimate public input without eroding rights, is
 the governance question the harness is built to support; we release it for others to
 extend to new polities, waves, and models.
@@ -637,14 +712,17 @@ floor/contestable labeling explicitly and treat it as a revisable choice rather 
 settled fact, so a deployer adopting the harness can inspect and adapt the boundary to
 its own legitimacy standard.
 
-\emph{Dual use.} The paper discloses an attack: a hostile ``public distribution'' pushed
-through the evidence channel cracks rights floors. We report it because the corresponding
-defense (class-aware evidence routing) is only motivated by showing that prompt- and
-weight-level guards do not work. The attack is a \emph{deployer-side} threat model---it
-presumes control of the evidence pipeline, not a novel end-user jailbreak---and the
-hostile distributions are clearly labeled synthetic red-team constructs in every artifact,
-making no claim about real public opinion. On balance we judge disclosure net-positive:
-the failure mode is one a naive deployer would otherwise ship unknowingly.
+\emph{Dual use.} The paper discloses a decomposed attack surface: distribution-shaped
+context erodes rights floors without any instruction, a direct instruction erodes them
+further, and the combined payload remains severe under several guard placements though
+substantially mitigated by one. We report it because guard efficacy proved placement-
+and model-dependent, which a deployer cannot discover from a single guard grid, and
+because the routing defense is motivated precisely by that unreliability. The attack is
+a \emph{deployer-side} threat model---it presumes control of the evidence pipeline or
+the prompt, not a novel end-user jailbreak---and the hostile distributions are clearly
+labeled synthetic red-team constructs in every artifact, making no claim about real
+public opinion. On balance we judge disclosure net-positive: the failure mode is one a
+naive deployer would otherwise ship unknowingly.
 
 \emph{Deployment guidance.} Our results argue \emph{against} trusting off-the-shelf models
 as autonomous policy delegates: prompting does not buy representation, the ``AI reflex''
