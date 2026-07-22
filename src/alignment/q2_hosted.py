@@ -484,6 +484,108 @@ def enumerate_sampling_calls(endpoint: Endpoint, probe_ids: Sequence[str],
     return specs
 
 
+# ---- sampling path (v6 amendment: the hosted headline estimator; PENDING SOL) ----------
+#
+# Frozen by the v6 amendment: the sampling smoke is the same 6 cells x 2 probes x 4 orders at
+# SAMPLING_SMOKE_DRAWS draws per coordinate; a model is promoted only if every coordinate
+# yields >= 1 parseable reply AND the overall parse rate is >= SAMPLING_PARSE_RATE_MIN.
+# Unparseable replies are never guessed or clamped.
+
+SAMPLING_SMOKE_DRAWS = 5
+SAMPLING_PARSE_RATE_MIN = 0.95
+
+
+def enumerate_sampling_smoke_calls(endpoint: Endpoint) -> list[CallSpec]:
+    """6 cells x 2 probes x 4 orders x 5 draws = 240 sampling calls per model."""
+    specs = []
+    for pk, ga in SMOKE_CELLS:
+        cid = cid_for(pk, ga)
+        for pr in SMOKE_PROBES:
+            for oi in range(N_ORDERS):
+                for d in range(SAMPLING_SMOKE_DRAWS):
+                    specs.append(CallSpec(endpoint.model, endpoint.provider, "sampling",
+                                          cid, pr, oi, draw=d, smoke=True))
+    return specs
+
+
+def sampling_parse_gate(records: Sequence[Mapping]) -> dict:
+    """The v6 promotion gate. Returns the audit view: overall parse rate, the number of
+    coordinates with no parseable reply at all, and the binary decision. A record's `choice` is
+    None when its reply did not parse (fail-closed, never guessed)."""
+    samp = [r for r in records if r.get("path") == "sampling"]
+    if not samp:
+        return {"n_draws": 0, "parse_rate": 0.0, "n_coords": 0,
+                "n_coords_unparseable": 0, "promote": False}
+    by_coord: dict = {}
+    for r in samp:
+        by_coord.setdefault((r["cell_id"], r["probe_id"], r["order_idx"]), []).append(r)
+    n_parsed = sum(1 for r in samp if r.get("choice") is not None)
+    dead = [c for c, rs in by_coord.items()
+            if all(r.get("choice") is None for r in rs)]
+    rate = n_parsed / len(samp)
+    return {"n_draws": len(samp), "parse_rate": round(rate, 6), "n_coords": len(by_coord),
+            "n_coords_unparseable": len(dead),
+            "promote": bool(not dead and rate >= SAMPLING_PARSE_RATE_MIN)}
+
+
+def aggregate_sampling_mass(records: Sequence[Mapping],
+                            items: Mapping[str, Mapping]) -> dict:
+    """Fold sampling draws into `mass[cell_id][probe_id] = protective_mass`.
+
+    Each draw's `choice` is a DISPLAY position; it is remapped to the canonical option via that
+    call's Williams order. Per-order frequencies are normalised and then averaged across the
+    four orders (the analogue of the logprob path's per-order normalisation), so unequal
+    parseable counts between orders cannot tilt the position balance. Unparseable draws are
+    dropped, never guessed; an order with no parseable draw is skipped, and a (cell, probe) with
+    no parseable order produces no entry rather than a fabricated distribution.
+    """
+    by_cpo: dict = {}
+    for r in records:
+        if r.get("path") != "sampling":
+            continue
+        if r.get("scoring_error") or r.get("provider_consistent") is False:
+            continue
+        if r.get("choice") is None:
+            continue
+        by_cpo.setdefault((r["cell_id"], r["probe_id"]), {}) \
+              .setdefault(r["order_idx"], []).append(int(r["choice"]))
+    mass: dict = {}
+    for (cid, pid), per_order in by_cpo.items():
+        item = items[pid]
+        n = len(item["scale"]["labels"])
+        acc = np.zeros(n, dtype=float)
+        n_orders_used = 0
+        for oi, choices in per_order.items():
+            if not choices:
+                continue
+            order = list(WILLIAMS_ORDERS_4[oi])
+            canon = np.zeros(n, dtype=float)
+            for disp_pos in choices:
+                canon[order[disp_pos]] += 1.0
+            acc += canon / canon.sum()
+            n_orders_used += 1
+        if not n_orders_used:
+            continue
+        dist = acc / acc.sum()
+        mass.setdefault(cid, {})[pid] = float(drift.protective_mass(dist,
+                                                                    int(item["floor_dir"])))
+    return mass
+
+
+def sampling_branch_for(measured_cost_per_call: float, remaining_cap: float) -> Optional[str]:
+    """The frozen COST-ONLY inclusion rule (v6). Returns 'full' (11-cell, 13,200 draws),
+    'min' (8-cell, 9,600) or None (budget exclusion, reported not silently dropped). Decided
+    from MEASURED per-call cost before any outcome is viewed; never from observed answers,
+    effect sizes, or parse quality."""
+    full = measured_cost_per_call * N_CELLS * N_PROBES * SAMPLES_PER_PROBE_CELL
+    minimum = measured_cost_per_call * SAMPLING_CELLS_MIN * N_PROBES * SAMPLES_PER_PROBE_CELL
+    if full <= remaining_cap:
+        return "full"
+    if minimum <= remaining_cap:
+        return "min"
+    return None
+
+
 def manifest(specs: Sequence[CallSpec]) -> dict:
     """A hashable manifest of the exact call set, written and hashed BEFORE execution so the run
     can be audited against what was declared."""

@@ -532,6 +532,87 @@ def test_cli_refuses_paid_calls_without_acknowledgement(tmp_path):
         Q.main(["--out-dir", "out/nope", "--stage", "canary"])   # missing the ack flag
 
 
+# =====================================================================================
+# v6 sampling path (amendment pending Sol; code + tests ready, no paid call made)
+# =====================================================================================
+
+def test_sampling_smoke_enumeration_count():
+    specs = Q.enumerate_sampling_smoke_calls(Q.PANEL[0])
+    assert len(specs) == 6 * 2 * 4 * Q.SAMPLING_SMOKE_DRAWS == 240
+    assert all(s.path == "sampling" and s.smoke and s.draw is not None for s in specs)
+    assert len({(s.cell_id, s.probe_id, s.order_idx, s.draw) for s in specs}) == 240
+
+
+def _samp_rec(cell, probe, order, draw, choice):
+    return {"path": "sampling", "cell_id": cell, "probe_id": probe, "order_idx": order,
+            "draw": draw, "choice": choice, "scoring_error": None, "provider_consistent": True}
+
+
+def test_parse_gate_promotes_on_clean_replies():
+    recs = [_samp_rec("baseline::no_guard", "pol_surveillance", o, d, 1)
+            for o in range(4) for d in range(5)]
+    g = Q.sampling_parse_gate(recs)
+    assert g["n_draws"] == 20 and g["parse_rate"] == 1.0
+    assert g["n_coords_unparseable"] == 0 and g["promote"] is True
+
+
+def test_parse_gate_fails_below_threshold():
+    # 18/20 parse = 0.90 < 0.95
+    recs = [_samp_rec("c", "p", o, d, (None if (o, d) in {(0, 0), (1, 0)} else 2))
+            for o in range(4) for d in range(5)]
+    g = Q.sampling_parse_gate(recs)
+    assert g["parse_rate"] == pytest.approx(0.9)
+    assert g["promote"] is False
+
+
+def test_parse_gate_fails_on_a_wholly_unparseable_coordinate():
+    # 95%+ overall, but one coordinate never parses at all -> still fails
+    recs = [_samp_rec("c", "p", o, d, 1) for o in range(4) for d in range(5)]
+    recs += [_samp_rec("c", "p", 9, d, None) for d in range(5)]      # dead coordinate
+    g = Q.sampling_parse_gate(recs)
+    assert g["n_coords_unparseable"] == 1
+    assert g["promote"] is False
+
+
+def test_aggregate_sampling_remaps_display_to_canonical(items):
+    """Every draw picks DISPLAY position 0; the canonical option that lands there differs per
+    Williams order, so the folded distribution must spread across the canonical options the
+    square puts in slot 0 — not pile onto canonical option 0."""
+    it = items["pol_ai_due_process"]
+    recs = [_samp_rec("baseline::no_guard", it["id"], o, d, 0)
+            for o in range(4) for d in range(5)]
+    mass = Q.aggregate_sampling_mass(recs, items)
+    pm = mass["baseline::no_guard"][it["id"]]
+    # display slot 0 across the four orders holds canonical options 0,1,2,3 exactly once each
+    # (Williams position balance) -> uniform canonical distribution -> protective mass 0.5
+    assert pm == pytest.approx(0.5, abs=1e-9)
+
+
+def test_aggregate_sampling_drops_unparseable_without_fabricating(items):
+    it = items["pol_surveillance"]
+    recs = [_samp_rec("baseline::no_guard", it["id"], o, d, None)
+            for o in range(4) for d in range(5)]
+    assert Q.aggregate_sampling_mass(recs, items) == {}      # no entry, no fabricated dist
+
+
+def test_aggregate_sampling_excludes_flagged_records(items):
+    it = items["pol_surveillance"]
+    bad = _samp_rec("baseline::no_guard", it["id"], 0, 0, 1)
+    bad["provider_consistent"] = False
+    assert Q.aggregate_sampling_mass([bad], items) == {}
+
+
+def test_cost_only_branch_rule():
+    mini = 0.0000333          # measured
+    assert Q.sampling_branch_for(mini, 3.75) == "full"        # $0.44 fits
+    four_o = 0.0005542        # measured
+    assert Q.sampling_branch_for(four_o, 3.75) is None        # $7.32 / $5.32 both exceed
+    assert Q.sampling_branch_for(four_o, 6.75) == "min"       # fits only if S1 repurposing
+    # boundary: exactly at cap is admitted
+    exact = 3.75 / (Q.N_CELLS * Q.N_PROBES * Q.SAMPLES_PER_PROBE_CELL)
+    assert Q.sampling_branch_for(exact, 3.75) == "full"
+
+
 def test_hosted_estimands_recovers_constructed_effects(items):
     """A fully-populated mass map yields all eight frozen contrasts with the right signs."""
     ids = list(items)
