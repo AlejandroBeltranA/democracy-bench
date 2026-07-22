@@ -1,10 +1,11 @@
-# Stage-2 hosted design — DRAFT for sign-off (freeze before any OpenRouter call)
+# Stage-2 hosted design — v5 FROZEN (A/F/S signed 2026-07-22; the commit adding this line is the Stage-2 freeze)
 
-Status: DRAFT. This is a LABELLED FOLLOW-UP to the local Q1 preregistration, designed
-after seeing the local outcomes (per `Q1_RESULTS_CONSENSUS.md`); it is not part of the
-original local preregistration and the paper must describe it as a follow-up. No API
-call until Alex and Sol approve this document and it is committed; that commit is the
-Stage-2 freeze.
+Status: FROZEN at v5. This is a LABELLED FOLLOW-UP to the local Q1 preregistration,
+designed after seeing the local outcomes (per `Q1_RESULTS_CONSENSUS.md`); it is not part
+of the original local preregistration and the paper must describe it as a follow-up.
+Alex, Fable, and Sol have approved v5; the commit introducing this status line is the
+Stage-2 freeze. No paid API call until the runner passes the no-network readiness tests
+below, and no design change without a fresh pre-outcome amendment signed by all three.
 
 **Sol vote (2026-07-22): OBJECT pending R-H1--R-H5 below.** No OpenRouter call is
 authorized from this draft.
@@ -25,6 +26,35 @@ authorized yet.
 **v4 (Fable, 2026-07-22): R-H9--R-H10 incorporated below (both-paths temperature 1.0;
 named provider table from the live OpenRouter endpoint catalog, fetched 2026-07-22).
 Fresh Alex + Sol sign-off required; no API call before the v4 freeze commit.**
+
+**Sol v4 vote (2026-07-22): AGREE.** The endpoint declarations were independently
+checked against OpenRouter's live endpoint API on 2026-07-22. This signs the frozen
+experimental specification; the hosted runner must still pass implementation/dry-run
+tests for request parameters, provider locking, smoke failure, output reuse, budgeting,
+and fail-loud artifact persistence before any paid call.
+
+**Alex v4 decision (2026-07-22): AGREE on the scientific design, with a required v5
+operational amendment before freeze.** Alex authorizes up to the approximately $3
+currently available on the configured key for capability validation once v5 is frozen
+and the runner passes the no-network tests below. He will add $10 only after the runner,
+routing, coverage, accounting, and restart path are demonstrated. The $3 is a ceiling,
+not a spending target, and does not authorize outcome-responsive redesign.
+
+**v5 operational amendment (Sol, 2026-07-22):** freeze the exact OpenRouter routing
+slugs, make implementation tests a gate rather than an aspiration, separate non-study
+canaries from the declared smoke, hide substantive smoke outcomes until promotion is
+decided, and stage funding without expanding the preregistered experiment cap. Alex and
+Sol agree to this amendment; fresh Fable sign-off is required. No paid call may precede
+the v5 freeze commit.
+
+**Fable v5 vote (2026-07-22): AGREE.** Independently re-verified against live OpenRouter
+docs on 2026-07-22: `X-OpenRouter-Metadata: enabled` is the documented router-metadata
+opt-in header, and variant-suffixed slugs (`akashml/fp8`) are valid in `provider.only`
+per the endpoint-variant targeting docs; the declared endpoints and their
+logprob/top_logprobs/seed support were re-confirmed against the live endpoint API. The
+amendment's five requirements are incorporated; counts and caps are internally
+consistent. Sign-off covers the frozen specification and the readiness gate; no paid
+call before the runner passes the no-network tests in the order given.
 
 ## Questions (fixed, per R-H2)
 
@@ -104,12 +134,12 @@ byte-reproducible and serving providers may change.
 - **Provider endpoints (per R-H10; OpenRouter endpoint catalog fetched 2026-07-22, all
   listed endpoints support `logprobs` + `top_logprobs` + `seed`):**
 
-  | model | declared provider | quantization | catalog price in/out per 1M |
-  |---|---|---|---:|
-  | `openai/gpt-4o-mini-2024-07-18` | OpenAI (sole endpoint) | unlisted (first-party) | $0.15 / $0.60 |
-  | `openai/gpt-4o-2024-11-20` | OpenAI (sole endpoint) | unlisted (first-party) | $2.50 / $10.00 |
-  | `x-ai/grok-4.5` | xAI, standard tag (not the priority/zdr variants; resolved tier and pricing persisted per call) | unlisted (first-party) | $2.00--$4.00 / $6.00+ |
-  | `meta-llama/llama-3.3-70b-instruct` | AkashML (cheapest logprob-capable endpoint) | fp8 | $0.13 / $0.40 |
+  | model | declared endpoint | exact `provider.only` slug | quantization | catalog price in/out per 1M |
+  |---|---|---|---|---:|
+  | `openai/gpt-4o-mini-2024-07-18` | OpenAI (sole endpoint) | `openai` | unlisted (first-party) | $0.15 / $0.60 |
+  | `openai/gpt-4o-2024-11-20` | OpenAI (sole endpoint) | `openai` | unlisted (first-party) | $2.50 / $10.00 |
+  | `x-ai/grok-4.5` | xAI standard (not priority/zdr) | `xai` | unlisted (first-party) | $2.00 / $6.00 below 200k input tokens |
+  | `meta-llama/llama-3.3-70b-instruct` | AkashML fp8 | `akashml/fp8` | fp8 | $0.13 / $0.40 |
 
   Llama quantization, disclosed pre-freeze: the catalog's logprob-capable Llama
   endpoints are AkashML/Parasail/Cloudflare (fp8), Novita (bf16), and WandB (fp16);
@@ -120,13 +150,67 @@ byte-reproducible and serving providers may change.
   higher-precision endpoint (Novita bf16) is permitted only by a pre-outcome amendment
   to this table, never after any result is viewed.
 
-  Requests send the declared provider via `provider.only`, with
-  `allow_fallbacks = false` and `require_parameters = true`; the resolved provider is
-  persisted on every response. If a declared endpoint rejects the frozen parameters, the
-  model is recorded as a pre-run capability failure; no replacement provider or model is
-  chosen after outcomes. If the resolved provider changes within a model, the affected
-  calls are NOT combined into one headline estimate: the model is failed and reported,
-  or the executions treated as separately declared, decided before outcomes are viewed.
+  Requests send the exact table slug as the sole member of `provider.only`, with
+  `allow_fallbacks = false` and `require_parameters = true`. They also send
+  `X-OpenRouter-Metadata: enabled`. The complete request, complete response, response
+  headers needed for audit, returned model id, provider/routing metadata, generation id,
+  token usage, and returned cost are persisted for every call. If a declared endpoint
+  rejects the frozen parameters, the model is recorded as a pre-run capability failure;
+  no replacement provider or model is chosen after outcomes. If the resolved provider
+  differs from the declared exact slug or changes within a model, the affected calls are
+  NOT combined into one headline estimate: the model is failed and reported, or the
+  executions are treated as separately declared, decided before outcomes are viewed.
+
+## Execution-readiness and staged-spend gate (v5)
+
+The existing generic OpenRouter helper is not the Stage-2 runner: it uses different
+inference settings and lacks the frozen provider, coverage, reuse, accounting, and
+restart controls. A dedicated runner must satisfy all tests below before a paid call.
+
+1. **No-network request snapshots:** for every model, path, cell, role placement, probe,
+   and Williams order, mocked tests assert the exact messages and roles; temperature 1.0;
+   `top_p=1.0`; `max_tokens=4`; logprob-path `logprobs=true`, `top_logprobs=20`, and
+   `seed=0`; sampling-path seed absent; and the exact provider object and metadata header.
+2. **Fail-closed response tests:** fixtures cover missing option numbers, duplicate token
+   variants, absent logprobs, wrong model/provider, malformed or partial responses,
+   content filtering, hard 4xx errors, retryable 429/5xx errors, and exhausted retries.
+   Option mass sums distinct accepted keys; a smoke call passes only when all four
+   displayed option numbers are represented.
+3. **Accounting tests:** each completed call becomes one immutable raw record, written to
+   a temporary file and atomically renamed before aggregation. Returned usage/cost, not
+   catalog estimates alone, drives the ledger and hard stops. A simulated response at
+   each cap proves the next request is refused. `Retry-After` is honored, and only
+   documented transient/provider failures may be retried.
+4. **Idempotence and restart tests:** interruption after every write boundary resumes
+   without paying for an already completed call. The 48 promoted smoke calls are keyed by
+   the full frozen request and reused exactly once in the matrix. Partial-model headline
+   estimates cannot be emitted.
+5. **Count tests:** the runner enumerates exactly 48 smoke calls and 528 total unique
+   logprob calls per promoted model, plus exactly 9,600 or 13,200 sampling calls on the
+   pre-cost branch. The manifest is written and hashed before execution.
+
+After those tests pass and v5 is committed, paid validation is staged:
+
+- At most a minimal non-study API canary may use synthetic prompts that are not paper
+  probes and cannot estimate a study contrast. It tests authentication, wire format,
+  routing metadata, usage/cost capture, and restart behavior only.
+- The declared 48-call smoke then runs model-by-model in the frozen panel order. During
+  the gate, the operator sees only request integrity, exact provider, four-option coverage,
+  errors, usage, and cumulative cost. Raw responses are persisted but substantive scores,
+  crack counts, directions, and effect sizes remain unrevealed until each model's binary
+  promotion decision and the funding decision are recorded.
+- The configured key authenticated on 2026-07-22 and reported approximately $3.005 of
+  key-limit headroom. **At most $3 total is authorized before top-up**, across non-study
+  canaries, declared smoke, and documented transient retries. Stop rather than partially
+  start a request whose worst-case cost could exceed the remaining pre-top-up allowance.
+- Adding $10 is permitted only after the runner passes the tests and the smoke audit is
+  recorded. Top-up changes available funding, not the design: the preregistered $8.50
+  planned-spend stop still counts every paid study request, including smoke, and is not
+  expanded by the added credit. Non-study canary spend is reported separately. Unused
+  credit is not a reason to add models, cells, samples, or retries.
+- No matrix or sampling-validation call may run before top-up and an authenticated key
+  check shows enough headroom to finish the next indivisible preregistered unit under the
+  applicable cap.
 
 ## Sampling validation (per R-H4)
 
@@ -152,11 +236,18 @@ recorded from smoke BEFORE any model is promoted. Deterministic cut rule if the 
 cap cannot cover all declared models: finish the current preregistered model in panel
 order, then stop before starting the next; a model is never partially run, and never
 selected or dropped because earlier cells look favorable. The reserve completes
-preregistered cells or reruns a documented provider failure only.
+preregistered cells or reruns a documented provider failure only. These component caps
+are ceilings, not additive entitlements: the $8.50 global study-spend stop overrides
+them, so exhausting one component cannot borrow from another except through the named
+reserve and cannot push total study spend above $8.50.
 
 ## Votes (v4)
 
-A: [ ] F: [AGREE] S: [ ]
+Superseded by v5 operational sign-off below.
+
+## Votes (v5)
+
+A: [AGREE] F: [AGREE] S: [AGREE]
 
 ## Sol review — required revisions before Stage-2 freeze
 
