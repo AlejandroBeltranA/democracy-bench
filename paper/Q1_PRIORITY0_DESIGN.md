@@ -7,6 +7,10 @@ Per PROTOCOL_CONSENSUS.md, conditions, models, and reported contrasts are chosen
 before results exist. No wording decisions remain open: D1 is resolved by R2 (Sol's
 text), D2 by R3.
 
+**Alex v2 vote (2026-07-21): AGREE.** With Sol's AGREE below and gates 1-3 complete
+(commits `a87eefb`, `fcf55ee`, `8430f3f`), this commit is the FREEZE; the local Q1
+matrix is authorized.
+
 **Sol v2 vote (2026-07-21): AGREE on the frozen experimental design.** R1--R6 are
 incorporated correctly. This approves the design, not an unimplemented runner. The
 pre-run engineering gates in the Sol v2 sign-off below remain mandatory.
