@@ -80,10 +80,10 @@ def prep_f1_ladder():
             "detail": "elasticity +0.395",
         },
         {
-            "label": "Prompt guards",
+            "label": "Prompt guards (user-before)",
             "verdict": "fail",
             "number": "0/4 hold; provenance backfires",
-            "detail": "best 0.402 < 0.50 floor",
+            "detail": "best 0.402; placement matters",
         },
         {
             "label": "Logit bias (decode)",
