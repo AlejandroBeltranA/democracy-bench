@@ -199,3 +199,55 @@ freezing GPT-5.4 or making any paid sampling call** until (a) the decode-envelop
 reasoning endpoints is signed, and (b) a GPT-5.4 capability canary resolves reasoning-disable,
 output-budget, and true per-call cost. No outcome has been viewed; nothing here is
 outcome-responsive.
+
+### GPT-5.4 capability canary — results (2026-07-23, Alex-authorized)
+
+Four synthetic non-study calls (no probe, no contrast), $0.0008 total, raw responses in
+`out/q2_stage2_canary/gpt54_probe/`. All three findings resolved:
+
+| config | result |
+|---|---|
+| A: frozen envelope (`temperature 1.0`, `top_p 1.0`, `require_parameters true`) | **HTTP 404 — "No endpoints found that can handle the requested parameters"** |
+| B: `reasoning:{effort:"none"}`, `max_tokens 4` | OK, `content "1"`, reasoning_tokens **0**, $0.0002 |
+| C: `reasoning:{effort:"none"}`, `max_tokens 16` | OK, `content "1"`, reasoning_tokens 0, $0.0002 |
+| D: no reasoning param, `max_tokens 64` | OK, `content "1"`, reasoning_tokens 0, $0.0002 |
+
+- **Finding 1 CONFIRMED empirically.** The frozen decode envelope returns a hard 404: GPT-5.4
+  cannot be run without a decode-envelope amendment. Because the 404 comes from
+  `require_parameters` + unsupported `temperature`/`top_p`, the fix is to OMIT `temperature` and
+  `top_p` from the request; `require_parameters: true` can then STAY (it only checks parameters
+  actually sent, all of which — `max_tokens`, `reasoning`, `seed` — GPT-5.4 supports).
+- **Findings 2 and 3 RESOLVED, favorably.** `reasoning:{effort:"none"}` is ACCEPTED (GPT-5.4 is
+  not a mandatory-reasoning model), reasoning_tokens are 0, and even `max_tokens 4` returns a
+  parseable single digit with `finish_reason "stop"`. GPT-5.4 is a viable sampling instrument
+  under a reasoning-none, no-`temperature`/`top_p` envelope.
+
+**New quantified finding — the budget, not capability, is now the binding constraint.**
+Measured $0.0002/call at 50 prompt tokens; projected at the study's observed mean prompt
+length (~218 tokens) and 5 completion tokens, **$0.00062/call → full 13,200-call grid ≈ $8.17;
+8-cell 9,600 ≈ $5.94.** Both exceed the frozen **$3.75 sampling cap** by a wide margin, and the
+full grid nearly exhausts the **$8.50 global study stop** on its own (leaving ~$0.30, no
+reserve). GPT-5.4-as-primary therefore requires a pre-outcome BUDGET-STRUCTURE amendment
+(Sol's S1: repurpose the now-unused $3.00 logprob-matrix cap and reserve toward one frontier
+model under the $8.50 global), not merely a decode amendment. Grok 4.5 at $2/$6 projects to
+~$0.00057/call → ~$7.5 full; also over $3.75, similar structure. A $10 top-up (net of
+OpenRouter's 5.5% purchase fee) gives real headroom, but the $8.50 preregistered study stop is
+unchanged and remains the hard limit.
+
+**Proposed amendment for A/F/S sign-off (still pre-outcome; nothing frozen unilaterally):**
+
+1. **Decode envelope for reasoning primaries:** send `max_tokens` (proposed 16 — cheap, robust
+   to a stray preamble token, parser reads the leading digit), `reasoning:{effort:"none"}`,
+   `seed` UNSET (independent draws), `provider:{only:[<slug>], allow_fallbacks:false,
+   require_parameters:true}`; NO `temperature`, NO `top_p`. Disclose that decode is the model's
+   fixed reasoning-none default, not a set temperature.
+2. **Budget structure:** make the $8.50 global study stop the binding cap for a single
+   frontier-primary run; retire the $3.00 logprob-matrix cap (its path is retired) and fold the
+   reserve, all still under $8.50. Freeze the model and its deterministic fallback from a
+   conservative full-grid projection computed from a sampling smoke's returned usage BEFORE any
+   substantive frequency is viewed, exactly as this memo's financial rule 3-4 requires.
+3. This makes conditions 5 (drop the undocumented cache header; treat caching as a cost effect)
+   and 6 (freeze `reasoning:{effort:"none"}`, now verified) concrete; the other eight conditions
+   stand.
+
+Session paid spend to date: **$0.0315** of the $3 pre-top-up ceiling. No study call made.

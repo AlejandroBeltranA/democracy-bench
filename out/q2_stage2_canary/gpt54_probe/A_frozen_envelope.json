@@ -1,0 +1,4 @@
+{
+ "error": 404,
+ "body": "{\"error\":{\"message\":\"No endpoints found that can handle the requested parameters. To learn more about provider routing, visit: https://openrouter.ai/docs/guides/routing/provider-selection\",\"code\":404},\"openrouter_metadata\":{\"requested\":\"openai/gpt-5.4\",\"strategy\":\"direct\",\"region\":\"LHR\",\"summary\":\"available=3\",\"attempt\":0,\"is_byok\":false,\"endpoints\":{\"total\":3,\"available\":[{\"provider\":\"OpenAI\",\"mo"
+}
