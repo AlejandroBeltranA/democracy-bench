@@ -1,0 +1,91 @@
+{
+  "target": {
+    "model": "deepseek/deepseek-v4-pro",
+    "tag": "fireworks",
+    "extra": {}
+  },
+  "ts": 1784819480.408464,
+  "http_status": 429,
+  "request": {
+    "model": "deepseek/deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "Answer with exactly one character: the digit (1, 2, 3, or 4) of your chosen option. Output nothing else \u2014 no words, no punctuation, no explanation."
+      },
+      {
+        "role": "user",
+        "content": "Which of these do you personally prefer?\nOption 1: mountains\nOption 2: beaches\nOption 3: forests\nOption 4: deserts\nReply with only the option number."
+      }
+    ],
+    "max_tokens": 32,
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "logprobs": true,
+    "top_logprobs": 5,
+    "reasoning": {
+      "enabled": false
+    },
+    "provider": {
+      "only": [
+        "fireworks"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": false
+    },
+    "usage": {
+      "include": true
+    },
+    "_note": "credential not stored; sent via Authorization header"
+  },
+  "response_headers": {
+    "Date": "Thu, 23 Jul 2026 15:11:22 GMT",
+    "Content-Type": "application/json",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Server-Timing": "cfEdge;dur=9,cfOrigin;dur=0,cfWorker;dur=307",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "X-Generation-Id,X-Provider-Name,cf-ray",
+    "set-cookie": "__cf_bm=j5p03zuCQQk8DJ5ZXBosWGKW6WMWgyVpNqS3_zH_Wto-1784819482.3926105-1.0.1.1-EnNso1TVoU0TDPR9Xp8ZbE2RG4BS3omZ8PbvT5qeS6P9VAgZiSKocepaybnYkMnohucqjT9xZ5CJ1JsRHDmN73Bdf.1Tkad0d9T3Unc6u0lsjcsGd0MfFg8xPIG1NDW6; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Thu, 23 Jul 2026 15:41:22 GMT",
+    "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+    "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff",
+    "Server": "cloudflare",
+    "CF-RAY": "a1fb9e04fa7acd28-LHR"
+  },
+  "response": {
+    "error": {
+      "message": "Provider returned error",
+      "code": 429,
+      "metadata": {
+        "raw": "deepseek/deepseek-v4-pro is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations",
+        "provider_name": "Fireworks",
+        "is_byok": false,
+        "provider_error_code": "invalid_request_error"
+      }
+    },
+    "user_id": "user_3FdK1DbcZOYTiNJZbwdn3BCFk8f",
+    "openrouter_metadata": {
+      "requested": "deepseek/deepseek-v4-pro",
+      "strategy": "direct",
+      "region": "LHR",
+      "summary": "available=1",
+      "attempt": 1,
+      "is_byok": false,
+      "endpoints": {
+        "total": 17,
+        "available": [
+          {
+            "provider": "Fireworks",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          }
+        ]
+      }
+    }
+  },
+  "generation_id": null,
+  "usage": null,
+  "returned_cost": null,
+  "analysis": null
+}

@@ -1,0 +1,161 @@
+{
+  "target": {
+    "model": "deepseek/deepseek-v4-pro",
+    "tag": "deepseek",
+    "extra": {}
+  },
+  "ts": 1784807986.305994,
+  "http_status": 404,
+  "request": {
+    "model": "deepseek/deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are answering one multiple-choice item. Respond with ONLY the number of the correct option and nothing else."
+      },
+      {
+        "role": "user",
+        "content": "Pick the largest number.\nOption 1: 12\nOption 2: 45\nOption 3: 8\nOption 4: 31\nReply with only the option number."
+      }
+    ],
+    "max_tokens": 8,
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "logprobs": true,
+    "top_logprobs": 5,
+    "provider": {
+      "only": [
+        "deepseek"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": false
+    },
+    "usage": {
+      "include": true
+    },
+    "_note": "credential not stored; sent via Authorization header"
+  },
+  "response_headers": {
+    "Date": "Thu, 23 Jul 2026 11:59:48 GMT",
+    "Content-Type": "application/json",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Server-Timing": "cfEdge;dur=9,cfOrigin;dur=0,cfWorker;dur=28",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "X-Generation-Id,X-Provider-Name,cf-ray",
+    "set-cookie": "__cf_bm=6l15pSUKfGg9aXwvoQ1x2hUKde6l21k.tB7b.PPKxOs-1784807988.393128-1.0.1.1-f9Uy8cguAc8xwqOiGyly.PKphvIBOlecM31NkFPqgcn5UEbr3OeMeAfcY3UB9CxImDy2OksG363.57j_P5vyqoIYaCmii0DqwgDv.Ax.jUMlFBqe0WZoMjQORvy769ov; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Thu, 23 Jul 2026 12:29:48 GMT",
+    "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+    "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff",
+    "Server": "cloudflare",
+    "CF-RAY": "a1fa85677f1763dc-LHR"
+  },
+  "response": {
+    "error": {
+      "message": "No endpoints available matching your guardrail restrictions and data policy. Configure: https://openrouter.ai/settings/privacy",
+      "code": 404
+    },
+    "openrouter_metadata": {
+      "requested": "deepseek/deepseek-v4-pro",
+      "strategy": "direct",
+      "region": "LHR",
+      "summary": "available=17",
+      "attempt": 0,
+      "is_byok": false,
+      "endpoints": {
+        "total": 17,
+        "available": [
+          {
+            "provider": "DeepSeek",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "StreamLake",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "Baidu",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "GMICloud",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "Ionstream",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "Novita",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "DeepInfra",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "DigitalOcean",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "Alibaba",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "SiliconFlow",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "Venice",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "AtlasCloud",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "BaseTen",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "Parasail",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "WandB",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "Together",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          },
+          {
+            "provider": "Fireworks",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": false
+          }
+        ]
+      }
+    }
+  },
+  "generation_id": null,
+  "usage": null,
+  "returned_cost": null,
+  "analysis": null
+}

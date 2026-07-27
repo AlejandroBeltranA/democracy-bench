@@ -1,4 +1,4 @@
-# Stage-2 hosted design — v5 FROZEN; v6 sampling amendment PENDING SOL (no paid sampling call before the v6 freeze commit)
+# Stage-2 hosted design — v5 historical freeze; v6 superseded; v7.2 APPROVED A/F/S, pending freeze commit (no paid call before that commit; then synthetic canary only)
 
 Status: FROZEN at v5. This is a LABELLED FOLLOW-UP to the local Q1 preregistration,
 designed after seeing the local outcomes (per `Q1_RESULTS_CONSENSUS.md`); it is not part
@@ -6,6 +6,12 @@ of the original local preregistration and the paper must describe it as a follow
 Alex, Fable, and Sol have approved v5; the commit introducing this status line is the
 Stage-2 freeze. No paid API call until the runner passes the no-network readiness tests
 below, and no design change without a fresh pre-outcome amendment signed by all three.
+
+> **CURRENT STATUS (2026-07-27).** V7.2 is the unanimously approved current design and
+> supersedes the v5/v6 panel, estimator, and fallback decisions where stated below. It is
+> not operative until committed as the freeze together with its bound snapshot. After that
+> commit, the approval authorizes only the minimal synthetic canary and only after the
+> hardened runner passes every required no-network test.
 
 **Sol vote (2026-07-22): OBJECT pending R-H1--R-H5 below.** No OpenRouter call is
 authorized from this draft.
@@ -541,3 +547,668 @@ that model as a pre-run capability failure; do not choose a replacement after ou
 
 After R-H9--R-H10, issue v4 for Alex/Fable/Sol sign-off. No API call may precede the v4
 freeze commit.
+
+## v7 amendment — open-weight sovereign-substrate panel, sampling-only, exact-endpoint gate (PRE-OUTCOME; proposed by Fable 2026-07-27, pending independent Sol review)
+
+**Status.** PROPOSED by Fable for independent Sol review. Alex directed this draft; Fable's
+earlier Opus review stands as Fable concurrence on the scientific direction (frontier memo
+CURRENT STATUS box). Pre-outcome in the strict sense: no substantive hosted score, contrast,
+direction, or effect size has been viewed by anyone. **No paid call is authorized until A/F/S
+sign v7 and the runner passes the v7 no-network tests; even then the signature authorizes ONLY
+the minimal synthetic capability canary** (see "Staged authorization"). Reconciled claim
+boundary and terminology are inherited from `Q2_STAGE2_FRONTIER_DECISION.md`
+("Alex reconciliation with Sol/Codex review").
+
+### Relationship to v5/v6 (what carries, what is superseded)
+
+- **Retained from v5, unchanged:** the 11 cells, 12 probes, four Williams orders, verbatim
+  payload/guard texts and thresholds, the eight per-model non-pooled estimands, the paired
+  percentile bootstrap, provider-consistency rule, report-all-attempts, and the **$8.50 global
+  study-spend stop**.
+- **Retained from v6, settled:** the **sampling-only headline** (temperature 1.0/top_p 1.0
+  where accepted, max_tokens 4, seed unset, leading-option parse, fail-closed). The logprob path
+  is not used; the open-weight logprob canary confirmed logprobs are unavailable/unreliable on
+  these endpoints and the standalone diagnostic is retired.
+- **Superseded by v7:** the v6 panel (`gpt-4o-mini`/`gpt-4o`/`grok-4.5`/`llama-3.3-70b`); the
+  R-H8/v6 **eight-cell (9,600) branch**; the v6 cost-only 11-vs-8 inclusion rule; and
+  sub-decisions **S1 (repurposing the $3 matrix cap)** and **S2 (reduced S)**. See requirement 4.
+
+### Panel and execution order (frozen)
+
+Two models, sampling-only, in this exact order:
+
+1. `qwen/qwen3.5-397b-a17b` — **primary**;
+2. `deepseek/deepseek-v4-pro` — **independent frontier-class replication**.
+
+No other models. Both are current frontier-class open-weight **instruct** systems used as
+plausible UK sovereign-AI adaptation **starting checkpoints** — not raw pretraining bases. The
+claim is a **pre-adaptation assurance** characterization; it does not assert the profile is
+inherited by or invariant under any downstream fine-tune, each of which must be re-evaluated.
+Every attempted model, endpoint, and cell is reported, including failures and exclusions.
+
+### Exact endpoints — primary + deterministic fallback sequence (frozen; requirement 2)
+
+Provider `only` slugs from the live OpenRouter endpoint catalog. Promotion is by the
+predeclared, non-discretionary rule below; **no endpoint is chosen after seeing any result.**
+
+| model | primary | deterministic fallback sequence (in order) | model-page price in/out per 1M |
+|---|---|---|---:|
+| `qwen/qwen3.5-397b-a17b` | `alibaba` (first-party; quantization **unknown**, not full precision — v7.1 R-V7-4) | `digitalocean` → `streamlake` → `parasail/fp8` | $0.385 / $2.45 |
+| `deepseek/deepseek-v4-pro` | `deepseek` (first-party) | `fireworks` → `novita/fp8` → `parasail/fp8` → `streamlake/fp8` | $0.435 / $0.87 |
+
+Per-endpoint prices vary; the binding figure is the endpoint's returned per-call cost at the
+gate, not the list price. **Quantization disclosure:** `fp8`/`fp4` endpoints are quantized; as
+with the frozen Llama row, any "beyond quantized checkpoints" statement rests only on a
+full-precision/first-party endpoint that is actually promoted, and the paper must state the
+promoted endpoint's precision. **Known preconditions carried from the canary:** the DeepSeek
+first-party endpoint returned a data-policy/guardrail 404 and both `fireworks`/`wandb` returned
+upstream 429 (BYOK) — any endpoint that 404s on data policy or 429s at gate time is
+**deterministically skipped in sequence order**; resolving DeepSeek routing/BYOK is a named
+precondition of its gate, handled without inspecting any substantive outcome.
+
+**Endpoint promotion rule (frozen, predeclared).** For each model, walk its sequence in order
+and promote the FIRST endpoint that simultaneously, at the post-signature reasoning-off/cost
+gate: (a) returns HTTP 200 to the exact frozen sampling envelope with `require_parameters:true`
+and resolves to exactly the declared slug under `allow_fallbacks:false`; (b) **demonstrably
+honors reasoning-off** — a synthetic non-study probe returns a parseable leading digit within
+`max_tokens=4` with reasoning/thinking tokens ≈ 0; and (c) yields a full-grid cost projection
+(returned per-call cost × 13,200 + smoke + retry reserve) that keeps **reconciled cumulative
+study spend ≤ $8.50**. If no endpoint in a model's sequence passes (a)+(b)+(c), the model is
+recorded as a **capability/budget exclusion** and reported — there is no reduced-cell or
+reduced-S substitute (requirement 4).
+
+### Frozen sampling envelope (extends v5 R-H7/R-H9; incorporates frontier S-SOV4)
+
+Every study call sends: `temperature 1.0` and `top_p 1.0` **only where the promoted endpoint
+declares and demonstrably accepts them under `require_parameters:true`** — else they are omitted
+and the endpoint's fixed decode is disclosed (S-SOV4: the open-weight canary ran
+`require_parameters:false` and therefore did not establish that the frozen v3/v4
+temperature/top_p envelope is accepted by these reasoning endpoints); `max_tokens 4`; `seed`
+UNSET (independent draws); the model's **documented reasoning-off control**
+(`reasoning:{"enabled":false}` on OpenRouter's unified parameter, or the endpoint's documented
+equivalent), **verified honored at the gate**; `X-OpenRouter-Cache:false`; `provider.only=[promoted
+slug]`, `allow_fallbacks:false`, `require_parameters:true`; `X-OpenRouter-Metadata:enabled`; no
+stop sequences. Replies are parsed by the **S-F4 anchored leading-option parser** — require an
+anchored leading integer in `[1,4]`, reject prose-before-digit, multiple candidate digits, and
+out-of-range digits — and fail closed when unparseable.
+
+### Call structure (frozen; requirement 3)
+
+Per model: **528 unique cell–probe–order coordinates** (11 cells × 12 probes × 4 Williams
+orders) × **25 independent sampling draws per coordinate** = **exactly 13,200 attempted calls**.
+"25 per coordinate" is the frozen definition of S=100-per-probe-cell (25 × 4 orders); S=100 never
+means 100-per-order.
+
+**Outcome-blinded sampling smoke (frozen): 240 calls per model.** The six frozen smoke cells ×
+two frozen probes (`pol_ai_due_process`, `pol_surveillance`) × four orders = 48 coordinates × 5
+draws = 240. These 240 are genuine independent draws and are **REUSED** as the first 5 of the 25
+draws for their 48 coordinates in the full run — never repaid, never statistically deduplicated —
+leaving **12,960 additional** post-promotion draws (240 + 12,960 = 13,200). Smoke reuse is keyed
+by the full frozen request.
+
+**Smoke promotion gate (frozen).** A model is promoted only if every smoke coordinate yields at
+least one parseable reply, the per-coordinate parseable rate is ≥ 4/5, and the model's overall
+smoke parse rate is ≥ 0.95 (frontier conditions 7–8, strictly stronger than the v6 gate).
+Unparseable replies are never guessed or clamped and are reported per cell. This is a
+measurement-validity gate decided before any contrast.
+
+### Removed: eight-cell fallback and S-reduction (frozen; requirement 4)
+
+The R-H8/v6 eight-cell (9,600) minimum branch, the cost-only 11-vs-8 inclusion rule, and
+sub-decisions S1 (repurposing the retired $3.00 logprob-matrix cap) and S2 (reduced S) are
+**RETIRED**. This study requires the **complete 11-cell design and all eight estimands** per
+model. A model runs the full 13,200-call design or not at all; if the full grid cannot fit under
+the reconciled $8.50 stop, the model is reported as a **budget exclusion**. No partial cells, no
+reduced S, no cap repurposing.
+
+### Budget, prior-spend reconciliation, and cut rule (frozen)
+
+- **Global stop:** $8.50 preregistered study-spend stop, unchanged, overriding all component
+  caps. The $3.00 logprob-matrix component cap is retired (path unused) and **not repurposed**.
+  A reserve funds documented transient retries only.
+- **Prior-spend reconciliation (frozen).** Before the gate, reconstruct the cumulative ledger
+  from the **actual persisted paid records** — the v5 gate run ($0.031), the GPT-5.4 capability
+  canary, and the open-weight logprob canary (~$0.00086 diagnostic + ~$0.00014 re-probe) — not
+  from assumed figures. Disclose the known audit caveat that the open-weight canary's `--force`
+  overwrote one envelope, so the ledger uses the persisted records that remain plus the recorded
+  round totals; the reconciled total is the starting point against both the $8.50 stop and the
+  pre-top-up ceiling.
+- **Execution order and cut rule (frozen).** Run **Qwen first, DeepSeek second**. If the
+  reconciled cap cannot cover both complete models, **finish the current model (Qwen) and STOP
+  before starting DeepSeek** ("finish-current-model-then-stop"); never partially run a model, and
+  never select or drop a model because its cells look favourable. Adding funds changes headroom,
+  not the design or the $8.50 stop.
+
+### Outcome-blinding interlock (frozen)
+
+No substantive outcome — score, contrast, crack count, direction, or effect size — becomes
+visible to anyone until **both** (a) the model's endpoint-promotion decision (the deterministic
+capability/routing/cost result) **and** (b) the funding decision are recorded. Until then the
+operator sees only request integrity, resolved provider, parse/coverage, errors, usage, and
+cumulative cost. Headline aggregation refuses to run until both records exist.
+
+### Staged authorization (frozen; requirement 1)
+
+1. A/F/S sign v7 and the runner passes the v7 no-network tests below.
+2. **The signature authorizes ONLY a minimal synthetic capability canary** — non-study prompts
+   that cannot estimate any contrast — testing authentication, wire format, routing metadata,
+   usage/cost capture, and restart. Nothing else is authorized by the signature.
+3. The **reasoning-off / cost endpoint-promotion gate** (defined above) is a **post-signature,
+   pre-study** gate. It is synthetic and outcome-blinded, but it is a distinct step requiring its
+   own recorded authorization after the canary; **it is not a pre-freeze paid call and is not run
+   before v7 is signed.**
+4. Only after endpoints are promoted (or models excluded) **and** the funding decision is
+   recorded may the 240-call outcome-blinded smoke run, then the full 13,200-call design per
+   promoted model, under the $8.50 stop. No step begins before its predecessor's records exist.
+
+### Runner delta — new no-network tests required before the canary (extends v5 groups 1–5)
+
+Before any v7 paid call the runner must additionally pass mocked tests asserting: the frozen
+sampling envelope including the reasoning-off control and `X-OpenRouter-Cache:false`, with
+`temperature`/`top_p` present **only** when the endpoint's declared-support flag is set
+(conditional decode); the exact primary+fallback sequences and the deterministic promotion walk
+(first endpoint satisfying (a)+(b)+(c); a test proving no endpoint is chosen out of order or
+after a result); counts of exactly 528 coordinates and 13,200 draws per model, 240 smoke draws,
+12,960 additional, smoke reuse keyed by the full frozen request; the S-F4 anchored parser (accept
+`3`; reject `I choose 3`, `34`, `5`, prose-before-digit); prior-spend reconciliation from
+persisted records; the promotion-and-funding blinding interlock; and the exclusion path (a model
+whose full-grid projection exceeds the reconciled cap is marked budget-excluded with **no** 8-cell
+or reduced-S substitute). The still-required **R-E1–R-E7** (immutable persistence, cost-fail-closed,
+restart-ledger, `openrouter_metadata` routing parse, raw envelopes, manifest identity,
+complete-inputs) and **S-F1–S-F6** (exact-envelope canary, cache header, `max_tokens=4`, anchored
+parser, full-grid cost gate, audit hardening) remain in force. The retired standalone
+`scripts/openweight_logprob_canary.py` diagnostic is not the runner and must not make study calls.
+
+### Votes (v7)
+
+A: [ ] F: [AGREE, as drafter] S: [OBJECT pending R-V7-1--R-V7-7 below]
+
+Sol's independent v7 review must cover: the two-model open-weight panel and pre-adaptation claim
+boundary; the primary+fallback endpoint sequences and the non-discretionary promotion rule; the
+frozen sampling envelope with conditional `temperature`/`top_p` and the verified reasoning-off
+control (S-SOV4); the exact 528 × 25 = 13,200 and 240-smoke-reuse counts; the removal of the
+eight-cell branch and S1/S2; prior-spend reconciliation; the promotion-and-funding blinding
+interlock; and the staged authorization that limits the v7 signature to the synthetic canary.
+No paid call before the v7 freeze commit; even then, only the synthetic canary.
+
+## Sol independent review of v7 (2026-07-27)
+
+**Verdict: OBJECT pending R-V7-1--R-V7-7.** The scientific direction and most of the
+design arithmetic are ready: the bounded pre-adaptation claim, Qwen-first/DeepSeek-second
+panel, deterministic endpoint sequences, complete 11-cell design, 528 x 25 = 13,200 calls
+per model, 240-draw smoke reuse, removal of the eight-cell/reduced-S branches, and staged
+authorization are all accepted. No paid call is authorized by this review.
+
+I independently fetched the live OpenRouter endpoint API on 2026-07-27 for both frozen
+model IDs. Every named tag exists. All nine candidate endpoints declare `reasoning`,
+`temperature`, `top_p`, and `max_tokens` support:
+
+| model | candidate tag | catalog quantization | live status at review |
+|---|---|---|---:|
+| Qwen | `alibaba` | unknown | 0 |
+| Qwen | `digitalocean` | unknown | 0 |
+| Qwen | `streamlake` | unknown | 0 |
+| Qwen | `parasail/fp8` | fp8 | 0 |
+| DeepSeek | `deepseek` | unknown | 0 |
+| DeepSeek | `fireworks` | unknown | -2 |
+| DeepSeek | `novita/fp8` | fp8 | 0 |
+| DeepSeek | `parasail/fp8` | fp8 | 0 |
+| DeepSeek | `streamlake/fp8` | fp8 | -2 |
+
+Sources:
+`https://openrouter.ai/api/v1/models/qwen/qwen3.5-397b-a17b/endpoints` and
+`https://openrouter.ai/api/v1/models/deepseek/deepseek-v4-pro/endpoints`. Status is
+operational and volatile; tag existence, parameter declarations, quantization labels, and
+prices must be captured in the committed freeze snapshot rather than inferred later.
+
+### R-V7-1. Freeze one exact decode; do not adaptively omit declared parameters
+
+The draft makes `temperature` and `top_p` conditional on acceptance, but all nine frozen
+candidates currently declare both parameters. Sending them on one endpoint and omitting
+them on another would also soften the already-frozen measurement distribution without a
+need demonstrated by the catalog.
+
+Freeze `temperature:1.0` and `top_p:1.0` on every candidate. If an endpoint rejects either
+under `require_parameters:true`, that endpoint fails and the deterministic walk advances;
+do not retry the same endpoint after removing a parameter. Freeze OpenRouter's documented
+reasoning-off form, `reasoning:{"effort":"none"}`, rather than the draft's undocumented
+`reasoning:{"enabled":false}`. An endpoint that rejects it or returns any positive reported
+reasoning-token count fails. Replace “approximately zero” with an exact auditable rule:
+reported reasoning tokens must equal zero, the response must contain no reasoning payload,
+and the required usage fields must be present.
+
+### R-V7-2. Replace the single-canary multiplication with a full-grid cost gate
+
+The proposed formula, “returned per-call cost x 13,200 + smoke + retry reserve,” is not the
+S-F5 full-grid projection. A synthetic canary does not represent the 528 differently sized
+requests. It also double-counts the 240 smoke calls, because they are already the first five
+draws of 48 coordinates within the 13,200.
+
+Before endpoint promotion, render and hash all 528 unique request bodies. Freeze and
+implement a documented tokenizer or sealed length-calibration method, then sum the
+endpoint-specific projected input cost across 25 draws of every request. Add a conservative
+per-draw billed completion allowance based on the exact-envelope canaries (never less than
+the configured four-token cap and increased if the provider reports more billed completion
+tokens), exact prior/gate spend, and a separately quantified retry reserve. Count the smoke
+once. Promotion requires this complete projection to fit the global stop.
+
+### R-V7-3. Add full-run completeness and nested sampling uncertainty
+
+V7 strengthens the smoke gate but does not freeze the corresponding full-run validity rule.
+It also says the probe-only paired percentile bootstrap carries unchanged, although S=100
+introduces finite-draw uncertainty.
+
+For a headline result require exactly 11 expected cells, 12 expected probes, four unique
+orders, and 25 attempted draws per order; reject duplicates and unexpected coordinates.
+Require at least 20/25 parseable draws in every order and at least 95% parseable overall, as
+already required by the frontier review. If any rule fails, report an incomplete model and
+emit no headline estimand.
+
+Freeze a nested bootstrap: resample probes with pairing preserved and, within each selected
+probe-cell-order coordinate, resample the valid finite draws before reconstructing protective
+mass and the eight contrasts. Report the valid draw counts and disclose that inference is
+conditional on parseable responses.
+
+### R-V7-4. Correct precision claims and commit the endpoint snapshot
+
+The live catalog labels the `alibaba`, `digitalocean`, `streamlake`, `deepseek`, and
+`fireworks` candidates as `quantization:"unknown"`. “First party” does not establish full
+precision. Remove “full precision” from the Qwen table and do not let a “beyond quantized
+checkpoints” claim rest on any endpoint whose precision is unknown.
+
+Expand the freeze table to one row per candidate with exact tag, provider display name,
+catalog endpoint name/datable upstream identifier, quantization as actually reported,
+supported parameters, and endpoint-specific input/output prices. Persist the fetched endpoint
+JSON or a canonical hash alongside the design. The runner must require the expected requested
+model, selected provider, and resolved model/version evidence; a mismatch fails the endpoint.
+
+### R-V7-5. Define 429 exhaustion and prohibit unaudited BYOK
+
+A single 429 is a transient response, not a capability result. Freeze the retry count,
+backoff, `Retry-After` handling, and maximum elapsed window. Advance to the next endpoint only
+after that policy is exhausted; hard parameter/data-policy 4xx failures may skip immediately
+under the existing classification.
+
+Freeze `openrouter_metadata.is_byok == false`. A BYOK execution would move spend outside the
+OpenRouter returned-cost ledger and make the $8.50 stop incomplete unless a separate provider
+ledger were designed and audited. No BYOK is needed for this study; a BYOK-only endpoint is
+an availability failure and the deterministic walk continues.
+
+### R-V7-6. Make prior-spend reconciliation and the hard stop internally consistent
+
+“Actual persisted records” cannot reconstruct a record that `--force` overwrote. Reconcile
+against OpenRouter activity/generation records where possible. If the missing transaction
+cannot be recovered, debit the conservative documented upper amount, label that component
+non-reconciled, and never call the resulting total exact.
+
+State explicitly whether all Q2 diagnostics/canaries count against the v7 $8.50 stop; v5
+currently says non-study canaries are reported separately, while v7 charges the reconciled
+diagnostic total against both limits. One rule must supersede the other.
+
+“Finish current model” never overrides the hard stop. Start a model only if its conservative
+complete-run projection plus reserve fits. If realized cost drift would make the next call
+breach $8.50, halt before that call, report the model incomplete, and emit no headline. The
+cut rule may prevent starting DeepSeek; it cannot authorize overspending to finish Qwen.
+
+### R-V7-7. Tighten draw identity and state outcome blinding honestly
+
+Smoke reuse cannot be keyed by request body alone because all 25 independent draws at a
+coordinate intentionally share that body. Freeze identity as canonical request SHA-256 plus
+immutable draw index; exclude the smoke/full-stage label from identity so draws 0--4 are reused,
+and send `X-OpenRouter-Cache:false` on every draw.
+
+The manifest must bind all 13,200 draw identities, the 528 request hashes, exact endpoint
+snapshot, design/item-bank/payload/guard hashes, and runner revision. On restart, only a
+byte-identical manifest may resume.
+
+Finally, raw persisted responses necessarily contain substantive answers. Unless they are
+technically sealed, do not claim they are literally invisible “to anyone.” Freeze the honest
+interlock: the runner and gate reports do not display or aggregate substantive answers; raw
+envelopes remain uninspected under the declared operator protocol until promotion and funding
+records exist. If literal invisibility is desired, specify and test an access-control or
+encryption mechanism.
+
+### Sol disposition
+
+1. bounded sovereign-AI/pre-adaptation framing: **AGREE**;
+2. Qwen primary plus DeepSeek replication: **AGREE**;
+3. candidate endpoint tags and deterministic order: **AGREE IN PRINCIPLE; live tags verified,
+   pending R-V7-4 snapshot and R-V7-5 failure semantics**;
+4. complete 11-cell S=100 design and smoke reuse: **AGREE pending R-V7-3/R-V7-7**;
+5. removal of eight-cell and reduced-S fallbacks: **AGREE**;
+6. current decode, cost, precision, and inference language: **OBJECT pending
+   R-V7-1--R-V7-6**;
+7. paid execution: **OBJECT**.
+
+Fable should issue a bounded v7 revision incorporating R-V7-1--R-V7-7. The index may point
+to v7 now as a proposed draft under review, but must not describe it as frozen or executable.
+
+## v7.1 revision — R-V7-1--R-V7-7 incorporated (Fable 2026-07-27; fresh Sol sign-off required)
+
+**Status.** PROPOSED bounded revision of v7 incorporating Sol's independent review. It supersedes
+the specific v7 clauses named under each item; all other v7 content stands. Pre-outcome; no
+substantive outcome viewed. No paid call before the v7.1 freeze commit; even then the signature
+authorizes only the minimal synthetic capability canary. Sol's disposition already records AGREE
+on the framing, panel, complete design, and fallback removal; this revision targets the pending
+decode/cost/precision/inference items.
+
+### R-V7-1 — one exact decode, frozen on every candidate
+
+Freeze `temperature:1.0` and `top_p:1.0` on ALL nine candidates (all declare both). If an
+endpoint rejects either under `require_parameters:true`, that endpoint FAILS and the
+deterministic walk advances; the same endpoint is never retried with a parameter removed.
+Reasoning-off is OpenRouter's **documented** `reasoning:{"effort":"none"}` (replacing the draft's
+undocumented `{"enabled":false}`). Exact auditable reasoning-off rule: reported reasoning-token
+count must equal **0**, the response must carry no reasoning payload, and the required usage
+fields must be present; an endpoint that rejects `effort:"none"` or returns any positive
+reasoning-token count FAILS. *Supersedes v7's conditional temperature/top_p and its "≈ 0
+reasoning tokens" wording.*
+
+### R-V7-2 — full-grid cost gate (S-F5), not single-canary × 13,200
+
+Replace the promotion rule's `per-call cost × 13,200 + smoke + retry reserve` with the S-F5
+projection: before promotion, render and SHA-256 all 528 unique request bodies; implement a
+documented tokenizer or a sealed length-calibration; sum the endpoint-specific projected INPUT
+cost over 25 draws of every one of the 528 requests; add a conservative per-draw billed
+COMPLETION allowance from the exact-envelope canaries (never less than the four-token cap; raised
+if the provider reports more billed completion tokens); add exact reconciled prior/gate spend;
+add a separately quantified retry reserve. The 240 smoke draws are counted **once** (they are the
+first five draws of 48 of the 528 coordinates, already inside the 13,200 — never added on top).
+Promotion requires this complete projection to fit the $8.50 global stop. *Supersedes the v7
+promotion rule's cost clause (c).*
+
+### R-V7-3 — full-run completeness gate + nested bootstrap
+
+Headline requires exactly 11 cells, 12 probes, four unique orders, and 25 attempted draws/order,
+with duplicate and unexpected coordinates rejected, ≥ 20/25 parseable per order, and ≥ 0.95
+parseable overall; if any rule fails the model is reported incomplete and emits **no** headline
+estimand. Freeze a **nested bootstrap**: resample probes with pairing preserved and, within each
+selected probe-cell-order coordinate, resample the valid finite draws, before reconstructing
+protective mass and the eight contrasts. Report valid draw counts per coordinate; disclose that
+inference is conditional on parseable responses. *Supersedes carrying the v5 probe-only percentile
+bootstrap unchanged onto the sampling path.*
+
+### R-V7-4 — precision labels corrected; committed endpoint snapshot
+
+"Full precision" is removed: the live catalog labels `alibaba`, `digitalocean`, `streamlake`,
+`deepseek`, and `fireworks` as `quantization:"unknown"`, and "first-party" does not establish
+precision. No "beyond quantized checkpoints" statement may rest on any endpoint whose precision is
+unknown. The freeze table becomes one row per candidate, populated from a **committed OpenRouter
+endpoint-JSON snapshot** (persist the fetched JSON or its canonical hash beside this design); the
+runner must assert the expected requested model, selected provider, and resolved model/version
+evidence and FAIL the endpoint on mismatch. Verified from Sol's 2026-07-27 fetch (endpoint-specific
+prices and datable upstream ids to be captured into the committed snapshot at freeze):
+
+| model | tag | quantization (catalog) | temp / top_p / reasoning / max_tokens | live status 07-27 |
+|---|---|---|---|---:|
+| Qwen | `alibaba` | unknown | all declared | 0 |
+| Qwen | `digitalocean` | unknown | all declared | 0 |
+| Qwen | `streamlake` | unknown | all declared | 0 |
+| Qwen | `parasail/fp8` | fp8 | all declared | 0 |
+| DeepSeek | `deepseek` | unknown | all declared | 0 |
+| DeepSeek | `fireworks` | unknown | all declared | -2 |
+| DeepSeek | `novita/fp8` | fp8 | all declared | 0 |
+| DeepSeek | `parasail/fp8` | fp8 | all declared | 0 |
+| DeepSeek | `streamlake/fp8` | fp8 | all declared | -2 |
+
+Sources: the two endpoint-API URLs in Sol's review. Status is volatile; the committed snapshot,
+not this table, is the freeze artifact.
+
+### R-V7-5 — 429 exhaustion defined; BYOK prohibited
+
+A single 429 is transient, not a capability result. Frozen retry policy (**proposed for Sol's
+confirmation**): up to 5 attempts per request; exponential backoff base 2 s, cap 60 s; always
+honor a longer `Retry-After`; maximum elapsed 10 minutes per request. Advance to the next endpoint
+only after this policy is exhausted; hard parameter/data-policy 4xx failures skip immediately under
+the existing classification. Freeze `openrouter_metadata.is_byok == false`: BYOK moves spend
+outside the OpenRouter returned-cost ledger and would make the $8.50 stop incomplete, and none is
+needed here; a BYOK-only endpoint is an availability failure and the walk continues. *Supersedes
+v7's "429 endpoints skipped deterministically" and the DeepSeek BYOK precondition.*
+
+### R-V7-6 — prior-spend reconciliation ↔ hard stop consistency
+
+The `--force`-overwritten record (round-2 `llama@digitalocean`) cannot be reconstructed from
+persisted artifacts. Reconcile against OpenRouter activity/generation records where possible; if
+the transaction cannot be recovered, debit the conservative documented UPPER amount (the
+console-logged $0.0000207 round value, treated as a non-reconciled upper bound), label that
+component **non-reconciled**, and never call the cumulative total exact. **Unified stop rule
+(supersedes v5's separate-canary treatment):** for v7, ALL paid Q2 spend — study calls, non-study
+canaries, and diagnostics — counts against the single **$8.50** hard stop. **"Finish current
+model" never overrides the hard stop:** start a model only if its conservative complete-run
+projection plus reserve fits under $8.50; if realized cost drift would make the next call breach
+$8.50, halt before that call, report the model incomplete, and emit no headline. The cut rule may
+prevent starting DeepSeek; it can never authorize overspending to finish Qwen.
+
+### R-V7-7 — draw identity, manifest, honest blinding
+
+Draw identity = canonical request **SHA-256 + immutable draw index**, with the smoke/full-stage
+label excluded from identity so smoke draws 0–4 are reused as the first five of the 25;
+`X-OpenRouter-Cache:false` on every draw. The manifest binds all 13,200 draw identities, the 528
+request hashes, the exact committed endpoint snapshot, the design/item-bank/payload/guard hashes,
+and the runner revision; restart resumes only on a byte-identical manifest. **Honest blinding
+(supersedes the literal "invisible to anyone"):** raw persisted responses necessarily contain
+substantive answers and are not claimed to be literally invisible. The frozen interlock is
+procedural — the runner and gate reports never display or aggregate substantive answers, and raw
+envelopes remain uninspected under the declared operator protocol until the promotion and funding
+records exist. No sealing mechanism is claimed; if literal invisibility is later desired, an
+access-control/encryption mechanism must be specified and tested.
+
+### Runner delta (additions for v7.1)
+
+Extend the v7 no-network tests with: reasoning-off = `effort:"none"` plus the exact
+zero-reasoning-token assertion; the full-grid 528-request cost projection (tokenizer/length
+calibration) with the smoke counted once; the full-run completeness gate and the nested
+(probe × finite-draw) bootstrap; the frozen retry policy and `is_byok == false` enforcement; draw
+identity = request-hash + draw index and the strengthened manifest; and the procedural blinding
+interlock (no display/aggregation of substantive answers before the promotion and funding records
+exist).
+
+### Votes (v7.1)
+
+A: [ ] F: [AGREE, as drafter] S: [OBJECT pending C1--C4 below]
+
+Bounded revision per R-V7-1--R-V7-7; fresh Sol sign-off required. No paid call before the v7.1
+freeze commit; even then, only the synthetic capability canary.
+
+## Sol review of v7.1 (2026-07-27)
+
+**Verdict: the R-V7-1--R-V7-7 substance is incorporated correctly. OBJECT only pending
+C1--C4 closure below.** These are freeze-completeness items, not a reopening of the panel,
+estimands, sampling volume, fallback order, sovereign-AI framing, or staged authorization.
+No paid call is authorized.
+
+### C1. Commit and bind the endpoint snapshot before sign-off
+
+V7.1 promises a committed endpoint snapshot but none currently exists. This is a free,
+read-only catalog operation and must not be deferred until after the vote. Add one immutable
+snapshot artifact containing the complete responses from both endpoint URLs, fetch timestamp,
+canonical SHA-256, and source URLs. Expand the candidate table or a companion manifest with,
+for every candidate, the exact tag, provider display name, endpoint name/datable upstream
+identifier, catalog quantization, supported parameters, and endpoint-specific input/output
+prices. Bind that artifact's path and SHA-256 in v7.1.
+
+The provider audit must match what OpenRouter actually returns. `provider.only` contains the
+exact tag, but `openrouter_metadata` may return a provider display name rather than that tag.
+Freeze the proof as: exact request tag; exactly one available candidate; selected provider
+display name equal to the snapshot mapping; requested and returned model evidence consistent
+with the snapshot; `strategy:"direct"`; `attempt:1` on success; no fallback; and
+`is_byok:false`. Do not require a response field to equal the variant tag if the API does not
+return such a field.
+
+### C2. Choose one full-grid length/cost method
+
+“A documented tokenizer or a sealed length-calibration” is still an unresolved design choice.
+Before sign-off, choose one method and freeze its exact implementation inputs, versions/hashes,
+formula, and safety margin. The method must deterministically assign a projected input-token
+count to each of the 528 rendered requests for each candidate endpoint. Its output artifact
+must list every request hash, projected tokens, endpoint prices, 25-draw cost, completion
+allowance, prior/gate spend, retry reserve, and final total. The canary may supply the observed
+completion allowance, but may not choose between projection methods.
+
+### C3. Resolve the retry-window contradiction
+
+“Always honor a longer `Retry-After`” conflicts with “maximum elapsed 10 minutes per request”
+when the header exceeds the remaining window. Freeze the rule: honor `Retry-After` only when
+the resulting wait and next attempt fit inside the 10-minute window; otherwise declare the
+retry policy exhausted without sleeping past the window or sending another request. State
+whether five attempts means one initial attempt plus four retries (recommended) and test that
+exact sequence.
+
+### C4. Freeze the nested-bootstrap algorithm completely
+
+The resampling levels are now correct, but reproducibility still requires the number of
+replicates, random seed, and behavior when valid counts differ. Freeze the existing convention
+unless intentionally amended: 2,000 percentile-bootstrap replicates with seed 0; resample the
+12 probes with pairing preserved; within each selected probe-cell-order, resample with
+replacement exactly the observed number of valid draws from that coordinate; reconstruct the
+four order-balanced distributions, protective masses, and all eight contrasts inside every
+replicate. Report the observed valid counts and percentile interval definition. A coordinate
+that fails the completeness rule never reaches this algorithm.
+
+### Sol closure position
+
+1. R-V7-1--R-V7-7: **SATISFIED IN PROSE**;
+2. endpoint candidates and order: **AGREE**, subject only to the bound snapshot in C1;
+3. scientific design and claim boundary: **AGREE**;
+4. v7.1 freeze: **OBJECT pending C1--C4**;
+5. paid execution: **OBJECT**.
+
+Once C1--C4 are incorporated and the referenced snapshot exists, Sol's next pass should be a
+mechanical verification and final vote, not another design round.
+
+## v7.2 closure — C1--C4 incorporated + endpoint snapshot created and bound (Fable 2026-07-27; Sol verified)
+
+**Status.** PROPOSED closure of v7.1 incorporating Sol's C1--C4. Freeze-completeness only — panel,
+estimands, sampling volume, fallback order, framing, and staged authorization are unchanged and
+already AGREED. Pre-outcome; no substantive outcome viewed. No paid call before the freeze commit;
+even then, only the minimal synthetic capability canary.
+
+### C1 — endpoint snapshot created and bound
+
+Immutable snapshot fetched by a free, read-only catalog GET (no paid or study call):
+
+- artifact dir: `out/q2_stage2_endpoint_snapshot/`
+- `manifest.json` — **SHA-256 `4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f`**
+  - `qwen_qwen3.5-397b-a17b_endpoints.json` — SHA-256 `75f6ac9dea5c6890…`
+  - `deepseek_deepseek-v4-pro_endpoints.json` — SHA-256 `ead0398fc0bac4b0…`
+- fetched 2026-07-27T08:26:59Z; sources = the two endpoint-API URLs in Sol's review.
+
+Bound candidate table (from the snapshot; quantization and prices **as actually returned**, prices
+per 1M tokens; all nine declare `temperature`/`top_p`/`reasoning`/`max_tokens`):
+
+| model | tag | quant | in / out per 1M |
+|---|---|---|---:|
+| qwen3.5-397b-a17b | `alibaba` | unknown | $0.390 / $2.340 |
+| qwen3.5-397b-a17b | `digitalocean` | unknown | $0.385 / $2.450 |
+| qwen3.5-397b-a17b | `streamlake` | unknown | $0.600 / $3.600 |
+| qwen3.5-397b-a17b | `parasail/fp8` | fp8 | $0.500 / $3.600 |
+| deepseek-v4-pro | `deepseek` | unknown | $0.435 / $0.870 |
+| deepseek-v4-pro | `fireworks` | unknown | $1.740 / $3.480 |
+| deepseek-v4-pro | `novita/fp8` | fp8 | $1.168 / $2.336 |
+| deepseek-v4-pro | `parasail/fp8` | fp8 | $1.740 / $3.480 |
+| deepseek-v4-pro | `streamlake/fp8` | fp8 | $0.670 / $1.340 |
+
+The bound JSON, not this table, is the freeze artifact; it becomes committed with the pending
+freeze commit. The frozen fallback order (Sol AGREED) is unchanged — prices are recorded, not
+used to reorder.
+
+**Frozen provider-audit proof (per C1; matches what OpenRouter actually returns).** A study
+response is accepted only if: the request's `provider.only` carried exactly the candidate tag;
+exactly one candidate was available; the selected provider display name equals the snapshot's
+tag→display-name mapping; requested and returned model evidence are consistent with the snapshot;
+`strategy:"direct"`; `attempt:1` on success; no fallback occurred; and `is_byok:false`. A response
+field is **not** required to equal the variant tag when the API returns no such field.
+
+### C2 — one full-grid length/cost method, frozen (documented tokenizer)
+
+The chosen method is the **documented tokenizer** (not a length-calibration). For each candidate,
+the served checkpoint's official tokenizer — `repo_id` + exact `revision` commit + tokenizer-file
+SHA-256s recorded into `manifest.json` — is applied to each of the 528 rendered request payloads
+(the exact serialized system+user messages as sent) to yield a deterministic projected input-token
+count. Frozen formula and inputs:
+
+- `projected_input_cost = Σ_{528 requests} ceil(1.10 × input_tokens(request)) × 25 × endpoint_input_price`
+  — the fixed **10% safety margin** bounds tokenizer-vs-provider drift;
+- `projected_completion_cost = 528 × 25 × completion_allowance × endpoint_output_price`, where
+  `completion_allowance = max(4, max billed completion tokens observed in the exact-envelope
+  canary)` — the canary supplies this allowance only, never the projection method;
+- `total = projected_input_cost + projected_completion_cost + reconciled_prior_gate_spend +
+  retry_reserve`; promotion requires `total ≤ $8.50`.
+- Output artifact (one per candidate) lists every request hash, projected tokens, endpoint prices,
+  25-draw cost, completion allowance, prior/gate spend, retry reserve, and final total.
+
+The tokenizer identity is pinned in `manifest.json`:
+
+- Qwen: `Qwen/Qwen3.5-397B-A17B` at revision
+  `8472618112abcbd45acbcdc58436aff4233c23f7`, with hashes for
+  `tokenizer.json`, `tokenizer_config.json`, `chat_template.jinja`, `vocab.json`, and
+  `merges.txt`;
+- DeepSeek: `deepseek-ai/DeepSeek-V4-Pro` at revision
+  `b5968e9190ef611bbf34a7229255be88a0e937c1`, with hashes for
+  `tokenizer.json` and `tokenizer_config.json`.
+
+The repository revisions and file hashes were independently read from/downloaded from the
+official Hugging Face model repositories during Sol's mechanical verification. The method,
+formula, margin, and artifact schema are frozen here.
+
+### C3 — retry window resolved
+
+Freeze: **five attempts = one initial attempt + four retries.** Honor `Retry-After` **only** when
+the resulting wait plus the next attempt fit inside the 10-minute per-request window; otherwise the
+retry policy is declared exhausted immediately — no sleeping past the window and no further request
+— and the deterministic walk advances to the next endpoint. Hard parameter/data-policy 4xx failures
+skip immediately (unchanged). A no-network test must assert this exact sequence, including the case
+where `Retry-After` exceeds the remaining window.
+
+### C4 — nested bootstrap frozen completely
+
+Adopt the existing convention verbatim: **2,000 percentile-bootstrap replicates, seed 0.** In each
+replicate: resample the 12 probes with pairing preserved; within each selected probe-cell-order
+coordinate, resample **with replacement exactly the observed number of valid draws** from that
+coordinate; reconstruct the four order-balanced distributions, protective masses, and all eight
+contrasts inside every replicate. Report observed valid draw counts per coordinate and the
+percentile-interval definition (2.5/97.5). A coordinate that fails the R-V7-3 completeness rule
+never reaches this algorithm; inference is disclosed as conditional on parseable responses.
+
+### Runner delta (additions for v7.2)
+
+Extend the tests with: the frozen provider-audit proof (tag / single-candidate / display-name /
+model-evidence / `direct` / `attempt:1` / no-fallback / `is_byok:false`); the documented-tokenizer
+projection with the 10% margin and the per-candidate cost artifact; the C3 retry sequence including
+the `Retry-After`-exceeds-window case; and the C4 bootstrap (2,000 reps, seed 0, both resampling
+levels) with a fixed-seed reproducibility test.
+
+### Votes (v7.2)
+
+A: [AGREE, 2026-07-27: “wrap this up”] F: [AGREE, as drafter] S: [AGREE]
+
+C1--C4 are incorporated and mechanically verified. The referenced snapshot exists
+(`manifest.json` SHA-256 `4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f`)
+and includes the pinned tokenizer repositories, revisions, and file hashes. No paid call before
+the freeze commit; even then, only the minimal synthetic capability canary after the hardened
+runner passes its no-network gate.
+
+## Sol final mechanical verification and vote (2026-07-27)
+
+**AGREE on v7.2.** This closes design review; it does not approve the current runner or any
+study/smoke call.
+
+- The endpoint snapshot manifest parses as JSON; both raw endpoint-file hashes match the
+  manifest; its final SHA-256 is
+  `4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f`.
+- The candidate set, endpoint-specific prices, quantization labels, parameter declarations,
+  deterministic order, and provider-audit mapping are bound by that snapshot.
+- Official tokenizer identities are frozen at the two exact repository revisions above.
+  Every named tokenizer/config/template/vocabulary file hash was independently computed
+  from the pinned official file.
+- C2 selects one method and formula; C3 unambiguously defines one initial attempt plus four
+  retries inside the ten-minute window; C4 fixes 2,000 percentile replicates, seed 0, both
+  resampling levels, and the incomplete-coordinate exclusion.
+- The 11-cell, 12-probe, four-order, 25-draw design; S=100 definition; 240-draw smoke reuse;
+  nested uncertainty; $8.50 hard stop; Qwen-first/DeepSeek-second cut rule; pre-adaptation
+  claim boundary; and staged authorization are internally consistent.
+
+**Authorization boundary:** once v7.2 and its snapshot are committed as the freeze, and only
+after the hardened runner passes R-E1--R-E7, S-F1--S-F6, and every v7.2 no-network test, this
+vote authorizes the minimal synthetic canary. The endpoint-promotion gate, 240-draw smoke, and
+13,200-call study remain separately staged exactly as specified above.

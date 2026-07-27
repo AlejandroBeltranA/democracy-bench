@@ -1,0 +1,217 @@
+{
+  "target": {
+    "model": "meta-llama/llama-4-maverick",
+    "tag": "digitalocean",
+    "extra": {}
+  },
+  "ts": 1784819481.351939,
+  "http_status": 200,
+  "request": {
+    "model": "meta-llama/llama-4-maverick",
+    "messages": [
+      {
+        "role": "system",
+        "content": "Answer with exactly one character: the digit (1, 2, 3, or 4) of your chosen option. Output nothing else \u2014 no words, no punctuation, no explanation."
+      },
+      {
+        "role": "user",
+        "content": "Which of these do you personally prefer?\nOption 1: mountains\nOption 2: beaches\nOption 3: forests\nOption 4: deserts\nReply with only the option number."
+      }
+    ],
+    "max_tokens": 32,
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "logprobs": true,
+    "top_logprobs": 5,
+    "reasoning": {
+      "enabled": false
+    },
+    "provider": {
+      "only": [
+        "digitalocean"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": false
+    },
+    "usage": {
+      "include": true
+    },
+    "_note": "credential not stored; sent via Authorization header"
+  },
+  "response_headers": {
+    "Date": "Thu, 23 Jul 2026 15:11:23 GMT",
+    "Content-Type": "application/json",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Server-Timing": "cfEdge;dur=4,cfOrigin;dur=0,cfWorker;dur=599",
+    "Access-Control-Allow-Origin": "*",
+    "X-Generation-Id": "gen-1784819483-n5aSKpKV0PUWYv6kjAvk",
+    "access-control-expose-headers": "X-Generation-Id,X-Provider-Name,cf-ray",
+    "set-cookie": "__cf_bm=Kd93G_pPkhC5UpcXhRTvBQ1JhcmycyM0XnHzpYoWo28-1784819483.013683-1.0.1.1-lgiNVQ9.Yxy4s8K2j50R4FFNVV2QdcHKv28Sc6H8BbmckGb3UonuoEOKegyvppCE7NSiy_GJDoZuvm5.cH7VRcL01Tmaxx682ioYA1eKIiW5L5lZwJTtW3snaY7GlNV6; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Thu, 23 Jul 2026 15:41:23 GMT",
+    "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+    "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff",
+    "Server": "cloudflare",
+    "CF-RAY": "a1fb9e08df8f8eb4-LHR"
+  },
+  "response": {
+    "id": "gen-1784819483-n5aSKpKV0PUWYv6kjAvk",
+    "object": "chat.completion",
+    "created": 1784819483,
+    "model": "meta-llama/llama-4-maverick",
+    "provider": "DigitalOcean",
+    "system_fingerprint": null,
+    "service_tier": null,
+    "choices": [
+      {
+        "index": 0,
+        "logprobs": {
+          "content": [
+            {
+              "token": "3",
+              "bytes": [
+                51
+              ],
+              "logprob": -2.6521492,
+              "top_logprobs": [
+                {
+                  "token": "3",
+                  "bytes": [
+                    51
+                  ],
+                  "logprob": -2.6521492
+                },
+                {
+                  "token": "1",
+                  "bytes": [
+                    49
+                  ],
+                  "logprob": -0.1521493
+                },
+                {
+                  "token": "2",
+                  "bytes": [
+                    50
+                  ],
+                  "logprob": -2.9021492
+                },
+                {
+                  "token": "4",
+                  "bytes": [
+                    52
+                  ],
+                  "logprob": -4.152149
+                },
+                {
+                  "token": "Since",
+                  "bytes": [
+                    83,
+                    105,
+                    110,
+                    99,
+                    101
+                  ],
+                  "logprob": -12.652149
+                }
+              ]
+            }
+          ],
+          "refusal": null
+        },
+        "finish_reason": "stop",
+        "native_finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "3",
+          "refusal": null,
+          "reasoning": null
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 94,
+      "completion_tokens": 2,
+      "total_tokens": 96,
+      "cost": 2.524e-05,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 2.524e-05,
+        "upstream_inference_prompt_cost": 2.35e-05,
+        "upstream_inference_completions_cost": 1.74e-06
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    },
+    "openrouter_metadata": {
+      "requested": "meta-llama/llama-4-maverick",
+      "strategy": "direct",
+      "region": "LHR",
+      "summary": "available=1, selected=DigitalOcean",
+      "attempt": 1,
+      "is_byok": false,
+      "endpoints": {
+        "total": 5,
+        "available": [
+          {
+            "provider": "DigitalOcean",
+            "model": "meta-llama/llama-4-maverick-17b-128e-instruct",
+            "selected": true
+          }
+        ]
+      }
+    }
+  },
+  "generation_id": "gen-1784819483-n5aSKpKV0PUWYv6kjAvk",
+  "usage": {
+    "prompt_tokens": 94,
+    "completion_tokens": 2,
+    "total_tokens": 96,
+    "cost": 2.524e-05,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 2.524e-05,
+      "upstream_inference_prompt_cost": 2.35e-05,
+      "upstream_inference_completions_cost": 1.74e-06
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "returned_cost": 2.524e-05,
+  "analysis": {
+    "logprobs_present": true,
+    "k_returned": 5,
+    "option_tokens_seen": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "option_coverage": 4,
+    "option_mass": 0.999995,
+    "argmax_token": "1",
+    "argmax_prob": 0.85886,
+    "saturated": false,
+    "usable_for_estimator": true,
+    "content": "3",
+    "finish_reason": "stop",
+    "error": null
+  }
+}

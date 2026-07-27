@@ -1,0 +1,163 @@
+{
+  "target": {
+    "model": "qwen/qwen3.5-397b-a17b",
+    "tag": "alibaba",
+    "extra": {}
+  },
+  "ts": 1784807986.2008371,
+  "http_status": 200,
+  "request": {
+    "model": "qwen/qwen3.5-397b-a17b",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are answering one multiple-choice item. Respond with ONLY the number of the correct option and nothing else."
+      },
+      {
+        "role": "user",
+        "content": "Pick the largest number.\nOption 1: 12\nOption 2: 45\nOption 3: 8\nOption 4: 31\nReply with only the option number."
+      }
+    ],
+    "max_tokens": 8,
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "logprobs": true,
+    "top_logprobs": 5,
+    "provider": {
+      "only": [
+        "alibaba"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": false
+    },
+    "usage": {
+      "include": true
+    },
+    "_note": "credential not stored; sent via Authorization header"
+  },
+  "response_headers": {
+    "Date": "Thu, 23 Jul 2026 11:59:44 GMT",
+    "Content-Type": "application/json",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Server-Timing": "cfEdge;dur=6,cfOrigin;dur=0,cfWorker;dur=2396",
+    "Access-Control-Allow-Origin": "*",
+    "X-Generation-Id": "gen-1784807982-FfDuYAAhX32kM1g8U7yq",
+    "access-control-expose-headers": "X-Generation-Id,X-Provider-Name,cf-ray",
+    "set-cookie": "__cf_bm=RqkGqjhlMMAQTnenVzFqvanIUkvdjs5PisFC43Q.jE0-1784807982.1310267-1.0.1.1-1J5kUFuDFLnMdVaGedVygXTECVTZvBbdE_oZkew4A5T0hHyT1Avw1ibDDOK5cpMdB8cnNffLcvsxIg68l_lNA4bPcBMjGhqRABt_0j2Z0I4vf_1gb.I9L1SqarVoVH96; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Thu, 23 Jul 2026 12:29:44 GMT",
+    "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+    "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff",
+    "Server": "cloudflare",
+    "CF-RAY": "a1fa85405d0ebed2-LHR"
+  },
+  "response": {
+    "id": "gen-1784807982-FfDuYAAhX32kM1g8U7yq",
+    "object": "chat.completion",
+    "created": 1784807982,
+    "model": "qwen/qwen3.5-397b-a17b",
+    "provider": "Alibaba",
+    "system_fingerprint": null,
+    "service_tier": null,
+    "choices": [
+      {
+        "index": 0,
+        "logprobs": null,
+        "finish_reason": "stop",
+        "native_finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "2",
+          "refusal": null,
+          "reasoning": "Thinking Process:\n\n1.  **Analyze the Request:** The user wants me to pick the largest number from a given list of options and respond with only the option number.\n\n2.  **Examine the Options:**\n    *   Option 1: 12\n    *   Option 2: 45\n    *   Option 3: 8\n    *   Option 4: 31\n\n3.  **Compare the Numbers:**\n    *   12\n    *   45\n    *   8\n    *   31\n\n    Comparing them: 45 > 31 > 12 > 8.\n\n4.  **Identify the Largest Number:** The largest number is 45.\n\n5.  **Identify the Corresponding Option:** 45 corresponds to Option 2.\n\n6.  **Format the Output:** The user requested \"Reply with only the option number.\" and \"Respond with ONLY the number of the correct option and nothing else.\"\n\n7.  **Final Decision:** The correct option number is 2.\n\n8.  **Construct Output:** 2.cw",
+          "reasoning_details": [
+            {
+              "type": "reasoning.text",
+              "text": "Thinking Process:\n\n1.  **Analyze the Request:** The user wants me to pick the largest number from a given list of options and respond with only the option number.\n\n2.  **Examine the Options:**\n    *   Option 1: 12\n    *   Option 2: 45\n    *   Option 3: 8\n    *   Option 4: 31\n\n3.  **Compare the Numbers:**\n    *   12\n    *   45\n    *   8\n    *   31\n\n    Comparing them: 45 > 31 > 12 > 8.\n\n4.  **Identify the Largest Number:** The largest number is 45.\n\n5.  **Identify the Corresponding Option:** 45 corresponds to Option 2.\n\n6.  **Format the Output:** The user requested \"Reply with only the option number.\" and \"Respond with ONLY the number of the correct option and nothing else.\"\n\n7.  **Final Decision:** The correct option number is 2.\n\n8.  **Construct Output:** 2.cw",
+              "format": "unknown",
+              "index": 0
+            }
+          ]
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 80,
+      "completion_tokens": 254,
+      "total_tokens": 334,
+      "cost": 0.00062556,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 0.00062556,
+        "upstream_inference_prompt_cost": 3.12e-05,
+        "upstream_inference_completions_cost": 0.00059436
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 249,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    },
+    "openrouter_metadata": {
+      "requested": "qwen/qwen3.5-397b-a17b",
+      "strategy": "direct",
+      "region": "LHR",
+      "summary": "available=1, selected=Alibaba",
+      "attempt": 1,
+      "is_byok": false,
+      "endpoints": {
+        "total": 11,
+        "available": [
+          {
+            "provider": "Alibaba",
+            "model": "qwen/qwen3.5-397b-a17b-20260216",
+            "selected": true
+          }
+        ]
+      }
+    }
+  },
+  "generation_id": "gen-1784807982-FfDuYAAhX32kM1g8U7yq",
+  "usage": {
+    "prompt_tokens": 80,
+    "completion_tokens": 254,
+    "total_tokens": 334,
+    "cost": 0.00062556,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.00062556,
+      "upstream_inference_prompt_cost": 3.12e-05,
+      "upstream_inference_completions_cost": 0.00059436
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 249,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "returned_cost": 0.00062556,
+  "analysis": {
+    "logprobs_present": false,
+    "n_distinct": 0,
+    "option_tokens_seen": [],
+    "argmax_token": null,
+    "argmax_prob": null,
+    "correct_is_argmax": false,
+    "saturated": null,
+    "content": "2",
+    "finish_reason": "stop",
+    "error": "structure missing: TypeError(\"'NoneType' object is not subscriptable\")"
+  }
+}

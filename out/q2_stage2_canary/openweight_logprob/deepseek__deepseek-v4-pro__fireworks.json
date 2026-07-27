@@ -1,0 +1,165 @@
+{
+  "target": {
+    "model": "deepseek/deepseek-v4-pro",
+    "tag": "fireworks",
+    "extra": {}
+  },
+  "ts": 1784808120.338218,
+  "http_status": 200,
+  "request": {
+    "model": "deepseek/deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are answering one multiple-choice item. Respond with ONLY the number of your chosen option and nothing else."
+      },
+      {
+        "role": "user",
+        "content": "Which of these do you personally prefer?\nOption 1: mountains\nOption 2: beaches\nOption 3: forests\nOption 4: deserts\nReply with only the option number."
+      }
+    ],
+    "max_tokens": 8,
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "logprobs": true,
+    "top_logprobs": 5,
+    "provider": {
+      "only": [
+        "fireworks"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": false
+    },
+    "usage": {
+      "include": true
+    },
+    "_note": "credential not stored; sent via Authorization header"
+  },
+  "response_headers": {
+    "Date": "Thu, 23 Jul 2026 12:02:02 GMT",
+    "Content-Type": "application/json",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Server-Timing": "cfEdge;dur=10,cfOrigin;dur=0,cfWorker;dur=698",
+    "Access-Control-Allow-Origin": "*",
+    "X-Generation-Id": "gen-1784808121-ocj4cVkVCgSEyuGCAmye",
+    "access-control-expose-headers": "X-Generation-Id,X-Provider-Name,cf-ray",
+    "set-cookie": "__cf_bm=SB94Qpsx7Ga1vtGU7CPwnIbDvyIZ3aAxvcFDd_ycCPg-1784808121.7017047-1.0.1.1-KfvFiXnwhnsca95ZOkz7zkXcHsSBhP0KBP_ImeQ9noTigsZaZS8dtzZh8_ngq.BYyjOVNgNtRd1Pdqcox_Nuy3apPHuL.gLYZ4aF3ctsS9UszSBt_R3lntAgA7ijPV57; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Thu, 23 Jul 2026 12:32:02 GMT",
+    "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+    "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff",
+    "Server": "cloudflare",
+    "CF-RAY": "a1fa88a89dd963d7-LHR"
+  },
+  "response": {
+    "id": "gen-1784808121-ocj4cVkVCgSEyuGCAmye",
+    "object": "chat.completion",
+    "created": 1784808121,
+    "model": "deepseek/deepseek-v4-pro",
+    "provider": "Fireworks",
+    "system_fingerprint": null,
+    "service_tier": null,
+    "choices": [
+      {
+        "index": 0,
+        "logprobs": null,
+        "finish_reason": "length",
+        "native_finish_reason": "length",
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "refusal": null,
+          "reasoning": "We are asked: \"Which of these",
+          "reasoning_details": [
+            {
+              "type": "reasoning.text",
+              "text": "We are asked: \"Which of these",
+              "format": "unknown",
+              "index": 0
+            }
+          ]
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 64,
+      "completion_tokens": 8,
+      "total_tokens": 72,
+      "cost": 0.0001392,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 0.0001392,
+        "upstream_inference_prompt_cost": 0.00011136,
+        "upstream_inference_completions_cost": 2.784e-05
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 8,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    },
+    "openrouter_metadata": {
+      "requested": "deepseek/deepseek-v4-pro",
+      "strategy": "direct",
+      "region": "LHR",
+      "summary": "available=1, selected=Fireworks",
+      "attempt": 1,
+      "is_byok": false,
+      "endpoints": {
+        "total": 17,
+        "available": [
+          {
+            "provider": "Fireworks",
+            "model": "deepseek/deepseek-v4-pro-20260423",
+            "selected": true
+          }
+        ]
+      }
+    }
+  },
+  "generation_id": "gen-1784808121-ocj4cVkVCgSEyuGCAmye",
+  "usage": {
+    "prompt_tokens": 64,
+    "completion_tokens": 8,
+    "total_tokens": 72,
+    "cost": 0.0001392,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.0001392,
+      "upstream_inference_prompt_cost": 0.00011136,
+      "upstream_inference_completions_cost": 2.784e-05
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 8,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "returned_cost": 0.0001392,
+  "analysis": {
+    "logprobs_present": false,
+    "k_returned": 0,
+    "option_tokens_seen": [],
+    "option_coverage": 0,
+    "option_mass": null,
+    "argmax_token": null,
+    "argmax_prob": null,
+    "saturated": null,
+    "usable_for_estimator": false,
+    "content": null,
+    "finish_reason": "length",
+    "error": "no logprobs returned (endpoint advertised support but sent none)"
+  }
+}

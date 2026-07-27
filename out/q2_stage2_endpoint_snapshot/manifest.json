@@ -1,0 +1,185 @@
+{
+  "artifact": "Q2 Stage-2 v7.1 endpoint freeze snapshot",
+  "fetched_utc": "2026-07-27T08:26:59Z",
+  "sources": [
+    "https://openrouter.ai/api/v1/models/qwen/qwen3.5-397b-a17b/endpoints",
+    "https://openrouter.ai/api/v1/models/deepseek/deepseek-v4-pro/endpoints"
+  ],
+  "raw_files": {
+    "qwen_qwen3.5-397b-a17b_endpoints.json": {
+      "sha256": "75f6ac9dea5c6890bf42fada0e884b81b5d21b8e48ad45f0b546e6c4ae73a3d2"
+    },
+    "deepseek_deepseek-v4-pro_endpoints.json": {
+      "sha256": "ead0398fc0bac4b04158409e2374e5f9fd4ba21547c1cb124db64487600b051e"
+    }
+  },
+  "tokenizers": {
+    "qwen/qwen3.5-397b-a17b": {
+      "repo_id": "Qwen/Qwen3.5-397B-A17B",
+      "revision": "8472618112abcbd45acbcdc58436aff4233c23f7",
+      "source": "https://huggingface.co/Qwen/Qwen3.5-397B-A17B",
+      "files": {
+        "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+        "tokenizer_config.json": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+        "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+        "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+        "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d"
+      }
+    },
+    "deepseek/deepseek-v4-pro": {
+      "repo_id": "deepseek-ai/DeepSeek-V4-Pro",
+      "revision": "b5968e9190ef611bbf34a7229255be88a0e937c1",
+      "source": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro",
+      "files": {
+        "tokenizer.json": "8f9f37ca37fdc4f5fd36d5cf4d3b0e8392edb4e894fd10cc0d70b4957c8633cf",
+        "tokenizer_config.json": "6ac8c8dc065ed118161d02dd532749ae3f52c243deac27872134fae2f50d8547"
+      }
+    }
+  },
+  "candidates": [
+    {
+      "model": "qwen/qwen3.5-397b-a17b",
+      "tag": "digitalocean",
+      "provider_name": "DigitalOcean",
+      "endpoint_name": "DigitalOcean | qwen/qwen3.5-397b-a17b-20260216",
+      "quantization": "unknown",
+      "params_all_declared": true,
+      "supported_parameters_subset": {
+        "temperature": true,
+        "top_p": true,
+        "reasoning": true,
+        "max_tokens": true
+      },
+      "price_prompt_per_token": "0.000000385",
+      "price_completion_per_token": "0.00000245"
+    },
+    {
+      "model": "qwen/qwen3.5-397b-a17b",
+      "tag": "alibaba",
+      "provider_name": "Alibaba",
+      "endpoint_name": "Alibaba | qwen/qwen3.5-397b-a17b-20260216",
+      "quantization": "unknown",
+      "params_all_declared": true,
+      "supported_parameters_subset": {
+        "temperature": true,
+        "top_p": true,
+        "reasoning": true,
+        "max_tokens": true
+      },
+      "price_prompt_per_token": "0.00000039",
+      "price_completion_per_token": "0.00000234"
+    },
+    {
+      "model": "qwen/qwen3.5-397b-a17b",
+      "tag": "parasail/fp8",
+      "provider_name": "Parasail",
+      "endpoint_name": "Parasail | qwen/qwen3.5-397b-a17b-20260216",
+      "quantization": "fp8",
+      "params_all_declared": true,
+      "supported_parameters_subset": {
+        "temperature": true,
+        "top_p": true,
+        "reasoning": true,
+        "max_tokens": true
+      },
+      "price_prompt_per_token": "0.0000005",
+      "price_completion_per_token": "0.0000036"
+    },
+    {
+      "model": "qwen/qwen3.5-397b-a17b",
+      "tag": "streamlake",
+      "provider_name": "StreamLake",
+      "endpoint_name": "StreamLake | qwen/qwen3.5-397b-a17b-20260216",
+      "quantization": "unknown",
+      "params_all_declared": true,
+      "supported_parameters_subset": {
+        "temperature": true,
+        "top_p": true,
+        "reasoning": true,
+        "max_tokens": true
+      },
+      "price_prompt_per_token": "0.0000006",
+      "price_completion_per_token": "0.0000036"
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "tag": "deepseek",
+      "provider_name": "DeepSeek",
+      "endpoint_name": "DeepSeek | deepseek/deepseek-v4-pro-20260423",
+      "quantization": "unknown",
+      "params_all_declared": true,
+      "supported_parameters_subset": {
+        "temperature": true,
+        "top_p": true,
+        "reasoning": true,
+        "max_tokens": true
+      },
+      "price_prompt_per_token": "0.000000435",
+      "price_completion_per_token": "0.00000087"
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "tag": "streamlake/fp8",
+      "provider_name": "StreamLake",
+      "endpoint_name": "StreamLake | deepseek/deepseek-v4-pro-20260423",
+      "quantization": "fp8",
+      "params_all_declared": true,
+      "supported_parameters_subset": {
+        "temperature": true,
+        "top_p": true,
+        "reasoning": true,
+        "max_tokens": true
+      },
+      "price_prompt_per_token": "0.0000006699",
+      "price_completion_per_token": "0.0000013398"
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "tag": "novita/fp8",
+      "provider_name": "Novita",
+      "endpoint_name": "Novita | deepseek/deepseek-v4-pro-20260423",
+      "quantization": "fp8",
+      "params_all_declared": true,
+      "supported_parameters_subset": {
+        "temperature": true,
+        "top_p": true,
+        "reasoning": true,
+        "max_tokens": true
+      },
+      "price_prompt_per_token": "0.000001168",
+      "price_completion_per_token": "0.000002336"
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "tag": "parasail/fp8",
+      "provider_name": "Parasail",
+      "endpoint_name": "Parasail | deepseek/deepseek-v4-pro-20260423",
+      "quantization": "fp8",
+      "params_all_declared": true,
+      "supported_parameters_subset": {
+        "temperature": true,
+        "top_p": true,
+        "reasoning": true,
+        "max_tokens": true
+      },
+      "price_prompt_per_token": "0.00000174",
+      "price_completion_per_token": "0.00000348"
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "tag": "fireworks",
+      "provider_name": "Fireworks",
+      "endpoint_name": "Fireworks | deepseek/deepseek-v4-pro-20260423",
+      "quantization": "unknown",
+      "params_all_declared": true,
+      "supported_parameters_subset": {
+        "temperature": true,
+        "top_p": true,
+        "reasoning": true,
+        "max_tokens": true
+      },
+      "price_prompt_per_token": "0.00000174",
+      "price_completion_per_token": "0.00000348"
+    }
+  ]
+}

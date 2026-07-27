@@ -1,0 +1,168 @@
+{
+  "target": {
+    "model": "qwen/qwen3.5-397b-a17b",
+    "tag": "digitalocean",
+    "extra": {}
+  },
+  "ts": 1784819479.96726,
+  "http_status": 200,
+  "request": {
+    "model": "qwen/qwen3.5-397b-a17b",
+    "messages": [
+      {
+        "role": "system",
+        "content": "Answer with exactly one character: the digit (1, 2, 3, or 4) of your chosen option. Output nothing else \u2014 no words, no punctuation, no explanation."
+      },
+      {
+        "role": "user",
+        "content": "Which of these do you personally prefer?\nOption 1: mountains\nOption 2: beaches\nOption 3: forests\nOption 4: deserts\nReply with only the option number."
+      }
+    ],
+    "max_tokens": 32,
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "logprobs": true,
+    "top_logprobs": 5,
+    "reasoning": {
+      "enabled": false
+    },
+    "provider": {
+      "only": [
+        "digitalocean"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": false
+    },
+    "usage": {
+      "include": true
+    },
+    "_note": "credential not stored; sent via Authorization header"
+  },
+  "response_headers": {
+    "Date": "Thu, 23 Jul 2026 15:11:21 GMT",
+    "Content-Type": "application/json",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Server-Timing": "cfEdge;dur=6,cfOrigin;dur=0,cfWorker;dur=885",
+    "Access-Control-Allow-Origin": "*",
+    "X-Generation-Id": "gen-1784819480-E5MYM8tj6BBYZRHz6Fqn",
+    "access-control-expose-headers": "X-Generation-Id,X-Provider-Name,cf-ray",
+    "set-cookie": "__cf_bm=LlFi2_Moql.TIUzNAQCfzwUFHpOvF26_10kPxksbc54-1784819480.799274-1.0.1.1-yESVYzjBijNnraZHO9Xw1S_pLO20j5tuvF09bD0po6m0p2ClpLkiQbvklLstq0sPcl.ppbP9IXyOqu0DFWe1DIfzzSw8UYejvuWDHDup..1R4BiEWtCFvF_IZSl.V6mu; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Thu, 23 Jul 2026 15:41:21 GMT",
+    "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+    "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff",
+    "Server": "cloudflare",
+    "CF-RAY": "a1fb9dfafb2694f9-LHR"
+  },
+  "response": {
+    "id": "gen-1784819480-E5MYM8tj6BBYZRHz6Fqn",
+    "object": "chat.completion",
+    "created": 1784819480,
+    "model": "qwen/qwen3.5-397b-a17b",
+    "provider": "DigitalOcean",
+    "system_fingerprint": null,
+    "service_tier": null,
+    "choices": [
+      {
+        "index": 0,
+        "logprobs": null,
+        "finish_reason": "length",
+        "native_finish_reason": "length",
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "refusal": null,
+          "reasoning": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Choose one option from the given list (mountains, beaches,",
+          "reasoning_details": [
+            {
+              "type": "reasoning.text",
+              "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Choose one option from the given list (mountains, beaches,",
+              "format": "unknown",
+              "index": 0
+            }
+          ]
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 95,
+      "completion_tokens": 32,
+      "total_tokens": 127,
+      "cost": 0.000114975,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 0.000114975,
+        "upstream_inference_prompt_cost": 3.6575e-05,
+        "upstream_inference_completions_cost": 7.84e-05
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 31,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    },
+    "openrouter_metadata": {
+      "requested": "qwen/qwen3.5-397b-a17b",
+      "strategy": "direct",
+      "region": "LHR",
+      "summary": "available=1, selected=DigitalOcean",
+      "attempt": 1,
+      "is_byok": false,
+      "endpoints": {
+        "total": 11,
+        "available": [
+          {
+            "provider": "DigitalOcean",
+            "model": "qwen/qwen3.5-397b-a17b-20260216",
+            "selected": true
+          }
+        ]
+      }
+    }
+  },
+  "generation_id": "gen-1784819480-E5MYM8tj6BBYZRHz6Fqn",
+  "usage": {
+    "prompt_tokens": 95,
+    "completion_tokens": 32,
+    "total_tokens": 127,
+    "cost": 0.000114975,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.000114975,
+      "upstream_inference_prompt_cost": 3.6575e-05,
+      "upstream_inference_completions_cost": 7.84e-05
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 31,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "returned_cost": 0.000114975,
+  "analysis": {
+    "logprobs_present": false,
+    "k_returned": 0,
+    "option_tokens_seen": [],
+    "option_coverage": 0,
+    "option_mass": null,
+    "argmax_token": null,
+    "argmax_prob": null,
+    "saturated": null,
+    "usable_for_estimator": false,
+    "content": null,
+    "finish_reason": "length",
+    "error": "no logprobs returned (endpoint advertised support but sent none)"
+  }
+}
