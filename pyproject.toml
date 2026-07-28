@@ -22,6 +22,13 @@ dev = [
 # NOT needed for the demo or to run the experiment — estimation.py ships a pure-numpy
 # Dirichlet-multinomial + empirical-Bayes path. Install (`pip install -e '.[bayes]'`) only
 # when writing up external claims; pymc is a heavy build (pytensor + compiler toolchain).
+# Q2 Stage-2 v7.2 hosted study. The frozen C2 cost projection applies each model's PINNED
+# official chat template and tokenizer to all 528 rendered requests, so both are hard
+# requirements of the study runner (not of the demo or the local experiment).
+stage2 = [
+    "tokenizers>=0.15",
+    "jinja2>=3.1",
+]
 bayes = [
     "pymc>=5.10",
 ]

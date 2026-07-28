@@ -3,10 +3,298 @@
 Reviewer: Codex  
 Date: 2026-07-28  
 Reviewed branch: `phase4-floor-guards`  
-Reviewed HEAD: `4d0c5ac` — *Build hardened Q2 Stage-2 v7.2 runner; synthetic canary passes on Qwen3.5-397B*  
-Implementation scope: cumulative Stage-2 code from `80399d7` through `4d0c5ac`
+Current reviewed HEAD: `84a3fa8` — *Promote both models on their primary endpoints; pin tokenizers; project the full grid*
 
-## Verdict
+Original review baseline: `4d0c5ac` — *Build hardened Q2 Stage-2 v7.2 runner; synthetic canary passes on Qwen3.5-397B*
+
+Current implementation scope: cumulative Stage-2 code from `80399d7` through `84a3fa8`
+
+## Pre-smoke re-audit — 2026-07-28
+
+Reviewed state:
+
+- branch: `phase4-floor-guards`;
+- exact HEAD: `84a3fa8` — *Promote both models on their primary endpoints; pin
+  tokenizers; project the full grid*;
+- worktree before this review edit: clean;
+- cumulative implementation: `4d0c5ac..84a3fa8`;
+- source and focused-test hashes were captured before the final test run and compared
+  afterward; they were byte-identical.
+
+### Pre-smoke verdict
+
+**OBJECT. Claude is not authorized to run either 240-draw smoke yet.**
+
+The implementation-scope gap has narrowed substantially. There is now an executable
+walk/project/smoke/full runner, deterministic study rendering, manifest binding, restart
+reconstruction, per-draw validation, an outcome-blinding interlock module, extraction, and
+extensive no-network coverage. Both synthetic endpoint walks promoted their primary
+endpoints, and committed projection artifacts report that both complete models fit under
+the unified stop.
+
+That is not sufficient to start the smoke. The frozen staged-authorization record required
+before smoke does not exist and is not enforced by the smoke entry point. The cost
+projection still does not implement the frozen documented-tokenizer method, existing
+projection files are trusted without integrity/binding checks, and one focused runner test
+fails. Two persistence/integrity defects also remain from the earlier review.
+
+No implementation fix was made as part of this audit.
+
+### PS-1 — the required promotion/funding authorization is absent and smoke does not enforce it
+
+**Priority: P0 — direct pre-smoke blocker**
+
+The frozen design says that the smoke may run only after endpoint-promotion decisions and
+the funding decision are recorded
+(`paper/Q2_STAGE2_HOSTED_DESIGN.md:690-702`). The current run directory contains:
+
+- two walk records;
+- two full-grid projections;
+- two model manifests;
+- the two paid synthetic walk envelopes and their derived records.
+
+It contains no `interlock/promotion_record.json` and no
+`interlock/funding_record.json`.
+
+The implementation provides write-once record helpers in
+`src/alignment/q2_v7/interlock.py:279-334`, but the executable runner never calls them.
+`STAGES` contains only `walk`, `project`, `smoke`, and `full`
+(`src/alignment/q2_v7/study_run.py:71`). `_stage_smoke` proceeds directly from `_prepared`
+to `run_smoke` (`study_run.py:1503-1512`) without checking either record.
+
+There is also no sound two-model binding yet. The interlock uses one fixed promotion
+filename per run directory, while this run has a distinct manifest per model. A single
+write-once record cannot bind both model promotion decisions unless the schema is changed
+to a panel-level decision or the records are made model-specific.
+
+Required before smoke:
+
+1. Define and implement an unambiguous two-model authorization record scheme.
+2. Derive the promotion records from the immutable walk/projection evidence; do not rely on
+   a manually transcribed endpoint tag or amount.
+3. Record the funding decision, hard stop, reconciled prior spend, and available headroom,
+   bound to the exact model manifest(s) and projection artifact hash(es).
+4. Make `_stage_smoke` fail closed before creating a transport or sending a request unless
+   the applicable promotion and authorized-funding records exist, validate, and match the
+   selected model, endpoint, manifest, snapshot, and projection.
+5. Add a no-network test proving that missing, refused, malformed, stale, cross-model, and
+   wrong-manifest records all produce zero transport calls.
+
+### PS-2 — R-C4 remains open: projections use a fixed overhead, not the pinned chat serialization
+
+**Priority: P1 — pre-smoke cost-gate blocker**
+
+The frozen C2 method applies the official pinned tokenizer to the exact serialized
+system+user messages for every request
+(`paper/Q2_STAGE2_HOSTED_DESIGN.md:1122-1138`).
+
+The implementation instead:
+
+- concatenates message contents without roles or delimiters
+  (`src/alignment/q2_v7/gate.py:252-266`);
+- adds `12` tokens per message plus `8` generation-prompt tokens
+  (`gate.py:240-249`);
+- loads `tokenizer.json` directly and exposes only `count(text)`
+  (`src/alignment/q2_v7/study_run.py:1392-1420`);
+- calculates `tokenizer(payload_text) + fixed_overhead`
+  (`gate.py:438-440`).
+
+That is a new heuristic, not the frozen documented-tokenizer method. It happens to be
+conservative for the committed Qwen assets: applying the pinned Qwen chat template to all
+528 requests produced an exact count 18 tokens lower than the heuristic for every request
+(for one representative request: exact `161`, bare content `147`, heuristic `179`).
+Conservatism does not make the result the preregistered method. For DeepSeek, the committed
+tokenizer/config assets expose no chat template at all, so the claimed exact serialized
+input cannot be independently reconstructed from the pinned files.
+
+Required before smoke:
+
+1. Apply the exact served chat serialization for each endpoint and count the resulting
+   token IDs, including roles, special tokens, and the generation prompt.
+2. Pin every template/config input needed to reproduce that serialization for both models.
+3. If exact DeepSeek serialization cannot be pinned, obtain a fresh pre-outcome design
+   amendment approving a specified conservative method; do not silently substitute a
+   heuristic for frozen C2.
+4. Add fixed expected-count tests using the committed real tokenizer/template assets.
+5. Regenerate and re-review both projection artifacts after the method is corrected.
+
+### PS-3 — projection artifacts are neither content-verified nor bound to later paid stages
+
+**Priority: P1 — pre-smoke cost-gate blocker**
+
+`write_projection` returns an existing same-name artifact without verifying that its bytes
+equal the newly computed projection (`src/alignment/q2_v7/study_run.py:662-669`).
+`read_projection` is an unchecked `json.loads` (`study_run.py:672-673`). `_prepared` then
+trusts that file to price every smoke/full call (`study_run.py:1486-1500`).
+
+The loader does not validate the artifact's model, endpoint, snapshot, prices, request-set
+digest, total, or relationship to the manifest. The manifest does not bind the projection
+hash. Consequently, fixing C2 and rerunning `project` in the same directory would silently
+retain the old heuristic artifact, and a stale or edited artifact could authorize paid
+calls using different prices or token counts.
+
+Required before smoke:
+
+1. Make projection writes immutable by content: identical bytes may resume; different bytes
+   at the same logical identity must raise.
+2. Canonically hash the artifact and bind that digest into the pre-smoke authorization.
+3. On every smoke/full invocation, validate model, endpoint, snapshot, tokenizer identity,
+   all 528 request hashes, row uniqueness, prices, arithmetic totals, and manifest binding
+   before constructing the transport.
+4. Recreate the corrected artifacts under a new content-addressed or otherwise unambiguous
+   identity; do not reuse the committed heuristic files.
+
+### PS-4 — a paid non-terminal retry response is not persisted or booked
+
+**Priority: P1**
+
+`_send_draw` collects retry responses in memory and persists only the terminal response
+(`src/alignment/q2_v7/study_run.py:1061-1100`). If a non-terminal response returns a
+positive cost, the function raises at lines `1085-1094` before persisting that response and
+before persisting the terminal response.
+
+Failing closed is preferable to continuing with understated spend, but it does not satisfy
+R-E1/R-C3: every returned paid response must become durable evidence and count against the
+unified stop. A process exit after this exception leaves no record from which the cost can
+be reconstructed.
+
+Required before smoke:
+
+1. Give every wire attempt an immutable attempt identity separate from the logical
+   manifest-bound sampling draw, or persist attempts in a dedicated append-only attempt
+   store linked to that draw.
+2. Persist and book every returned attempt before deciding whether to retry or validate.
+3. Preserve exactly one terminal sampling outcome for completeness/estimands.
+4. Add tests for a paid 429/5xx followed by success, paid exhaustion, missing-cost
+   non-terminal responses, and restart after each case.
+
+### PS-5 — canary derived records are bound to the wrong raw hash
+
+**Priority: P1**
+
+The canary writes:
+
+```python
+raw_sha256 = canonical_sha256(env.response_body or {})
+```
+
+at `src/alignment/q2_v7/canary.py:291-297`. The rest of the v7 pipeline binds a derived
+record to `RawEnvelope.content_sha256()`, which hashes the complete immutable envelope.
+Study replay and extraction reject mismatched bindings.
+
+Canary replay also re-evaluates the raw response without requiring or verifying its linked
+successful derived record. R-C1 is therefore improved but not fully closed as originally
+specified.
+
+Required before smoke:
+
+1. Write `env.content_sha256()` into canary derived records.
+2. On reuse, require the derived record, verify its raw hash, and preserve a persisted
+   invalid verdict.
+3. Add a test that round-trips a real canary envelope/derived pair through the same binding
+   check used by study replay.
+
+### PS-6 — the focused runner suite is red at the hard-stop boundary
+
+**Priority: P2, but the no-network gate must be green before smoke**
+
+`tests/test_q2_v7_study_run.py:756-766` fails because ten returned costs of `0.0001`
+sum to `0.0010000000000000002`; `ledger.total_spent_usd` therefore reports a value greater
+than its `0.001` hard stop. The runner halts and emits no headline, but the ledger violates
+the explicit tested invariant.
+
+Required before smoke:
+
+1. Represent money with exact decimal or integer units throughout booking, comparison, and
+   reporting, or define one canonical quantization rule at ingestion.
+2. Do not fix this only by weakening the assertion; prove that pre-call checks, reconstructed
+   totals, projection totals, remaining headroom, and reports share the same exact rule.
+3. Rerun the complete focused gate with zero failures.
+
+### Remaining integration work before the full run
+
+This does not independently block an outcome-blinded smoke once PS-1 through PS-6 are
+closed, but it still blocks describing the implementation as end-to-end study-ready:
+
+- the CLI has no extraction/artifact stage (`study_run.py:71`, `1549-1554`);
+- the runner writes `manifest_<model>.json` in the root run directory
+  (`study_run.py:785-796`), while default extraction searches for `manifest.json` inside
+  the envelope-store directory (`study_extract.py:79-126`);
+- the runner does not connect a completed full run to `extract_model` and
+  `write_artifact`.
+
+Close and test that integration before authorizing the full study, even if it is deliberately
+kept separate from the smoke gate.
+
+### Disposition of the original R-C findings
+
+- R-C1: **partially fixed**; raw replay is real, but canary derived binding/reuse remains open.
+- R-C2: **fixed** for current canary, shared walk, and study-store reconstruction.
+- R-C3: **fixed for canary and walk**; still open for non-terminal study retries (PS-4).
+- R-C4: **not fixed**; the exact template method was replaced by a fixed-overhead heuristic.
+- R-C5: **fixed**; the v5 paid CLI errors before constructing a live transport.
+- R-C6: **fixed**; canary content must parse and equal the requested option.
+
+### Re-test record for `84a3fa8`
+
+Commands were run from the repository root under the active Python environment. No network
+or paid study call was made by this audit.
+
+```text
+python -m pytest -q tests/test_q2_v7_study_run.py
+
+1 failed, 60 passed in 106.39s
+```
+
+Failure:
+
+```text
+test_full_run_halts_before_a_call_that_would_breach_the_hard_stop
+assert 0.0010000000000000002 <= 0.001
+```
+
+```text
+python -m pytest -q \
+  tests/test_q2_v7_envelope.py \
+  tests/test_q2_v7_identity.py \
+  tests/test_q2_v7_ledger.py \
+  tests/test_q2_v7_gate.py \
+  tests/test_q2_v7_conformance.py \
+  tests/test_q2_v7_canary.py \
+  tests/test_q2_v7_interlock.py \
+  tests/test_q2_v7_study_render.py \
+  tests/test_q2_v7_study_conformance.py
+
+730 passed, 1 skipped in 16.04s
+```
+
+```text
+python -m pytest -q tests/test_q2_v7_study_extract.py
+
+65 passed in 615.99s
+```
+
+Total: **855 passed, 1 skipped, 1 failed**.
+
+### Conditions for a new smoke authorization
+
+- [ ] PS-1: valid per-model or panel-level promotion and authorized-funding records exist
+      and `_stage_smoke` enforces them before any transport can send.
+- [ ] PS-2: C2 uses the exact pinned serialization/tokenizer method, or an explicitly
+      approved pre-outcome amendment replaces it.
+- [ ] PS-3: corrected projection artifacts are content-verified and bound to the manifest
+      and authorization records.
+- [ ] PS-4: every paid retry attempt is durably persisted and booked.
+- [ ] PS-5: canary derived records use the full envelope hash and are verified on reuse.
+- [ ] PS-6: every focused Stage-2 test passes.
+- [ ] The review is repeated against the exact clean commit proposed for smoke.
+
+Until every box above is checked, there is **no authorization for Claude or any other
+operator to run `study_run smoke`**.
+
+## Original `4d0c5ac` review (historical)
+
+### Verdict at the original baseline
 
 **OBJECT to further paid Stage-2 execution until R-C1--R-C6 below are fixed and
 retested.**

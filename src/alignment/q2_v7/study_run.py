@@ -5,16 +5,19 @@ the one executable path that renders the frozen grid, walks the endpoint sequenc
 the full-grid cost, executes the outcome-blinded smoke, reuses those draws inside the full
 13,200-draw design, and enforces restart and the hard stop throughout.
 
-Six separately callable, separately testable stages (nothing ever auto-advances):
+Seven separately callable, separately testable stages (nothing ever auto-advances):
 
 1. `run_walk`      — the deterministic endpoint promotion walk (ONE synthetic, non-study
                      capability probe per candidate, in frozen sequence order).
-2. `run_projection`— the C2 documented-tokenizer full-grid projection artifact.
-3. `run_smoke`     — the 240 outcome-blinded smoke draws (48 coordinates x draw indices 0-4).
-4. `smoke_promotion_gate` — the frozen measurement-validity gate on those 240 draws.
-5. `run_full`      — the remaining 12,960 draws (240 + 12,960 = 13,200 attempted per model),
+2. `run_projection`— the C2 documented-tokenizer full-grid projection artifact, written under a
+                     CONTENT-ADDRESSED identity and pinned by a write-once binding record.
+3. `record_promotion_authorization` / `record_funding_authorization` — the frozen staged
+                     authorization (v7 "Staged authorization" 4). NO paid call.
+4. `run_smoke`     — the 240 outcome-blinded smoke draws (48 coordinates x draw indices 0-4).
+5. `smoke_promotion_gate` — the frozen measurement-validity gate on those 240 draws.
+6. `run_full`      — the remaining 12,960 draws (240 + 12,960 = 13,200 attempted per model),
                      reusing every persisted smoke draw and never repaying it.
-6. `build_study_manifest` / `write_study_manifest` — the R-V7-7 manifest binding, plus
+7. `build_study_manifest` / `write_study_manifest` — the R-V7-7 manifest binding, plus
                      `open_ledger`, which reconstructs cumulative spend BEFORE the first
                      budget check (R-C2).
 
@@ -30,7 +33,13 @@ Frozen invariants this module refuses to break:
 * there is NO reduced-cell and NO reduced-S substitute: a model that cannot pass the walk or
   cannot fit the $8.50 stop is reported as a capability/budget exclusion;
 * "finish current model" NEVER overrides the $8.50 hard stop: the run halts BEFORE the call
-  that would breach it, the model is reported incomplete, and no headline is emitted.
+  that would breach it, the model is reported incomplete, and no headline is emitted;
+* every wire attempt that returned a response is persisted and booked BEFORE the retry policy
+  is allowed to decide anything, and exactly ONE terminal sampling outcome per draw enters the
+  13,200-draw study store (PS-4);
+* no paid study call is constructed, let alone sent, until the model's promotion authorization
+  and the panel's funding authorization are on disk, validate, and match this exact model,
+  endpoint, manifest, snapshot and projection artifact (PS-1).
 
 NETWORK: the HTTP transport is an INJECTED seam (`SingleAttemptTransport` is the only live
 implementation and is constructed solely by `main`). Every stage function takes the transport
@@ -39,7 +48,7 @@ as an argument, so the whole module is exercised with no network in
 
 Usage (each stage is invoked separately; no stage ever starts its successor):
 
-    python -m alignment.q2_v7.study_run {walk,project,smoke,full} \
+    python -m alignment.q2_v7.study_run {walk,project,authorize,smoke,full} \
         --model MODEL --run-dir DIR --i-have-authorized-paid-spend
 """
 from __future__ import annotations
@@ -47,12 +56,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import sys
 import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional, Protocol, Sequence
 
@@ -60,6 +71,7 @@ from alignment.q2_v7 import canary as C
 from alignment.q2_v7 import envelope as E
 from alignment.q2_v7 import gate as G
 from alignment.q2_v7 import identity as I
+from alignment.q2_v7 import interlock as K
 from alignment.q2_v7 import ledger as L
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -68,12 +80,23 @@ DESIGN_DOC = ROOT / "paper" / "Q2_STAGE2_HOSTED_DESIGN.md"
 DEFAULT_RUN_DIR = ROOT / "out" / "q2_stage2_v7_study"
 V7_CANARY_RAW = ROOT / "out" / "q2_stage2_v7_canary" / "raw"
 
-STAGES: tuple[str, ...] = ("walk", "project", "smoke", "full")
+STAGES: tuple[str, ...] = ("walk", "project", "authorize", "smoke", "full")
 
 #: Reporting labels only — ALL buckets share the single $8.50 stop (R-V7-6).
 WALK_STAGE, WALK_BUCKET = "gate", "gate"
 SMOKE_STAGE, SMOKE_BUCKET = "smoke", "smoke"
 FULL_STAGE, FULL_BUCKET = "study", "study"
+
+#: Sub-directory holding the append-only per-wire-attempt records (PS-4). It is deliberately
+#: SEPARATE from the study store so the study store keeps exactly one terminal sampling
+#: outcome per manifest-bound draw (the 13,200 count never changes).
+ATTEMPT_DIRNAME = "study_attempts"
+
+#: Draw-index base for attempt identities. A sampling draw index is 0-24; an attempt index is
+#: `BASE + draw_index * max_attempts + attempt`, so an attempt identity can never collide with
+#: a manifest-bound sampling draw identity, and every attempt of every draw is distinct.
+ATTEMPT_DRAW_INDEX_BASE = 1000
+assert ATTEMPT_DRAW_INDEX_BASE > I.DRAWS_PER_COORDINATE
 
 #: Worst case debited against the stop before one synthetic capability probe. The probe is a
 #: two-message, four-token call; a cent is orders of magnitude above its realised cost.
@@ -83,7 +106,7 @@ PROBE_WORST_CASE_USD = 0.01
 #: default, because a projection with no reserve can authorise a run it cannot finish.
 DEFAULT_RETRY_RESERVE_USD = 0.25
 
-USAGE = ("python -m alignment.q2_v7.study_run {walk,project,smoke,full} "
+USAGE = ("python -m alignment.q2_v7.study_run {walk,project,authorize,smoke,full} "
          "--model MODEL --run-dir DIR --i-have-authorized-paid-spend")
 
 
@@ -109,6 +132,24 @@ class MeasurementValidityFailure(StudyRunError):
 
 class HardStopHalt(StudyRunError):
     """The $8.50 stop would be breached by the next call."""
+
+
+class ProjectionIntegrityError(StudyRunError):
+    """A projection artifact is absent, unbound, edited, or does not describe this run (PS-3).
+
+    Every paid study call is priced from a projection artifact. An artifact that cannot be
+    proved — byte-for-byte — to be the one the promotion decision was taken on is never used
+    to authorise a payment.
+    """
+
+
+class AuthorizationError(StudyRunError):
+    """The frozen staged authorization for a paid study stage is absent or does not apply.
+
+    Raised BEFORE any transport is constructed, so a missing, refused, malformed, stale,
+    cross-model, or wrong-manifest authorization record produces exactly ZERO wire calls
+    (PS-1).
+    """
 
 
 # =======================================================================================
@@ -654,23 +695,368 @@ def build_projection(*, model: str, candidate: G.EndpointCandidate,
     )
 
 
+#: The canonical serialization `gate.write_projection_artifact` uses. Recomputed here so the
+#: artifact can be content-addressed and byte-compared without re-writing it.
+def projection_bytes(projection: G.CostProjection) -> bytes:
+    return json.dumps(projection.as_artifact(), sort_keys=True,
+                      separators=(",", ":")).encode("utf-8")
+
+
+def projection_sha256(projection: G.CostProjection) -> str:
+    return hashlib.sha256(projection_bytes(projection)).hexdigest()
+
+
+def _safe_tag(tag: str) -> str:
+    return tag.replace("/", "__")
+
+
 def projection_path(projection_dir: Path | str, projection: G.CostProjection) -> Path:
-    tag = projection.endpoint_tag.replace("/", "__")
-    return Path(projection_dir) / f"projection_{_safe_model(projection.model)}__{tag}.json"
+    """The CONTENT-ADDRESSED artifact path (PS-3.4).
+
+    The v7.2 pre-smoke re-audit found that a single `projection_<model>__<tag>.json` name made
+    a corrected projection indistinguishable from the stale heuristic one it replaced: rerunning
+    `project` silently kept the old file. The digest is therefore part of the filename, so an
+    artifact computed by a different method, at different prices, or over a different request
+    set can never occupy the identity of the one that decided a promotion. Which of several
+    artifacts a paid stage may use is decided by the write-once binding record below, never by
+    a filename glob.
+    """
+    digest = projection_sha256(projection)
+    return (Path(projection_dir) /
+            f"projection_{_safe_model(projection.model)}__{_safe_tag(projection.endpoint_tag)}"
+            f"__sha256-{digest[:16]}.json")
 
 
 def write_projection(projection_dir: Path | str, projection: G.CostProjection) -> Path:
-    """Persist the per-candidate cost artifact. An existing artifact is NEVER overwritten: a
-    projection that decided a promotion is immutable evidence."""
+    """Persist the per-candidate cost artifact, IMMUTABLE BY CONTENT (PS-3.1).
+
+    Identical bytes at the same content-addressed identity resume silently — that is what makes
+    the stage restartable. Different bytes at the same identity RAISE: the previous
+    implementation returned an existing same-name artifact without ever comparing it, so a
+    stale projection could price every paid call in the run.
+    """
     path = projection_path(projection_dir, projection)
+    body = projection_bytes(projection)
     if path.exists():
+        existing = path.read_bytes()
+        if existing != body:
+            raise ProjectionIntegrityError(
+                f"projection artifact {path} exists with different bytes (sha256 "
+                f"{hashlib.sha256(existing).hexdigest()[:12]} on disk vs "
+                f"{hashlib.sha256(body).hexdigest()[:12]} recomputed) — refusing to reuse or "
+                f"replace immutable cost evidence")
         return path
     G.write_projection_artifact(path, projection)
     return path
 
 
 def read_projection(path: Path | str) -> dict:
-    return json.loads(Path(path).read_text())
+    """Read one projection artifact, with the MINIMUM structural check.
+
+    This is the raw reader. It is never sufficient to authorise a payment: every smoke/full
+    invocation goes through `verify_projection`, which checks the artifact against the
+    snapshot, the manifest, the pinned tokenizer identity, all 528 request hashes, the prices,
+    and every arithmetic total.
+    """
+    obj = json.loads(Path(path).read_text())
+    if not isinstance(obj, Mapping):
+        raise ProjectionIntegrityError(f"{path}: projection artifact is not a JSON object")
+    if not isinstance(obj.get("rows"), list):
+        raise ProjectionIntegrityError(f"{path}: projection artifact carries no rows")
+    return dict(obj)
+
+
+# ---------------------------------------------------------------------------------------
+# The write-once projection binding record — the LOGICAL identity of "the projection this
+# model+endpoint runs on". PS-3.2: it is what the authorization records bind.
+# ---------------------------------------------------------------------------------------
+
+PROJECTION_BINDING_SCHEMA = "q2_v7.study_run.projection_binding.v1"
+
+
+def projection_binding_path(run_dir: Path | str, model: str, tag: str) -> Path:
+    return Path(run_dir) / f"projection_binding_{_safe_model(model)}__{_safe_tag(tag)}.json"
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _canonical(payload: Mapping[str, Any]) -> str:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def _binding_digest(payload: Mapping[str, Any]) -> str:
+    """SHA-256 over a record's canonical payload — the same idiom `interlock` uses.
+
+    Every field a later stage relies on is inside the payload, so an edited record fails to
+    load rather than silently authorising a different run.
+    """
+    return hashlib.sha256(_canonical(payload).encode("utf-8")).hexdigest()
+
+
+#: Fields that record WHO/WHEN, not WHAT was decided. They are covered by `binding_sha256`
+#: (so they cannot be edited after the fact) but are excluded from the write-once comparison,
+#: exactly as `identity.write_or_resume_manifest` resumes on identical content: re-invoking a
+#: stage must be a no-op, and a wall-clock second is not a different decision.
+_VOLATILE_RECORD_FIELDS: tuple[str, ...] = ("recorded_utc", "recorded_by")
+
+
+def _decision_content(record: Mapping[str, Any]) -> dict:
+    return {k: v for k, v in record.items()
+            if k != "binding_sha256" and k not in _VOLATILE_RECORD_FIELDS}
+
+
+def _write_once_record(path: Path, payload: Mapping[str, Any], *,
+                       error: type[StudyRunError]) -> dict:
+    """Persist one write-once record atomically. Identical decision content resumes; different
+    decision content raises. A decision record is evidence — there is no `--force`."""
+    body = dict(payload)
+    body["binding_sha256"] = _binding_digest(payload)
+    text = _canonical(body)
+    if path.exists():
+        stored = json.loads(path.read_text())
+        if _decision_content(stored) != _decision_content(body):
+            raise error(
+                f"{path} already records a DIFFERENT decision — a recorded decision is "
+                f"immutable evidence and is never rewritten. Move the superseded record aside "
+                f"deliberately (and re-review it) before recording a new one.")
+        return dict(stored)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text)
+    os.replace(tmp, path)
+    try:
+        os.chmod(path, 0o444)
+    except OSError:                                    # pragma: no cover - platform-dependent
+        pass
+    return body
+
+
+def _read_once_record(path: Path, schema: str, *, error: type[StudyRunError]) -> dict:
+    if not path.exists():
+        raise error(f"no record at {path}")
+    try:
+        obj = json.loads(path.read_text())
+    except (OSError, ValueError) as exc:
+        raise error(f"{path}: unreadable record ({exc})") from None
+    if not isinstance(obj, Mapping):
+        raise error(f"{path}: record is not a JSON object")
+    if obj.get("schema") != schema:
+        raise error(f"{path}: wrong schema {obj.get('schema')!r}, expected {schema!r}")
+    stored = obj.get("binding_sha256")
+    payload = {k: v for k, v in obj.items() if k != "binding_sha256"}
+    if not isinstance(stored, str) or stored != _binding_digest(payload):
+        raise error(
+            f"{path}: binding_sha256 does not match the record payload — the record was "
+            f"edited after it was written, or moved onto another run")
+    return dict(obj)
+
+
+def _tokenizer_identity(snapshot: E.Snapshot, model: str) -> dict:
+    """The pinned tokenizer identity C2 requires: repo id, exact revision, and file hashes."""
+    spec = snapshot.tokenizers.get(model)
+    if not isinstance(spec, Mapping):
+        raise ProjectionIntegrityError(
+            f"the committed snapshot pins no tokenizer for {model!r}; C2 cannot be reproduced")
+    return {
+        "repo_id": str(spec.get("repo_id") or ""),
+        "revision": str(spec.get("revision") or ""),
+        "files": {str(k): str(v) for k, v in sorted((spec.get("files") or {}).items())},
+    }
+
+
+def request_set_sha256(request_sha256s: Sequence[str]) -> str:
+    """A canonical digest over the SET of request hashes the projection priced."""
+    return I.canonical_sha256(sorted(set(request_sha256s)))
+
+
+def write_projection_binding(run_dir: Path | str, projection: G.CostProjection, *,
+                             snapshot: E.Snapshot, manifest: I.Manifest,
+                             artifact_path: Path, recorded_by: str = "") -> dict:
+    """Pin ONE projection artifact as the projection this model+endpoint is priced from.
+
+    Write-once. Re-running `project` after correcting the C2 method produces a different
+    artifact digest and therefore a different record body, which RAISES here rather than
+    silently swapping the artifact that prices 13,200 paid calls (PS-3.1/PS-3.4).
+    """
+    artifact_path = Path(artifact_path)
+    body = artifact_path.read_bytes()
+    payload = {
+        "schema": PROJECTION_BINDING_SCHEMA,
+        "model": projection.model,
+        "endpoint_tag": projection.endpoint_tag,
+        "artifact_filename": artifact_path.name,
+        "artifact_sha256": hashlib.sha256(body).hexdigest(),
+        "endpoint_snapshot_sha256": snapshot.sha256,
+        "manifest_sha256": manifest.sha256,
+        "tokenizer": _tokenizer_identity(snapshot, projection.model),
+        "n_requests": int(projection.n_requests),
+        "draws_per_request": int(projection.draws_per_request),
+        "completion_allowance": int(projection.completion_allowance),
+        "price_prompt_per_token": float(projection.price_prompt_per_token),
+        "price_completion_per_token": float(projection.price_completion_per_token),
+        "request_set_sha256": request_set_sha256([r.request_sha256 for r in projection.rows]),
+        "projected_input_tokens_total": int(projection.projected_input_tokens_total),
+        "projected_input_cost": float(projection.projected_input_cost),
+        "projected_completion_cost": float(projection.projected_completion_cost),
+        "reconciled_prior_gate_spend": float(projection.reconciled_prior_gate_spend),
+        "retry_reserve": float(projection.retry_reserve),
+        "total": float(projection.total),
+        "stop": float(projection.stop),
+        "fits": bool(projection.fits),
+        "recorded_utc": _utc_now(),
+        "recorded_by": recorded_by,
+    }
+    path = projection_binding_path(run_dir, projection.model, projection.endpoint_tag)
+    return _write_once_record(path, payload, error=ProjectionIntegrityError)
+
+
+def load_projection_binding(run_dir: Path | str, model: str, tag: str) -> dict:
+    return _read_once_record(projection_binding_path(run_dir, model, tag),
+                             PROJECTION_BINDING_SCHEMA, error=ProjectionIntegrityError)
+
+
+def _close(a: float, b: float) -> bool:
+    return math.isclose(float(a), float(b), rel_tol=1e-9, abs_tol=1e-12)
+
+
+def verify_projection(run_dir: Path | str, *, model: str, tag: str, snapshot: E.Snapshot,
+                      manifest: I.Manifest,
+                      requests: Sequence[StudyRequestLike]) -> tuple[dict, str]:
+    """Validate the bound projection artifact END TO END, BEFORE any transport exists (PS-3.3).
+
+    Checks, in order: the binding record loads and is unedited; it names this model, this
+    endpoint, this committed snapshot, this manifest and this pinned tokenizer; the artifact on
+    disk hashes to the bound digest; the artifact's own model/endpoint/prices agree with the
+    snapshot candidate; all 528 rows are unique in both hash and coordinate and exactly cover
+    the rendered grid and the manifest; and every arithmetic total re-derives from the rows
+    under the frozen C2 formula, fits the $8.50 stop, and matches the binding record.
+
+    Returns `(artifact, artifact_sha256)`; raises `ProjectionIntegrityError` otherwise.
+    """
+    run_dir = Path(run_dir)
+    binding = load_projection_binding(run_dir, model, tag)
+
+    def fail(msg: str) -> None:
+        raise ProjectionIntegrityError(
+            f"projection binding {projection_binding_path(run_dir, model, tag).name}: {msg}")
+
+    if binding.get("model") != model:
+        fail(f"bound to model {binding.get('model')!r}, not {model!r}")
+    if binding.get("endpoint_tag") != tag:
+        fail(f"bound to endpoint {binding.get('endpoint_tag')!r}, not the promoted {tag!r}")
+    if binding.get("endpoint_snapshot_sha256") != snapshot.sha256:
+        fail(f"bound to endpoint snapshot {binding.get('endpoint_snapshot_sha256')!r}, not the "
+             f"committed {snapshot.sha256!r}")
+    if binding.get("manifest_sha256") != manifest.sha256:
+        fail(f"bound to manifest {str(binding.get('manifest_sha256'))[:12]}, not this run's "
+             f"{manifest.sha256[:12]}")
+    if binding.get("tokenizer") != _tokenizer_identity(snapshot, model):
+        fail("the pinned tokenizer identity (repo/revision/file hashes) has changed since the "
+             "projection was recorded; C2 is no longer reproducible from it")
+
+    artifact_path = run_dir / str(binding.get("artifact_filename") or "")
+    if not artifact_path.exists():
+        fail(f"the bound artifact {binding.get('artifact_filename')!r} is absent")
+    raw = artifact_path.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != binding.get("artifact_sha256"):
+        fail(f"the bound artifact hashes to {digest[:12]} but the record binds "
+             f"{str(binding.get('artifact_sha256'))[:12]} — the artifact was edited")
+    artifact = read_projection(artifact_path)
+
+    if artifact.get("model") != model or artifact.get("endpoint_tag") != tag:
+        fail(f"artifact describes {artifact.get('model')!r}@{artifact.get('endpoint_tag')!r}")
+
+    candidate = gate_candidates(snapshot, model).get(f"{model}::{tag}")
+    if candidate is None:
+        fail(f"{tag!r} is not a candidate of {model!r} in the committed snapshot")
+    prices = artifact.get("endpoint_prices") or {}
+    in_price = float(prices.get("price_prompt_per_token", float("nan")))
+    out_price = float(prices.get("price_completion_per_token", float("nan")))
+    if not _close(in_price, candidate.price_prompt_per_token) or \
+            not _close(out_price, candidate.price_completion_per_token):
+        fail(f"artifact prices ({in_price}, {out_price}) differ from the committed snapshot "
+             f"({candidate.price_prompt_per_token}, {candidate.price_completion_per_token})")
+    if not _close(in_price, float(binding["price_prompt_per_token"])) or \
+            not _close(out_price, float(binding["price_completion_per_token"])):
+        fail("artifact prices differ from the bound prices")
+
+    rows = artifact["rows"]
+    if len(rows) != I.COORDINATES_PER_MODEL:
+        fail(f"{len(rows)} priced rows, expected {I.COORDINATES_PER_MODEL}")
+    hashes = [str(r["request_sha256"]) for r in rows]
+    coords = [(str(r["cell_id"]), str(r["probe_id"]), int(r["order_idx"])) for r in rows]
+    if len(set(hashes)) != len(hashes):
+        fail("duplicate request hashes among the priced rows")
+    if len(set(coords)) != len(coords):
+        fail("duplicate coordinates among the priced rows")
+    rendered = {r.request_sha256 for r in requests}
+    if set(hashes) != rendered:
+        fail(f"the priced request set does not equal the rendered grid "
+             f"({len(set(hashes) - rendered)} priced-only, {len(rendered - set(hashes))} "
+             f"rendered-only)")
+    if set(hashes) != set(manifest.request_sha256s):
+        fail("the priced request set does not equal the manifest's 528 request hashes")
+    if binding.get("request_set_sha256") != request_set_sha256(hashes):
+        fail("the priced request set does not match the bound request-set digest")
+
+    draws = int(artifact.get("draws_per_request", 0))
+    if draws != I.DRAWS_PER_COORDINATE:
+        fail(f"artifact prices {draws} draws per coordinate, expected "
+             f"{I.DRAWS_PER_COORDINATE}")
+    allowance = int(artifact.get("completion_allowance", 0))
+    if allowance < G.MIN_COMPLETION_ALLOWANCE:
+        fail(f"completion allowance {allowance} is below the frozen "
+             f"{G.MIN_COMPLETION_ALLOWANCE}")
+
+    input_cost = 0.0
+    tokens_total = 0
+    for row in rows:
+        raw_tokens = int(row["raw_input_tokens"])
+        projected = int(row["projected_input_tokens"])
+        if projected != G.projected_input_tokens(raw_tokens):
+            fail(f"row {str(row['request_sha256'])[:12]} carries projected tokens {projected} "
+                 f"!= ceil(1.10 x {raw_tokens}) under the frozen margin")
+        if int(row["draws"]) != draws:
+            fail(f"row {str(row['request_sha256'])[:12]} prices {row['draws']} draws")
+        expected_row_cost = projected * draws * in_price
+        if not _close(float(row["input_cost_for_draws"]), expected_row_cost):
+            fail(f"row {str(row['request_sha256'])[:12]} input cost "
+                 f"{row['input_cost_for_draws']} != {expected_row_cost}")
+        tokens_total += projected
+        input_cost += float(row["input_cost_for_draws"])
+
+    if int(artifact.get("projected_input_tokens_total", -1)) != tokens_total:
+        fail("projected_input_tokens_total does not equal the sum of the rows")
+    if not _close(float(artifact["projected_input_cost"]), input_cost):
+        fail("projected_input_cost does not equal the sum of the row costs")
+    completion_cost = len(rows) * draws * allowance * out_price
+    if not _close(float(artifact["projected_completion_cost"]), completion_cost):
+        fail("projected_completion_cost does not equal 528 x 25 x allowance x output price")
+    total = (float(artifact["projected_input_cost"])
+             + float(artifact["projected_completion_cost"])
+             + float(artifact["reconciled_prior_gate_spend"])
+             + float(artifact["retry_reserve"]))
+    if not _close(float(artifact["total"]), total):
+        fail("total does not equal input + completion + prior gate spend + retry reserve")
+    if not _close(float(artifact.get("stop", 0.0)), G.GLOBAL_STUDY_STOP):
+        fail(f"artifact stop {artifact.get('stop')} is not the frozen "
+             f"${G.GLOBAL_STUDY_STOP:.2f}")
+    if float(artifact["total"]) > float(artifact["stop"]) or not artifact.get("fits"):
+        fail(f"projected total ${float(artifact['total']):.4f} does not fit the "
+             f"${float(artifact['stop']):.2f} stop")
+    for key in ("total", "projected_input_cost", "projected_completion_cost",
+                "reconciled_prior_gate_spend", "retry_reserve"):
+        if not _close(float(artifact[key]), float(binding[key])):
+            fail(f"artifact {key} differs from the bound value")
+    if int(binding["projected_input_tokens_total"]) != tokens_total:
+        fail("projected_input_tokens_total differs from the bound value")
+    if int(binding["completion_allowance"]) != allowance:
+        fail("completion allowance differs from the bound value")
+
+    return artifact, digest
 
 
 def worst_case_lookup(projection: G.CostProjection | Mapping[str, Any]
@@ -803,8 +1189,67 @@ def walk_store(run_dir: Path | str) -> L.EnvelopeStore:
 
 def study_store(run_dir: Path | str) -> L.EnvelopeStore:
     """Records of the study draws. Smoke and full share ONE store — that is what makes the
-    240 smoke draws the first five of the 25 rather than a separate payment."""
+    240 smoke draws the first five of the 25 rather than a separate payment.
+
+    This store holds exactly ONE terminal sampling outcome per manifest-bound draw. Every wire
+    attempt behind that outcome lives in the append-only attempt store below (PS-4).
+    """
     return L.EnvelopeStore(Path(run_dir) / "study")
+
+
+def attempt_store(run_dir: Path | str) -> L.EnvelopeStore:
+    """The append-only store of EVERY returned wire attempt (PS-4).
+
+    A study draw's identity is `request hash + immutable draw index` and is bound by the
+    manifest, so it cannot absorb extra indices for retries. The previous implementation
+    therefore kept retry responses in memory and persisted only the terminal one: a paid
+    non-terminal 429/5xx response, and the evidence needed to reconcile it, was lost on any
+    process exit during the retry ladder. Attempts now get their own immutable identities in
+    their own store, linked to the sampling draw by the shared request hash and by
+    `attempt_draw_index`, and it is the attempt store — not the study store — that carries the
+    money into the $8.50 stop.
+    """
+    return L.EnvelopeStore(Path(run_dir) / ATTEMPT_DIRNAME)
+
+
+def attempt_store_for(store: L.EnvelopeStore) -> L.EnvelopeStore:
+    """The attempt store that belongs beside a given study store."""
+    return L.EnvelopeStore(Path(store.run_dir).parent / ATTEMPT_DIRNAME)
+
+
+def attempt_draw_index(draw_index: int, attempt: int,
+                       max_attempts: int = G.MAX_ATTEMPTS) -> int:
+    """The immutable attempt identity index for attempt `attempt` of sampling draw `draw_index`.
+
+    `BASE + draw_index * max_attempts + attempt` is injective over the frozen ranges and lies
+    entirely above the 0-24 sampling indices, so no attempt identity can ever be mistaken for
+    (or collide with) a manifest-bound sampling draw.
+    """
+    if not 0 <= int(attempt) < int(max_attempts):
+        raise StudyRunError(
+            f"attempt {attempt} is outside the frozen C3 policy of {max_attempts} attempts")
+    if int(draw_index) < 0:
+        raise StudyRunError("draw index must be non-negative")
+    return ATTEMPT_DRAW_INDEX_BASE + int(draw_index) * int(max_attempts) + int(attempt)
+
+
+def attempt_draw_ids(request_sha256: str, draw_index: int,
+                     max_attempts: int = G.MAX_ATTEMPTS) -> tuple[str, ...]:
+    """Every attempt identity one sampling draw is authorised to have paid for."""
+    return tuple(I.draw_id(request_sha256, attempt_draw_index(draw_index, k, max_attempts))
+                 for k in range(max_attempts))
+
+
+def authorised_attempt_draw_ids(study_draw_ids: Sequence[str],
+                                max_attempts: int = G.MAX_ATTEMPTS) -> set[str]:
+    """The deterministic, pre-computable attempt identities of a set of sampling draws."""
+    out: set[str] = set()
+    for identity in study_draw_ids:
+        sha, sep, index = str(identity).partition("#draw")
+        if not sep:
+            continue
+        out |= set(attempt_draw_ids(sha, int(index), max_attempts))
+    return out
 
 
 def _prior_dirs() -> list[Path]:
@@ -876,16 +1321,328 @@ def open_ledger(run_dir: Path | str, *, model: str, endpoint: str = "",
     # ledger for the second model hits the first model's persisted walk envelope and raises
     # ManifestBindingError. The panel is frozen, so these ids are deterministic and
     # pre-computable — this widens the binding, it does not weaken it (a draw outside the
-    # panel's authorised set is still refused).
+    # panel's authorised set is still refused). The same argument applies to the frozen C3
+    # retry ladder: each sampling draw's `max_attempts` attempt identities are deterministic,
+    # so they are authorised up front and every returned attempt has an identity to be booked
+    # under (PS-4).
     authorised = set(study_draw_ids)
+    authorised |= authorised_attempt_draw_ids(study_draw_ids, max_attempts)
     for panel_model in G.PANEL_ORDER:
         authorised |= set(walk_draw_ids(panel_model, max_attempts))
     manifest = L.RunManifest.from_draw_ids(authorised, model=model, endpoint=endpoint)
-    ledger = L.reconstruct_ledger(study_store(run_dir), manifest=manifest,
+    # Money is reconstructed from the ATTEMPT store: it holds every returned wire response,
+    # including the paid non-terminal retries the old runner discarded.
+    ledger = L.reconstruct_ledger(attempt_store(run_dir), manifest=manifest,
                                   reconciliation=reconciliation)
+    _verify_sampling_outcomes(study_store(run_dir), attempt_store(run_dir),
+                              manifest=manifest, ledger=ledger, max_attempts=max_attempts)
     for envelope in walk_store(run_dir).envelopes():
         ledger.book_envelope(envelope)
     return ledger
+
+
+def _verify_sampling_outcomes(store: L.EnvelopeStore, attempts: L.EnvelopeStore, *,
+                              manifest: L.RunManifest, ledger: L.V7Ledger,
+                              max_attempts: int) -> None:
+    """Apply the R-E3 binding/uniqueness checks to the study store WITHOUT double-booking.
+
+    A terminal sampling outcome is the same wire response as its terminal attempt, and that
+    attempt has already been booked from the attempt store, so booking the study record again
+    would count one paid response twice against the $8.50 stop. A study record with NO attempt
+    record at all (written before the attempt store existed) is still booked here — otherwise
+    a pre-PS-4 run would silently understate its spend.
+    """
+    booked = set(ledger.booked_draw_ids())
+    seen: set[str] = set()
+    for envelope in store.envelopes():
+        if not manifest.contains(envelope.draw_id):
+            raise L.ManifestBindingError(
+                f"persisted record {envelope.draw_id} is not bound by manifest "
+                f"{manifest.manifest_sha256[:12]} — refusing to reconstruct an unaudited run")
+        if envelope.draw_id in seen:
+            raise L.ManifestBindingError(
+                f"draw {envelope.draw_id} appears more than once in {store.raw_dir}")
+        seen.add(envelope.draw_id)
+        linked = attempt_draw_ids(envelope.request_sha256, envelope.draw_index, max_attempts)
+        if not any(identity in booked for identity in linked):
+            ledger.book_envelope(envelope)
+
+
+# =======================================================================================
+# Staged authorization (PS-1) — the records the frozen design requires BEFORE the smoke
+# =======================================================================================
+#
+# The frozen "Staged authorization" rule (requirement 4) is: *only after endpoints are promoted
+# (or models excluded) AND the funding decision is recorded* may the 240-call smoke run.
+#
+# Record scheme, and why it is this one
+# -------------------------------------
+# `interlock` writes ONE `promotion_record.json` per run directory. This run renders a distinct
+# manifest per model — different endpoint slug, different 528 request hashes, different 13,200
+# draw identities — so a single write-once file physically cannot bind both models' promotion
+# decisions: whichever model recorded second would either destroy the first record or bind to a
+# manifest that is wrong for it. Therefore:
+#
+#   * PROMOTION records are MODEL-SPECIFIC (`interlock/promotion_record_<model>.json`). A
+#     promotion decision is about one model at one endpoint under one manifest; the
+#     `interlock.PromotionRecord` schema already carries exactly one `model` field, so only its
+#     filename was ever panel-level.
+#   * The FUNDING record is PANEL-LEVEL and there is exactly one per run
+#     (`interlock/funding_record_panel.json`). The $8.50 stop is ONE stop shared by the whole
+#     panel — "overriding all component caps", "not repurposed", "finish current model then
+#     stop". A per-model funding record would assert per-model budgets, which the frozen design
+#     explicitly refuses. It therefore binds EVERY panel model's manifest digest and projection
+#     artifact digest, and names the models it authorizes.
+#
+# Both are derived from immutable evidence already on disk — the walk record and the bound
+# projection artifact — never from a hand-typed endpoint tag or amount.
+#
+# These records are distinct artifacts from `interlock`'s own `promotion_record.json` /
+# `funding_record.json`, which gate HEADLINE AGGREGATION (a later, separate step) and whose
+# single-manifest schema cannot express the panel binding required here.
+
+AUTHORIZATION_PROMOTION_SCHEMA = "q2_v7.study_run.model_promotion_authorization.v1"
+AUTHORIZATION_FUNDING_SCHEMA = "q2_v7.study_run.panel_funding_authorization.v1"
+
+FUNDING_AUTHORIZATION_FILENAME = "funding_record_panel.json"
+
+
+def authorization_dir(run_dir: Path | str) -> Path:
+    """The interlock directory — the two authorization families live side by side."""
+    return K.interlock_dir(run_dir)
+
+
+def promotion_authorization_path(run_dir: Path | str, model: str) -> Path:
+    return authorization_dir(run_dir) / f"promotion_record_{_safe_model(model)}.json"
+
+
+def funding_authorization_path(run_dir: Path | str) -> Path:
+    return authorization_dir(run_dir) / FUNDING_AUTHORIZATION_FILENAME
+
+
+def _walk_evidence(run_dir: Path | str, model: str) -> tuple[dict, str]:
+    """The immutable walk record and its digest. The promoted tag is READ, never retyped."""
+    path = walk_record_path(run_dir, model)
+    if not path.exists():
+        raise AuthorizationError(
+            f"no walk record at {path} — the endpoint-promotion decision cannot be authorized "
+            f"before the `walk` stage has produced its evidence")
+    raw = path.read_bytes()
+    return json.loads(raw.decode("utf-8")), hashlib.sha256(raw).hexdigest()
+
+
+def build_promotion_authorization(run_dir: Path | str, *, model: str, snapshot: E.Snapshot,
+                                  manifest: Optional[I.Manifest] = None,
+                                  requests: Optional[Sequence[StudyRequestLike]] = None,
+                                  probe_ids: Optional[Sequence[str]] = None,
+                                  primary: str = "ENG",
+                                  recorded_by: str = "") -> dict:
+    """Derive one model's promotion authorization payload from the on-disk evidence (PS-1.2).
+
+    Everything in the payload comes from `walk_<model>.json` and from the bound projection
+    artifact: the endpoint tag, the projection total, the artifact digest. Nothing is supplied
+    by the operator except who recorded the decision.
+    """
+    walk, walk_sha256 = _walk_evidence(run_dir, model)
+    excluded = bool(walk.get("excluded")) or not walk.get("promoted_tag")
+    payload: dict[str, Any] = {
+        "schema": AUTHORIZATION_PROMOTION_SCHEMA,
+        "model": model,
+        "endpoint_snapshot_sha256": snapshot.sha256,
+        "walk_record_sha256": walk_sha256,
+        "excluded": excluded,
+        "exclusion_reason": (walk.get("exclusion_reason") if excluded else None),
+        "promoted_tag": (None if excluded else str(walk["promoted_tag"])),
+        "promoted_endpoint_name": "",
+        "promoted_upstream_model": "",
+        "manifest_sha256": None,
+        "projection_artifact_filename": None,
+        "projection_artifact_sha256": None,
+        "projection_total_usd": None,
+        "projection_stop_usd": None,
+        "recorded_utc": _utc_now(),
+        "recorded_by": recorded_by,
+    }
+    if excluded:
+        return payload
+
+    tag = str(walk["promoted_tag"])
+    candidate = gate_candidates(snapshot, model).get(f"{model}::{tag}")
+    if candidate is None:
+        raise AuthorizationError(
+            f"the walk record promotes {tag!r}, which is not a candidate of {model!r} in the "
+            f"committed endpoint snapshot")
+    if manifest is None:
+        probe_ids = list(probe_ids) if probe_ids is not None else probe_ids_for(primary)
+        requests = requests if requests is not None else render_study_grid(model, tag, probe_ids)
+        manifest = build_study_manifest(model=model, endpoint_tag=tag, requests=requests,
+                                        probe_ids=probe_ids, snapshot_sha256=snapshot.sha256,
+                                        binding=default_binding(primary))
+    if requests is None:
+        raise AuthorizationError("the rendered 528-request grid is required to authorize a "
+                                 "promotion; it is what the projection is checked against")
+    stored = manifest_path(run_dir, model)
+    if stored.exists() and stored.read_bytes() != manifest.raw:
+        raise AuthorizationError(
+            f"the manifest on disk at {stored} is not the recomputed manifest for {model!r} — "
+            f"refusing to authorize a promotion against a manifest this run cannot reproduce")
+    artifact, artifact_sha256 = verify_projection(
+        run_dir, model=model, tag=tag, snapshot=snapshot, manifest=manifest, requests=requests)
+    binding = load_projection_binding(run_dir, model, tag)
+
+    payload.update({
+        "promoted_endpoint_name": candidate.endpoint_name,
+        "promoted_upstream_model": (E.resolved_model_evidence(candidate.endpoint_name) or ""),
+        "manifest_sha256": manifest.sha256,
+        "projection_artifact_filename": binding["artifact_filename"],
+        "projection_artifact_sha256": artifact_sha256,
+        "projection_total_usd": float(artifact["total"]),
+        "projection_stop_usd": float(artifact["stop"]),
+    })
+    return payload
+
+
+def record_promotion_authorization(run_dir: Path | str, **kwargs) -> dict:
+    """Write one model's promotion authorization. Write-once; makes NO paid call."""
+    payload = build_promotion_authorization(run_dir, **kwargs)
+    return _write_once_record(promotion_authorization_path(run_dir, payload["model"]),
+                              payload, error=AuthorizationError)
+
+
+def load_promotion_authorization(run_dir: Path | str, model: str) -> dict:
+    return _read_once_record(promotion_authorization_path(run_dir, model),
+                             AUTHORIZATION_PROMOTION_SCHEMA, error=AuthorizationError)
+
+
+def build_funding_authorization(run_dir: Path | str, *, decision: str, authorized: bool,
+                                reconciliation: L.ReconciliationResult,
+                                hard_stop_usd: float = L.HARD_STOP_USD,
+                                panel: Sequence[str] = G.PANEL_ORDER,
+                                recorded_by: str = "") -> dict:
+    """Derive the panel funding authorization payload from the recorded promotion decisions.
+
+    Requires a promotion record for EVERY panel model — a promotion or an explicit exclusion —
+    because the frozen rule is "only after endpoints are promoted (or models excluded) AND the
+    funding decision is recorded". Binds each model's manifest digest and projection artifact
+    digest (PS-1.3) alongside the $8.50 hard stop, the reconciled prior spend and the headroom
+    that decision leaves.
+    """
+    models: list[dict] = []
+    for model in panel:
+        record = load_promotion_authorization(run_dir, model)
+        models.append({
+            "model": model,
+            "excluded": bool(record["excluded"]),
+            "endpoint_tag": record["promoted_tag"],
+            "manifest_sha256": record["manifest_sha256"],
+            "projection_artifact_sha256": record["projection_artifact_sha256"],
+            "projection_total_usd": record["projection_total_usd"],
+            "promotion_binding_sha256": record["binding_sha256"],
+        })
+    reconciled = float(reconciliation.total_usd)
+    totals = [float(m["projection_total_usd"]) for m in models
+              if m["projection_total_usd"] is not None]
+    return {
+        "schema": AUTHORIZATION_FUNDING_SCHEMA,
+        "authorized": bool(authorized),
+        "decision": decision,
+        "hard_stop_usd": float(hard_stop_usd),
+        "reconciled_prior_usd": reconciled,
+        "reconciliation_is_exact": bool(reconciliation.is_exact),
+        "available_headroom_usd": float(hard_stop_usd) - reconciled,
+        "max_projected_total_usd": (max(totals) if totals else None),
+        "models": models,
+        "recorded_utc": _utc_now(),
+        "recorded_by": recorded_by,
+    }
+
+
+def record_funding_authorization(run_dir: Path | str, **kwargs) -> dict:
+    """Write the panel funding authorization. Write-once; makes NO paid call."""
+    payload = build_funding_authorization(run_dir, **kwargs)
+    return _write_once_record(funding_authorization_path(run_dir), payload,
+                              error=AuthorizationError)
+
+
+def load_funding_authorization(run_dir: Path | str) -> dict:
+    return _read_once_record(funding_authorization_path(run_dir),
+                             AUTHORIZATION_FUNDING_SCHEMA, error=AuthorizationError)
+
+
+def require_paid_stage_authorization(run_dir: Path | str, *, model: str, tag: str,
+                                     manifest: I.Manifest, snapshot: E.Snapshot,
+                                     artifact_sha256: str,
+                                     reconciliation: L.ReconciliationResult,
+                                     stage: str = "smoke") -> tuple[dict, dict]:
+    """RAISE unless BOTH frozen authorizations apply to exactly this paid stage (PS-1.4).
+
+    Called before a transport is constructed, so every failure mode below — missing, refused,
+    malformed, stale, cross-model, wrong-manifest, wrong-projection — produces zero wire calls.
+    """
+    run_dir = Path(run_dir)
+    promotion = load_promotion_authorization(run_dir, model)      # raises when absent/edited
+
+    def refuse(msg: str) -> None:
+        raise AuthorizationError(
+            f"{stage} refused for {model}@{tag}: {msg}. The frozen staged authorization "
+            f"permits a paid study stage only after the endpoint-promotion decision and the "
+            f"funding decision are recorded under {authorization_dir(run_dir)}.")
+
+    if promotion.get("model") != model:
+        refuse(f"the promotion record is for {promotion.get('model')!r}")
+    if promotion.get("excluded"):
+        refuse(f"the recorded decision is a capability/budget EXCLUSION "
+               f"({promotion.get('exclusion_reason')}); there is no reduced-cell and no "
+               f"reduced-S substitute")
+    if promotion.get("promoted_tag") != tag:
+        refuse(f"the promotion record promotes {promotion.get('promoted_tag')!r}, not {tag!r}")
+    if promotion.get("manifest_sha256") != manifest.sha256:
+        refuse(f"the promotion record binds manifest "
+               f"{str(promotion.get('manifest_sha256'))[:12]}, not this run's "
+               f"{manifest.sha256[:12]}")
+    if promotion.get("endpoint_snapshot_sha256") != snapshot.sha256:
+        refuse("the promotion record binds a different committed endpoint snapshot")
+    if promotion.get("projection_artifact_sha256") != artifact_sha256:
+        refuse(f"the promotion record binds projection artifact "
+               f"{str(promotion.get('projection_artifact_sha256'))[:12]}, not the one this "
+               f"stage would price from ({artifact_sha256[:12]})")
+    _, walk_sha256 = _walk_evidence(run_dir, model)
+    if promotion.get("walk_record_sha256") != walk_sha256:
+        refuse("the walk record has changed since the promotion was authorized — the "
+               "authorization is stale")
+
+    funding = load_funding_authorization(run_dir)                 # raises when absent/edited
+    if not funding.get("authorized"):
+        refuse(f"the recorded funding decision REFUSES this run "
+               f"({funding.get('decision')!r})")
+    if not _close(float(funding.get("hard_stop_usd", 0.0)), L.HARD_STOP_USD):
+        refuse(f"the funding record names a ${float(funding.get('hard_stop_usd', 0.0)):.2f} "
+               f"stop, not the frozen ${L.HARD_STOP_USD:.2f}")
+    if not _close(float(funding.get("reconciled_prior_usd", -1.0)),
+                  float(reconciliation.total_usd)):
+        refuse(f"prior reconciled spend has moved from "
+               f"${float(funding.get('reconciled_prior_usd', -1.0)):.6f} to "
+               f"${float(reconciliation.total_usd):.6f} since the funding decision")
+    entries = [m for m in (funding.get("models") or []) if m.get("model") == model]
+    if not entries:
+        refuse("the funding record does not cover this model")
+    entry = entries[0]
+    if entry.get("endpoint_tag") != tag:
+        refuse(f"the funding record funds {entry.get('endpoint_tag')!r} for this model")
+    if entry.get("manifest_sha256") != manifest.sha256:
+        refuse("the funding record binds a different manifest for this model")
+    if entry.get("projection_artifact_sha256") != artifact_sha256:
+        refuse("the funding record binds a different projection artifact for this model")
+    if entry.get("promotion_binding_sha256") != promotion.get("binding_sha256"):
+        refuse("the funding record was recorded against a different promotion record")
+    if float(funding.get("available_headroom_usd", 0.0)) <= 0.0:
+        refuse(f"the recorded funding decision leaves no headroom "
+               f"(${float(funding.get('available_headroom_usd', 0.0)):.6f})")
+    total = promotion.get("projection_total_usd")
+    if total is None or float(total) > L.HARD_STOP_USD:
+        refuse(f"the authorized projection total {total} does not fit the "
+               f"${L.HARD_STOP_USD:.2f} stop")
+    return promotion, funding
 
 
 # =======================================================================================
@@ -1058,46 +1815,119 @@ def _replay(request: StudyRequestLike, draw_index: int, envelope: L.RawEnvelope,
         failures=tuple(failures))
 
 
+def _persist_sampling_outcome(*, store: L.EnvelopeStore, draw: StudyDraw,
+                              request_body: Mapping[str, Any],
+                              request_headers: Mapping[str, str], wire: WireResult,
+                              bucket: str, model: str, provider: str,
+                              stage: str) -> Optional[L.RawEnvelope]:
+    """Persist THE ONE terminal sampling outcome under the manifest-bound draw identity.
+
+    Deliberately not booked here: this is the same wire response that was already persisted and
+    booked under its own immutable attempt identity, and booking it twice would count one paid
+    response twice against the $8.50 stop. `open_ledger` reconstructs money from the attempt
+    store for exactly this reason, and still books any study record that has no attempt behind
+    it (a pre-PS-4 record).
+    """
+    existing = store.get(draw.draw_id)
+    if existing is not None:                       # crash between attempt and outcome: resume
+        return existing
+    envelope = L.build_envelope(
+        draw=draw, request_body=request_body, request_headers=request_headers,
+        response_body=wire.body, response_headers=wire.headers, http_status=wire.status,
+        bucket=bucket, model=model, provider=provider, stage=stage)
+    store.put(envelope)
+    return envelope
+
+
 def _send_draw(*, request: StudyRequestLike, draw_index: int, model: str, tag: str,
                headers: Mapping[str, str], store: L.EnvelopeStore, ledger: L.V7Ledger,
                transport: Transport, stage: str, bucket: str, sleep: G.Sleeper,
                clock: G.Clock, max_attempts: int,
-               snapshot: Optional[E.Snapshot] = None) -> DrawOutcome:
-    """Send ONE study draw under the frozen C3 retry policy, persisting the terminal response.
+               snapshot: Optional[E.Snapshot] = None,
+               attempts: Optional[L.EnvelopeStore] = None) -> DrawOutcome:
+    """Send ONE study draw under the frozen C3 retry policy, persisting EVERY attempt (PS-4).
 
-    Only the terminal response is persisted, because a study draw's identity (request hash +
-    immutable draw index) is bound by the manifest and cannot absorb extra indices. A
-    non-terminal transient attempt that nevertheless returned a finite cost therefore cannot be
-    booked under any authorised identity, and the run FAILS CLOSED for reconciliation rather
-    than continuing with an understated total.
+    Each wire attempt is persisted and booked under its own immutable attempt identity in the
+    append-only attempt store BEFORE the retry policy is allowed to classify it, so a process
+    exit anywhere in the retry ladder — including inside a backoff sleep — leaves complete,
+    reconcilable evidence of every paid response. The terminal attempt is then persisted ONCE
+    more, unbooked, in the study store under the manifest-bound sampling identity: that is the
+    single outcome the completeness gate and the estimands see, so the 13,200 count is
+    unchanged.
+
+    An attempt whose returned cost cannot be reconciled still becomes durable evidence, and the
+    run then FAILS CLOSED rather than continuing with an understated cumulative total (R-E2).
+
+    Booking rule, stated exactly once: a returned response is booked EXACTLY ONCE, under its
+    attempt identity. `open_ledger` authorises those identities, so that is what happens in
+    every run this module drives. A caller whose ledger manifest binds only the 13,200 sampling
+    identities (a pre-PS-4 ledger) cannot book an attempt identity; there the TERMINAL response
+    is booked under its manifest-bound sampling identity instead — still exactly once, still
+    against the same $8.50 stop — and a NON-terminal response that no identity can book halts
+    the run, because that spend would otherwise escape the ledger entirely.
     """
     draw = StudyDraw(request_sha256=request.request_sha256, draw_index=draw_index)
+    attempts = attempts if attempts is not None else attempt_store_for(store)
     wires: list[WireResult] = []
+    attempt_ids: list[str] = []
+    attempt_costs: list[Optional[float]] = []
+    attempt_failures: list[tuple[str, ...]] = []
 
     def send() -> G.AttemptOutcome:
         wire = _post_once(transport, request.body, headers)
+        index = len(wires)
         wires.append(wire)
+        attempt = StudyDraw(
+            request_sha256=request.request_sha256,
+            draw_index=attempt_draw_index(draw_index, index, max_attempts))
+        cost, failures, envelope = _record_and_book(
+            store=attempts, ledger=ledger, draw=attempt, request_body=request.body,
+            request_headers=headers, wire=wire, bucket=bucket, model=model, provider=tag,
+            stage=f"{stage}_attempt")
+        _write_derived(attempts, envelope,
+                       valid=(wire.status == 200 and not failures),
+                       failures=(*failures,
+                                 *(("http_error",) if wire.status != 200 else ())))
+        attempt_ids.append(attempt.draw_id)
+        attempt_costs.append(cost)
+        attempt_failures.append(tuple(failures))
         return G.AttemptOutcome(status=wire.status,
                                 retry_after_s=_retry_after_seconds(wire.headers),
                                 is_byok=_is_byok(wire.body), payload=wire.body)
 
     G.execute_with_retries(send, sleep=sleep, clock=clock, max_attempts=max_attempts)
-    for wire in wires[:-1]:
-        try:
-            unbooked = L.returned_cost(wire.body)
-        except L.CostAccountingError:
-            continue                       # transient failures return no cost — the normal case
-        if unbooked > 0:
-            raise StudyRunError(
-                f"a non-terminal attempt on draw {draw.draw_id} returned a cost of "
-                f"${unbooked:.8f} that no authorised draw identity can book; halting for "
-                f"reconciliation rather than understating cumulative spend")
+
+    unreconciled = [identity for identity, failures in zip(attempt_ids, attempt_failures)
+                    if any(f.startswith("cost_unreconciled") for f in failures)]
+    if unreconciled:
+        raise StudyRunError(
+            f"attempt(s) {unreconciled} behind draw {draw.draw_id} returned no reconcilable "
+            f"cost; every attempt is durable under {attempts.raw_dir}, but the run halts for "
+            f"reconciliation rather than continuing with an understated cumulative total "
+            f"(R-E2/R-C3)")
+    unbindable = [identity for identity, failures in zip(attempt_ids[:-1], attempt_failures)
+                  if any(f.startswith("ManifestBindingError") for f in failures)]
+    if unbindable:
+        raise StudyRunError(
+            f"non-terminal attempt(s) {unbindable} behind draw {draw.draw_id} returned a paid "
+            f"response that no authorised identity can book; the responses are durable under "
+            f"{attempts.raw_dir}, but the run halts for reconciliation rather than "
+            f"understating cumulative spend")
 
     terminal = wires[-1]
-    cost, failures, envelope = _record_and_book(
-        store=store, ledger=ledger, draw=draw, request_body=request.body,
-        request_headers=headers, wire=terminal, bucket=bucket, model=model, provider=tag,
-        stage=stage)
+    failures = attempt_failures[-1]
+    cost = attempt_costs[-1]
+    if any(f.startswith("ManifestBindingError") for f in failures):
+        # Pre-PS-4 ledger: the attempt identity is unauthorised, so the terminal response is
+        # booked under the manifest-bound sampling identity. It is still booked exactly once.
+        cost, failures, envelope = _record_and_book(
+            store=store, ledger=ledger, draw=draw, request_body=request.body,
+            request_headers=headers, wire=terminal, bucket=bucket, model=model, provider=tag,
+            stage=stage)
+    else:
+        envelope = _persist_sampling_outcome(
+            store=store, draw=draw, request_body=request.body, request_headers=headers,
+            wire=terminal, bucket=bucket, model=model, provider=tag, stage=stage)
 
     parse = (I.parse_option(_message_content(terminal.body)) if terminal.status == 200
              else I.ParseResult(False, None, None, "http_error"))
@@ -1125,7 +1955,8 @@ def execute_plan(*, plan: Sequence[tuple[StudyRequestLike, int]], model: str, ta
                  worst_case_usd: Callable[[str], float], stage: str, bucket: str,
                  sleep: G.Sleeper = time.sleep, clock: G.Clock = time.monotonic,
                  max_attempts: int = G.MAX_ATTEMPTS,
-                 snapshot: Optional[E.Snapshot] = None) -> PlanRun:
+                 snapshot: Optional[E.Snapshot] = None,
+                 attempts: Optional[L.EnvelopeStore] = None) -> PlanRun:
     """Execute a planned set of draws with restart and the hard stop enforced.
 
     A draw already on disk is REPLAYED from its record and the transport is not called for it.
@@ -1133,6 +1964,7 @@ def execute_plan(*, plan: Sequence[tuple[StudyRequestLike, int]], model: str, ta
     $8.50 stop permits it; if not the run halts BEFORE that call.
     """
     headers = E.request_headers(key)
+    attempts = attempts if attempts is not None else attempt_store_for(store)
     outcomes: list[DrawOutcome] = []
     n_sent = n_reused = 0
     halted = False
@@ -1155,7 +1987,8 @@ def execute_plan(*, plan: Sequence[tuple[StudyRequestLike, int]], model: str, ta
         outcomes.append(_send_draw(
             request=request, draw_index=draw_index, model=model, tag=tag, headers=headers,
             store=store, ledger=ledger, transport=transport, stage=stage, bucket=bucket,
-            sleep=sleep, clock=clock, max_attempts=max_attempts, snapshot=snapshot))
+            sleep=sleep, clock=clock, max_attempts=max_attempts, snapshot=snapshot,
+            attempts=attempts))
         n_sent += 1
 
     return PlanRun(outcomes=tuple(outcomes), halted=halted, halt_reason=halt_reason,
@@ -1282,13 +2115,14 @@ def run_smoke(*, model: str, tag: str, key: str,
               run_dir: Optional[Path] = None,
               sleep: G.Sleeper = time.sleep, clock: G.Clock = time.monotonic,
               max_attempts: int = G.MAX_ATTEMPTS,
-              snapshot: Optional[E.Snapshot] = None) -> SmokeReport:
+              snapshot: Optional[E.Snapshot] = None,
+              attempts: Optional[L.EnvelopeStore] = None) -> SmokeReport:
     """Execute the 240 outcome-blinded smoke draws and decide the frozen promotion gate."""
     run = execute_plan(plan=plan_smoke_draws(smoke_requests), model=model, tag=tag, key=key,
                        store=store, ledger=ledger, transport=transport,
                        worst_case_usd=worst_case_usd, stage=SMOKE_STAGE, bucket=SMOKE_BUCKET,
                        sleep=sleep, clock=clock, max_attempts=max_attempts,
-                       snapshot=snapshot)
+                       snapshot=snapshot, attempts=attempts)
     report = SmokeReport(model=model, endpoint=tag, run=run,
                          gate=smoke_promotion_gate(run.outcomes))
     if run_dir is not None:
@@ -1359,7 +2193,8 @@ def run_full(*, model: str, tag: str, key: str, requests: Sequence[StudyRequestL
              run_dir: Optional[Path] = None,
              sleep: G.Sleeper = time.sleep, clock: G.Clock = time.monotonic,
              max_attempts: int = G.MAX_ATTEMPTS,
-             snapshot: Optional[E.Snapshot] = None) -> FullRunReport:
+             snapshot: Optional[E.Snapshot] = None,
+             attempts: Optional[L.EnvelopeStore] = None) -> FullRunReport:
     """Execute the full 13,200-draw design, reusing every persisted smoke draw.
 
     The 240 smoke draws are draw indices 0-4 of 48 of these 528 coordinates: they are replayed
@@ -1372,7 +2207,7 @@ def run_full(*, model: str, tag: str, key: str, requests: Sequence[StudyRequestL
                        store=store, ledger=ledger, transport=transport,
                        worst_case_usd=worst_case_usd, stage=FULL_STAGE, bucket=FULL_BUCKET,
                        sleep=sleep, clock=clock, max_attempts=max_attempts,
-                       snapshot=snapshot)
+                       snapshot=snapshot, attempts=attempts)
     completeness: Optional[G.CompletenessReport] = None
     if not run.halted:
         completeness = G.completeness_gate(
@@ -1408,16 +2243,13 @@ def pinned_tokenizer(model: str, snapshot: E.Snapshot, tokenizer_dir: Path | str
         if digest != expected:
             raise StudyRunError(
                 f"pinned tokenizer file {name} hashes to {digest} != committed {expected}")
-    try:
-        from tokenizers import Tokenizer as HFTokenizer       # type: ignore
-    except ImportError as exc:                                 # pragma: no cover
-        raise StudyRunError(f"the `tokenizers` package is required: {exc}") from None
-    tok = HFTokenizer.from_file(str(directory / "tokenizer.json"))
-
-    def count(text: str) -> int:
-        return len(tok.encode(text).ids)
-
-    return count
+    # PS-2: return the gate's PinnedTokenizer, NOT a bare closure. `project_full_grid`
+    # dispatches on the object's type: a PinnedTokenizer carrying a chat template takes the
+    # exact frozen-C2 serialization path, while a plain `str -> int` callable silently falls
+    # back to the fixed-overhead heuristic and labels the projection
+    # `fixed_overhead_fallback`. Returning a closure here would mean the real study
+    # instrument never used the frozen method. Do NOT wrap this in a lambda.
+    return G.load_pinned_tokenizer(model, directory, spec=spec)
 
 
 # =======================================================================================
@@ -1469,22 +2301,92 @@ def _stage_project(args, *, key: str, snapshot: E.Snapshot, run_dir: Path) -> in
     projection = build_projection(model=args.model, candidate=candidate, requests=requests,
                                  tokenizer=tokenizer, ledger=ledger,
                                  retry_reserve_usd=args.retry_reserve)
-    path = write_projection(run_dir, projection)
+    # PS-2: a study projection MUST use the frozen documented-tokenizer serialization. This
+    # raises if the fixed-overhead fallback was taken (e.g. a model with no pinned chat
+    # template), so a heuristic projection can never reach authorize/smoke.
+    G.require_frozen_c2_serialization(projection)
     manifest = build_study_manifest(model=args.model, endpoint_tag=tag, requests=requests,
                                     probe_ids=probes, snapshot_sha256=snapshot.sha256,
                                     binding=default_binding(args.primary))
     decision = write_study_manifest(run_dir, args.model, manifest)
+    path = write_projection(run_dir, projection)
+    binding = write_projection_binding(run_dir, projection, snapshot=snapshot,
+                                       manifest=manifest, artifact_path=path,
+                                       recorded_by=args.recorded_by)
     print(f"projection artifact: {path}")
+    print(f"artifact sha256 {binding['artifact_sha256'][:16]} bound by "
+          f"{projection_binding_path(run_dir, args.model, tag).name}")
     print(f"total ${projection.total:.4f} of ${projection.stop:.2f}; fits={projection.fits}")
     print(f"manifest {decision.sha256[:12]} (created={decision.created}, "
           f"resumed={decision.resumed}) binds {manifest.n_draws} draws / "
           f"{manifest.n_coordinates} coordinates")
-    print(f"next stage (invoke separately): `{USAGE}` with stage `smoke`")
+    print(f"next stage (invoke separately): `{USAGE}` with stage `authorize`")
     return 0 if projection.fits else 1
 
 
-def _prepared(args, *, snapshot: E.Snapshot, run_dir: Path):
-    """Shared smoke/full preparation: promoted tag, grid, manifest, ledger, worst case."""
+def _stage_authorize(args, *, key: str, snapshot: E.Snapshot, run_dir: Path) -> int:
+    """Record the frozen staged authorization. This stage makes NO paid call of any kind.
+
+    `--record-funding` records the ONE panel-level funding decision; without it the stage
+    records this model's endpoint-promotion decision, derived entirely from the immutable walk
+    record and the bound projection artifact.
+    """
+    print("authorize: no network call and no paid call is made by this stage.\n")
+    if args.record_funding:
+        if not args.funding_decision:
+            print("--funding-decision TEXT is required: the funding decision is recorded "
+                  "verbatim, not inferred", file=sys.stderr)
+            return 2
+        record = record_funding_authorization(
+            run_dir, decision=args.funding_decision, authorized=not args.refuse_funding,
+            reconciliation=default_reconciliation(), recorded_by=args.recorded_by)
+        print(f"panel funding decision recorded at {funding_authorization_path(run_dir)}")
+        print(f"authorized={record['authorized']} hard stop "
+              f"${record['hard_stop_usd']:.2f}; reconciled prior "
+              f"${record['reconciled_prior_usd']:.6f} (exact="
+              f"{record['reconciliation_is_exact']}); headroom "
+              f"${record['available_headroom_usd']:.4f}")
+        for entry in record["models"]:
+            print(f"    {entry['model']}: endpoint={entry['endpoint_tag']!r} "
+                  f"excluded={entry['excluded']} "
+                  f"manifest={str(entry['manifest_sha256'])[:12]} "
+                  f"projection={str(entry['projection_artifact_sha256'])[:12]} "
+                  f"total={entry['projection_total_usd']}")
+        if not record["authorized"]:
+            print("\nFUNDING REFUSED — no paid study stage may run.")
+            return 1
+        print(f"\nnext stage (invoke separately): `{USAGE}` with stage `smoke`")
+        return 0
+
+    record = record_promotion_authorization(
+        run_dir, model=args.model, snapshot=snapshot, primary=args.primary,
+        recorded_by=args.recorded_by)
+    print(f"promotion decision recorded at "
+          f"{promotion_authorization_path(run_dir, args.model)}")
+    if record["excluded"]:
+        print(f"{args.model}: recorded as a capability/budget EXCLUSION "
+              f"({record['exclusion_reason']}); no paid study stage may run for it.")
+        return 1
+    print(f"promoted {record['promoted_tag']!r} (from walk record "
+          f"{record['walk_record_sha256'][:12]}); manifest "
+          f"{record['manifest_sha256'][:12]}; projection "
+          f"{record['projection_artifact_sha256'][:12]} totalling "
+          f"${record['projection_total_usd']:.4f} of "
+          f"${record['projection_stop_usd']:.2f}")
+    print(f"\nrecord the panel funding decision next: `{USAGE}` with stage `authorize` "
+          f"--record-funding --funding-decision TEXT")
+    return 0
+
+
+def _prepared(args, *, snapshot: E.Snapshot, run_dir: Path, stage: str = "smoke"):
+    """Shared smoke/full preparation: promoted tag, grid, manifest, projection, authorization,
+    ledger, worst case — in that order, and ALL of it before any transport can be constructed.
+
+    Both fail-closed gates the v7.2 pre-smoke re-audit demanded live here, so a missing,
+    refused, malformed, stale, cross-model or wrong-manifest authorization (PS-1) and an
+    absent, unbound, edited or arithmetically inconsistent projection (PS-3) each abort the
+    invocation with exactly ZERO wire calls: the caller has not yet built a transport.
+    """
     tag = load_promotion(run_dir, args.model)
     probes = probe_ids_for(args.primary)
     requests = render_study_grid(args.model, tag, probes)
@@ -1492,17 +2394,23 @@ def _prepared(args, *, snapshot: E.Snapshot, run_dir: Path):
                                     probe_ids=probes, snapshot_sha256=snapshot.sha256,
                                     binding=default_binding(args.primary))
     write_study_manifest(run_dir, args.model, manifest)          # resumes only if identical
+    reconciliation = default_reconciliation()
+    artifact, artifact_sha256 = verify_projection(
+        run_dir, model=args.model, tag=tag, snapshot=snapshot, manifest=manifest,
+        requests=requests)
+    require_paid_stage_authorization(
+        run_dir, model=args.model, tag=tag, manifest=manifest, snapshot=snapshot,
+        artifact_sha256=artifact_sha256, reconciliation=reconciliation, stage=stage)
     ledger = open_ledger(run_dir, model=args.model, endpoint=tag,
                          study_draw_ids=manifest.draw_identities,
-                         reconciliation=default_reconciliation())
-    artifact = read_projection(
-        run_dir / f"projection_{_safe_model(args.model)}__{tag.replace('/', '__')}.json")
+                         reconciliation=reconciliation)
     return tag, probes, requests, ledger, worst_case_lookup(artifact)
 
 
 def _stage_smoke(args, *, key: str, snapshot: E.Snapshot, run_dir: Path) -> int:
+    # `_prepared` raises before this function ever names a transport class (PS-1/PS-3).
     tag, probes, requests, ledger, worst_case = _prepared(args, snapshot=snapshot,
-                                                          run_dir=run_dir)
+                                                          run_dir=run_dir, stage="smoke")
     _print_ledger(ledger)
     smoke = render_smoke_grid(args.model, tag, probes)
     report = run_smoke(model=args.model, tag=tag, key=key, smoke_requests=smoke,
@@ -1525,7 +2433,7 @@ def _stage_smoke(args, *, key: str, snapshot: E.Snapshot, run_dir: Path) -> int:
 
 def _stage_full(args, *, key: str, snapshot: E.Snapshot, run_dir: Path) -> int:
     tag, probes, requests, ledger, worst_case = _prepared(args, snapshot=snapshot,
-                                                          run_dir=run_dir)
+                                                          run_dir=run_dir, stage="full")
     smoke_record = smoke_record_path(run_dir, args.model)
     if not smoke_record.exists() or not json.loads(smoke_record.read_text()).get("promoted"):
         print(f"the smoke stage has not been run and promoted for {args.model} "
@@ -1549,9 +2457,13 @@ def _stage_full(args, *, key: str, snapshot: E.Snapshot, run_dir: Path) -> int:
 _DISPATCH: Mapping[str, Callable[..., int]] = {
     "walk": _stage_walk,
     "project": _stage_project,
+    "authorize": _stage_authorize,
     "smoke": _stage_smoke,
     "full": _stage_full,
 }
+
+#: Stages that can send a paid request. `authorize` is deliberately NOT one of them.
+PAID_STAGES: tuple[str, ...] = ("walk", "smoke", "full")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1571,6 +2483,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--retry-reserve", type=float, default=DEFAULT_RETRY_RESERVE_USD)
     parser.add_argument("--primary", default="ENG")
     parser.add_argument("--ca-file", default=None)
+    parser.add_argument("--recorded-by", default="",
+                        help="who recorded a decision (`authorize`/`project` stages)")
+    parser.add_argument("--record-funding", action="store_true",
+                        help="`authorize`: record the ONE panel-level funding decision")
+    parser.add_argument("--funding-decision", default="",
+                        help="`authorize --record-funding`: the decision, recorded verbatim")
+    parser.add_argument("--refuse-funding", action="store_true",
+                        help="`authorize --record-funding`: record a REFUSAL (authorized=false)")
     return parser
 
 
@@ -1581,8 +2501,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("This makes PAID OpenRouter calls. Re-run with "
               "--i-have-authorized-paid-spend", file=sys.stderr)
         return 2
-    key = os.environ.get("OPENROUTER_API_KEY")
-    if not key:
+    # `authorize` records decisions from files already on disk; it never opens a socket, so it
+    # neither needs nor is given a credential.
+    key = os.environ.get("OPENROUTER_API_KEY") or ""
+    if not key and args.stage != "authorize":
         print("OPENROUTER_API_KEY not set", file=sys.stderr)
         return 2
     if args.model not in G.PANEL_ORDER:
@@ -1602,7 +2524,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         # Exactly ONE stage runs per invocation: no stage ever advances to the next.
         return _DISPATCH[args.stage](args, key=key, snapshot=snapshot, run_dir=run_dir)
-    except (StudyRunError, L.LedgerError, G.GateError, I.IdentityError, E.EnvelopeError) as exc:
+    except (StudyRunError, L.LedgerError, G.GateError, I.IdentityError, E.EnvelopeError,
+            K.InterlockError) as exc:
         print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
 

@@ -16,6 +16,15 @@ EXACTLY 0), because that is the binding capability question for these thinking m
 It does NOT run the smoke, the study, or any endpoint promotion: the post-signature
 reasoning-off/cost gate is a separate, separately authorized step.
 
+LEGACY ARTIFACTS (PS-5). Canary records written before this fix bound their derived record
+to `canonical_sha256(response_body)` instead of `RawEnvelope.content_sha256()`. Those files
+are immutable audit records and are NEITHER deleted NOR rewritten. Because their binding
+cannot be verified under the rule the rest of the v7 pipeline enforces, they are NOT usable
+as a passing reuse: replaying such a directory fails closed with `CanaryError`. The same
+holds for `out/q2_stage2_v7_canary/`, which has raw envelopes and no derived records at all.
+The operator remedy is explicit re-authorization — run the paid canary again into a FRESH
+run directory (the store refuses to overwrite, so this cannot silently launder old records).
+
 Usage:
     .venv/bin/python -m alignment.q2_v7.canary --i-have-authorized-paid-spend
 """
@@ -28,7 +37,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional, Sequence
 
@@ -224,16 +233,8 @@ def run_one(*, model: str, tag: str, key: str, snapshot: E.Snapshot,
     # is not evidence of success.
     existing = store.get(draw.draw_id)
     if existing is not None:
-        if existing.request_sha256 != draw.request_sha256:
-            raise CanaryError(
-                f"persisted envelope {draw.draw_id} has request hash "
-                f"{existing.request_sha256} != recomputed {draw.request_sha256}")
-        return _evaluate(model, tag, status=existing.http_status,
-                         response=existing.response_body or {},
-                         resp_headers=existing.response_headers or {},
-                         cost=existing.cost_usd, snapshot=snapshot,
-                         err=None if existing.cost_usd is not None else "cost_unreconciled",
-                         reused=True)
+        return replay_persisted(model, tag, draw=draw, envelope=existing,
+                                store=store, snapshot=snapshot)
 
     headers = E.request_headers(key)
     ledger.check_before_call(0.01, label=f"{STAGE}:{model}@{tag}")
@@ -275,6 +276,68 @@ def run_one(*, model: str, tag: str, key: str, snapshot: E.Snapshot,
     return result
 
 
+def verify_derived_binding(store: L.EnvelopeStore,
+                           envelope: L.RawEnvelope) -> L.DerivedRecord:
+    """Load the derived record linked to `envelope` and prove the link (PS-5).
+
+    This is the SAME binding rule study replay enforces
+    (`study_run._replay`: `derived.raw_sha256 != envelope.content_sha256()` is fatal): a
+    derived record is bound to the hash of the COMPLETE immutable envelope, not to the
+    response body alone. Both a missing record and a record that does not hash-match are
+    fatal — an unverifiable audit trail is never evidence of a successful paid call.
+    """
+    derived = store.get_derived(envelope.draw_id)
+    if derived is None:
+        raise CanaryError(
+            f"persisted envelope {envelope.draw_id} has no linked derived validation "
+            f"record — refusing to treat an unverifiable paid record as a successful "
+            f"reuse; re-authorize the canary into a fresh run directory")
+    if derived.draw_id != envelope.draw_id:
+        raise CanaryError(
+            f"derived record filed under {envelope.draw_id} carries draw id "
+            f"{derived.draw_id!r} — filename/content mismatch, refusing to trust the "
+            f"audit trail")
+    if derived.raw_sha256 != envelope.content_sha256():
+        raise CanaryError(
+            f"derived record for {envelope.draw_id} is bound to raw hash "
+            f"{derived.raw_sha256[:12]} but the envelope hashes to "
+            f"{envelope.content_sha256()[:12]} — refusing to trust the audit trail")
+    return derived
+
+
+def replay_persisted(model: str, tag: str, *, draw: L.DrawIdentity,
+                     envelope: L.RawEnvelope, store: L.EnvelopeStore,
+                     snapshot: E.Snapshot) -> CanaryResult:
+    """Replay one persisted canary draw FROM ITS RECORD (R-C1 / PS-5). No transport.
+
+    The verdict is the CONJUNCTION of (a) re-evaluating the immutable envelope and (b) the
+    linked derived record, which must exist and must be bound to `content_sha256()`. A
+    persisted INVALID verdict therefore stays invalid no matter what a re-parse says.
+    """
+    if envelope.request_sha256 != draw.request_sha256:
+        raise CanaryError(
+            f"persisted envelope {draw.draw_id} has request hash "
+            f"{envelope.request_sha256} != recomputed {draw.request_sha256}")
+    if envelope.draw_index != draw.draw_index:
+        raise CanaryError(
+            f"persisted envelope {draw.draw_id} carries draw index "
+            f"{envelope.draw_index} != planned {draw.draw_index}")
+
+    derived = verify_derived_binding(store, envelope)
+
+    result = _evaluate(model, tag, status=envelope.http_status,
+                       response=envelope.response_body or {},
+                       resp_headers=envelope.response_headers or {},
+                       cost=envelope.cost_usd, snapshot=snapshot,
+                       err=None if envelope.cost_usd is not None else "cost_unreconciled",
+                       reused=True)
+    if not derived.valid:
+        reasons = ", ".join(derived.failures) or "derived_record_invalid"
+        result = replace(result,
+                         error=result.error or f"excluded_by_derived_record: {reasons}")
+    return result
+
+
 def _write_derived(store: L.EnvelopeStore, draw: L.DrawIdentity, result: "CanaryResult",
                    status: int, err: Optional[str], cost: Optional[float]) -> None:
     """Linked derived validation record (R-E1/R-C3): why a paid call was excluded."""
@@ -288,9 +351,15 @@ def _write_derived(store: L.EnvelopeStore, draw: L.DrawIdentity, result: "Canary
         *((f"parse:{result.parse_reason}",) if not result.parse_ok else ()),
         *((f"error:{err}",) if err else ()),
     ))
+    # PS-5: bind to the hash of the COMPLETE immutable envelope, exactly as
+    # `L.record_validation` and study replay do. Hashing only `response_body` left canary
+    # records bound to a hash no other v7 consumer computes, so they could not survive the
+    # binding check every other stage applies. `record_validation` is not reused here only
+    # because the canary books `booked_cost_usd` from the LEDGER's booked cost, which can
+    # differ from `envelope.cost_usd` when accounting failed.
     store.put_derived(L.DerivedRecord(
         draw_id=draw.draw_id,
-        raw_sha256=L.canonical_sha256(env.response_body or {}),
+        raw_sha256=env.content_sha256(),
         valid=result.passed, failures=failures,
         excluded_from_estimands=not result.passed,
         booked_cost_usd=cost if cost is not None else 0.0,

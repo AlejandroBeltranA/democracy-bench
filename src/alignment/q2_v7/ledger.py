@@ -39,6 +39,53 @@ Frozen rules this module enforces:
              reserve fits, and realized-cost drift halts execution before the next call, with
              the model reported incomplete and NO headline emitted.
 
+MONEY REPRESENTATION — the single canonical quantization rule (PS-6)
+--------------------------------------------------------------------------------------
+A money ledger that can report spend ABOVE its own ceiling is not trustworthy at a $8.50
+boundary. Binary floats make that possible: ten returned costs of `0.0001` sum to
+`0.0010000000000000002`, which is strictly greater than a `0.001` stop even though the
+arithmetic is nominally exact. Money here is therefore represented EXACTLY, as
+`decimal.Decimal`, and every accumulation and comparison happens in that domain.
+
+THE RULE (applied at INGESTION — the moment any amount enters this module):
+
+    unit           1e-12 USD (one pico-dollar); `MONEY_QUANTUM_USD`,
+                   `MONEY_DECIMAL_PLACES == 12`
+    rounding mode  ROUND_HALF_UP (nearest; ties away from zero); `MONEY_ROUNDING`
+    exception      a STRICTLY POSITIVE amount never quantizes to zero — if it would, it is
+                   raised to one whole quantum, so a paid call is never booked as free
+    entry points   `to_money()` is the ONLY way an amount becomes ledger money, and every
+                   ingestion path calls it: `returned_cost`, `RawEnvelope.from_dict`,
+                   `DerivedRecord.from_dict`, `NonReconciledComponent`, `_persisted_cost`,
+                   `reconcile_prior_spend`, `ModelProjection`, `V7Ledger.book_envelope`,
+                   `check_before_call`, `may_start_call`, `may_start_model`,
+                   `must_halt_before_next_call`, the hard stop itself, and every reported or
+                   serialized figure.
+
+Why a NEAREST mode and not ROUND_CEILING: the quantum's job is to erase binary
+representation noise, and only a nearest mode does that. `float("0.0001")` is really
+0.000100000000000000004792…; rounding that UP would book 0.000100000001 and ten such calls
+would breach a $0.001 stop for the same reason floats do. ROUND_HALF_UP is chosen over
+ROUND_HALF_EVEN because a tie then rounds away from zero, so a booked cost never
+under-states; at 1e-12 against $8.50 the choice is immaterial to the estimand and matters
+only as a documented, deterministic rule.
+
+Why 1e-12: it is finer than any billable OpenRouter amount by several orders of magnitude
+(the smallest cost this project has ever observed is $2.07e-05), and ~10^3 coarser than the
+float representation error of any amount in this module's range (|x| < $10^3), so
+`float -> Decimal -> quantize` is a lossless normalization of every real cost while being a
+strict noise filter. Quantized 12-dp amounts below $10^3 carry at most 15 significant digits
+and therefore also round-trip exactly through `float`, which is what keeps the
+float-compatible public API and the exact internals in agreement.
+
+Public API stays FLOAT-COMPATIBLE: callers pass floats and read floats (`total_spent_usd`,
+`run_usd`, `prior_usd`, `remaining_usd`, `hard_stop_usd`, `book_envelope`, `audit_summary`,
+`spend_by_bucket`, every `to_dict`) exactly as before; conversion happens at the boundary.
+The exact values are exposed alongside them as `*_exact_usd` (`Decimal`) for anyone who
+needs to prove an equality rather than approximate one. Every decision inside this module —
+the pre-call check, the start decision, the halt decision, reconstruction, and the reported
+totals — is computed from the SAME quantized Decimals, so they cannot disagree.
+
 This module is pure + filesystem only. It makes NO network calls of any kind.
 """
 from __future__ import annotations
@@ -49,6 +96,7 @@ import math
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from decimal import ROUND_HALF_UP, Context, Decimal, InvalidOperation, localcontext
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
@@ -59,8 +107,101 @@ from typing import Any, Iterable, Mapping, Optional, Sequence
 #: v7.1 R-V7-6 unified hard stop. ALL paid Q2 spend counts against this single figure.
 HARD_STOP_USD: float = 8.50
 
-#: Floating-point slack for cap comparisons (sub-nano-dollar; far below any real call cost).
+#: Retained for backward compatibility ONLY. Cap comparisons used to add this slack because
+#: they were performed in binary floating point. They are now exact `Decimal` comparisons
+#: (see the module docstring), so NO comparison in this module adds any slack: a total exactly
+#: at the hard stop is permitted and one quantum over it is refused.
 EPS: float = 1e-12
+
+# ---- the canonical money representation (see the module docstring) ---------------------
+
+#: Number of decimal places money is quantized to at ingestion.
+MONEY_DECIMAL_PLACES: int = 12
+
+#: The quantum: 1e-12 USD (one pico-dollar).
+MONEY_QUANTUM_USD: Decimal = Decimal(1).scaleb(-MONEY_DECIMAL_PLACES)
+
+#: The single rounding mode: nearest, ties away from zero.
+MONEY_ROUNDING: str = ROUND_HALF_UP
+
+#: Arithmetic context for money. The precision is far wider than any total this study can
+#: reach (12 dp against a $8.50 stop is 13 significant digits), so addition of quantized
+#: amounts is exact and never silently rounds.
+MONEY_CONTEXT: Context = Context(prec=60, rounding=MONEY_ROUNDING)
+
+#: Exact zero, already quantized.
+MONEY_ZERO: Decimal = Decimal(0).quantize(MONEY_QUANTUM_USD)
+
+#: The canonical rule, in a form that travels with every serialized report.
+MONEY_RULE: dict = {
+    "representation": "decimal.Decimal",
+    "unit_usd": str(MONEY_QUANTUM_USD),
+    "decimal_places": MONEY_DECIMAL_PLACES,
+    "rounding": MONEY_ROUNDING,
+    "applied": "at ingestion, once, by to_money()",
+    "positive_never_rounds_to_zero": True,
+}
+
+
+def to_money(value: Any) -> Decimal:
+    """Quantize any amount into ledger money — the ONE canonical ingestion rule.
+
+    Rule: nearest 1e-12 USD, ties away from zero (`ROUND_HALF_UP`); a strictly positive
+    amount never quantizes to zero (it is raised to one quantum), so a paid call can never be
+    booked as free.
+
+    Floats are converted through their EXACT binary value (`Decimal(float)`), so the quantum
+    filters representation noise rather than compounding it. Raises `ValueError` on anything
+    that is not a finite number.
+    """
+    if isinstance(value, Decimal):
+        exact = value
+    elif isinstance(value, bool):                       # bool is an int; never money
+        raise ValueError(f"{value!r} is not a monetary amount")
+    elif isinstance(value, int):
+        exact = Decimal(value)
+    elif isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"monetary amount must be finite, got {value!r}")
+        exact = Decimal(value)                          # exact binary value, then quantize
+    elif isinstance(value, str):
+        try:
+            exact = Decimal(value)
+        except InvalidOperation as exc:
+            raise ValueError(f"{value!r} is not a monetary amount") from exc
+    else:
+        raise ValueError(f"{value!r} is not a monetary amount")
+
+    if not exact.is_finite():
+        raise ValueError(f"monetary amount must be finite, got {value!r}")
+
+    with localcontext(MONEY_CONTEXT):
+        quantized = exact.quantize(MONEY_QUANTUM_USD, rounding=MONEY_ROUNDING)
+        if quantized == 0 and exact > 0:
+            # Never round a genuinely paid amount down to free (R-E2 in miniature).
+            quantized = MONEY_QUANTUM_USD
+        elif quantized == 0 and exact < 0:
+            quantized = -MONEY_QUANTUM_USD
+        return quantized
+
+
+def from_money(amount: Decimal) -> float:
+    """The float view of an exact amount, for the float-compatible public API.
+
+    Quantized amounts in this module's range carry at most 15 significant digits, so this is a
+    lossless round trip: `to_money(from_money(x)) == x`.
+    """
+    return float(amount)
+
+
+def money_sum(values: Iterable[Any]) -> Decimal:
+    """Exact sum of quantized amounts. Every input is ingested through `to_money` first."""
+    with localcontext(MONEY_CONTEXT):
+        total = MONEY_ZERO
+        for value in values:
+            total += to_money(value)
+        return total
+
 
 #: Header names whose values are secrets and must be redacted before persistence.
 SECRET_HEADERS: frozenset[str] = frozenset({
@@ -260,21 +401,26 @@ def reject_cache_hit(response: Mapping[str, Any],
             "X-OpenRouter-Cache: false; the draw is a replay, not an independent sample")
 
 
-def _finite_non_negative(value: Any) -> Optional[float]:
+def _money_or_none(value: Any) -> Optional[Decimal]:
+    """Quantized non-negative money, or None when the value is unusable as an amount."""
     try:
-        num = float(value)
-    except (TypeError, ValueError):
+        amount = to_money(value)
+    except (ValueError, TypeError, ArithmeticError):
         return None
-    if not math.isfinite(num) or num < 0.0:
-        return None
-    return num
+    return None if amount < 0 else amount
 
 
-def returned_cost(response: Mapping[str, Any]) -> float:
-    """The RETURNED cost of a call, or RAISE (R-E2). Never falls back to 0.0.
+def _finite_non_negative(value: Any) -> Optional[float]:
+    """Float view of `_money_or_none` — same rule, float-compatible return."""
+    amount = _money_or_none(value)
+    return None if amount is None else from_money(amount)
 
-    A cache hit may legitimately return no cost or 0.0 and is booked at 0.0; anything else
-    without a finite, non-negative `usage.cost` / `usage.total_cost` is an accounting failure.
+
+def returned_cost_exact(response: Mapping[str, Any]) -> Decimal:
+    """The RETURNED cost of a call as EXACT quantized money, or RAISE (R-E2).
+
+    This is the ingestion point for every cost that ever reaches the ledger: the canonical
+    rule (nearest 1e-12 USD, ties away from zero) is applied here and nowhere else re-derived.
     """
     usage = response.get("usage") or {}
     raw = usage.get("cost")
@@ -283,17 +429,29 @@ def returned_cost(response: Mapping[str, Any]) -> float:
 
     if raw is None:
         if is_cache_hit(response):
-            return 0.0
+            return MONEY_ZERO
         raise CostAccountingError(
             "successful non-cached response carried no usage.cost / usage.total_cost; "
             "refusing to book 0.0 — reconcile via the persisted generation id or declare a "
             "NonReconciledComponent upper bound (R-E2)")
 
-    cost = _finite_non_negative(raw)
+    cost = _money_or_none(raw)
     if cost is None:
         raise CostAccountingError(
             f"returned cost {raw!r} is not finite and non-negative; refusing to book (R-E2)")
     return cost
+
+
+def returned_cost(response: Mapping[str, Any]) -> float:
+    """The RETURNED cost of a call, or RAISE (R-E2). Never falls back to 0.0.
+
+    Float view of `returned_cost_exact` — the value is already quantized, so the persisted
+    figure and the booked figure are the same number.
+
+    A cache hit may legitimately return no cost or 0.0 and is booked at 0.0; anything else
+    without a finite, non-negative `usage.cost` / `usage.total_cost` is an accounting failure.
+    """
+    return from_money(returned_cost_exact(response))
 
 
 # =======================================================================================
@@ -362,7 +520,10 @@ class RawEnvelope:
             generation_id=obj.get("generation_id"),
             timestamp=obj["timestamp"],
             usage=dict(obj.get("usage") or {}),
-            cost_usd=(None if obj.get("cost_usd") is None else float(obj["cost_usd"])),
+            # Re-quantized on read: a record written by any producer enters the ledger under
+            # the one canonical rule, so what was persisted and what is booked cannot differ.
+            cost_usd=(None if obj.get("cost_usd") is None
+                      else from_money(to_money(obj["cost_usd"]))),
             cost_status=obj.get("cost_status", "missing"),
             openrouter_metadata=obj.get("openrouter_metadata"),
             bucket=obj.get("bucket", "unknown"),
@@ -370,6 +531,11 @@ class RawEnvelope:
             provider=obj.get("provider", ""),
             stage=obj.get("stage", "unknown"),
         )
+
+    @property
+    def cost_exact_usd(self) -> Optional[Decimal]:
+        """The booked cost as exact quantized money, or None when accounting failed."""
+        return None if self.cost_usd is None else to_money(self.cost_usd)
 
     def content_sha256(self) -> str:
         return canonical_sha256(self.to_dict())
@@ -469,9 +635,13 @@ class DerivedRecord:
             valid=bool(obj["valid"]),
             failures=tuple(obj.get("failures") or ()),
             excluded_from_estimands=bool(obj.get("excluded_from_estimands", not obj["valid"])),
-            booked_cost_usd=float(obj.get("booked_cost_usd", 0.0)),
+            booked_cost_usd=from_money(to_money(obj.get("booked_cost_usd", 0.0))),
             timestamp=obj["timestamp"],
         )
+
+    @property
+    def booked_cost_exact_usd(self) -> Decimal:
+        return to_money(self.booked_cost_usd)
 
 
 # =======================================================================================
@@ -605,11 +775,17 @@ class NonReconciledComponent:
     reason: str
 
     def __post_init__(self) -> None:
-        if _finite_non_negative(self.upper_bound_usd) is None:
+        if _money_or_none(self.upper_bound_usd) is None:
             raise ValueError("non-reconciled upper bound must be finite and non-negative")
 
+    @property
+    def upper_bound_exact_usd(self) -> Decimal:
+        """The declared upper bound under the canonical quantization rule."""
+        return to_money(self.upper_bound_usd)
+
     def to_dict(self) -> dict:
-        return {"label": self.label, "upper_bound_usd": self.upper_bound_usd,
+        return {"label": self.label,
+                "upper_bound_usd": from_money(self.upper_bound_exact_usd),
                 "reason": self.reason}
 
 
@@ -634,12 +810,26 @@ class ReconciliationResult:
     sources: tuple[str, ...] = ()
 
     @property
+    def reconciled_exact_usd(self) -> Decimal:
+        return to_money(self.reconciled_usd)
+
+    @property
+    def non_reconciled_exact_usd(self) -> Decimal:
+        """Exact sum of the declared upper bounds — never a float accumulation."""
+        return money_sum(c.upper_bound_usd for c in self.components)
+
+    @property
+    def total_exact_usd(self) -> Decimal:
+        with localcontext(MONEY_CONTEXT):
+            return self.reconciled_exact_usd + self.non_reconciled_exact_usd
+
+    @property
     def non_reconciled_usd(self) -> float:
-        return sum(c.upper_bound_usd for c in self.components)
+        return from_money(self.non_reconciled_exact_usd)
 
     @property
     def total_usd(self) -> float:
-        return self.reconciled_usd + self.non_reconciled_usd
+        return from_money(self.total_exact_usd)
 
     @property
     def is_exact(self) -> bool:
@@ -648,7 +838,7 @@ class ReconciliationResult:
 
     def to_dict(self) -> dict:
         return {
-            "reconciled_usd": self.reconciled_usd,
+            "reconciled_usd": from_money(self.reconciled_exact_usd),
             "non_reconciled_usd": self.non_reconciled_usd,
             "total_usd": self.total_usd,
             "is_exact": self.is_exact,
@@ -658,16 +848,19 @@ class ReconciliationResult:
         }
 
 
-def _persisted_cost(obj: Mapping[str, Any]) -> Optional[float]:
-    """Returned cost of a persisted record, tolerating the v5 and v7 record shapes."""
+def _persisted_cost(obj: Mapping[str, Any]) -> Optional[Decimal]:
+    """Returned cost of a persisted record as exact quantized money.
+
+    Tolerates the v5 and v7 record shapes; None when no usable cost is present.
+    """
     for key in ("cost_usd", "cost", "actual_cost"):
         if obj.get(key) is not None:
-            return _finite_non_negative(obj[key])
+            return _money_or_none(obj[key])
     for holder in (obj.get("usage"), (obj.get("response_body") or {}).get("usage")):
         if isinstance(holder, Mapping):
             for key in ("cost", "total_cost"):
                 if holder.get(key) is not None:
-                    return _finite_non_negative(holder[key])
+                    return _money_or_none(holder[key])
     return None
 
 
@@ -681,7 +874,7 @@ def reconcile_prior_spend(record_dirs: Sequence[Path | str], *,
     being silently treated as free. Such a record must be reconciled through its generation
     id or declared as a `NonReconciledComponent`.
     """
-    total = 0.0
+    total = MONEY_ZERO
     count = 0
     sources: list[str] = []
     for directory in record_dirs:
@@ -700,11 +893,12 @@ def reconcile_prior_spend(record_dirs: Sequence[Path | str], *,
                 raise ReconciliationError(
                     f"prior record {path} carries no finite returned cost; refusing to treat "
                     f"it as free — reconcile it or declare a NonReconciledComponent (R-V7-6)")
-            total += cost
+            with localcontext(MONEY_CONTEXT):
+                total += cost                     # exact: both operands are quantized money
             count += 1
             sources.append(str(path))
 
-    return ReconciliationResult(reconciled_usd=total, record_count=count,
+    return ReconciliationResult(reconciled_usd=from_money(total), record_count=count,
                                 components=tuple(non_reconciled), sources=tuple(sources))
 
 
@@ -728,18 +922,26 @@ class ModelProjection:
     retry_reserve_usd: float
 
     @property
+    def complete_run_exact_usd(self) -> Decimal:
+        """Projection + reserve as EXACT money — the figure `may_start_model` compares."""
+        return money_sum((self.projected_input_cost_usd,
+                          self.projected_completion_cost_usd,
+                          self.retry_reserve_usd))
+
+    @property
     def complete_run_usd(self) -> float:
-        return (self.projected_input_cost_usd
-                + self.projected_completion_cost_usd
-                + self.retry_reserve_usd)
+        return from_money(self.complete_run_exact_usd)
 
     def to_dict(self) -> dict:
         return {
             "model": self.model,
             "endpoint": self.endpoint,
-            "projected_input_cost_usd": self.projected_input_cost_usd,
-            "projected_completion_cost_usd": self.projected_completion_cost_usd,
-            "retry_reserve_usd": self.retry_reserve_usd,
+            # every reported figure is quantized by the one rule, so the parts and the total
+            # in this record are guaranteed to add up
+            "projected_input_cost_usd": from_money(to_money(self.projected_input_cost_usd)),
+            "projected_completion_cost_usd": from_money(
+                to_money(self.projected_completion_cost_usd)),
+            "retry_reserve_usd": from_money(to_money(self.retry_reserve_usd)),
             "complete_run_usd": self.complete_run_usd,
         }
 
@@ -761,8 +963,13 @@ class StartDecision:
         return not self.allowed
 
     @property
+    def headroom_exact_usd(self) -> Decimal:
+        with localcontext(MONEY_CONTEXT):
+            return to_money(self.hard_stop_usd) - to_money(self.projected_total_usd)
+
+    @property
     def headroom_usd(self) -> float:
-        return self.hard_stop_usd - self.projected_total_usd
+        return from_money(self.headroom_exact_usd)
 
 
 @dataclass(frozen=True)
@@ -797,27 +1004,58 @@ class V7Ledger:
     reconciliation: ReconciliationResult
     hard_stop_usd: float = HARD_STOP_USD
     manifest: Optional[RunManifest] = None
-    _booked: dict = field(default_factory=dict)      # draw_id -> cost
-    _bucket_spend: dict = field(default_factory=dict)
+    _booked: dict = field(default_factory=dict)      # draw_id -> quantized Decimal cost
+    _bucket_spend: dict = field(default_factory=dict)   # bucket -> quantized Decimal spend
     current_model: Optional[str] = None
     current_model_complete: bool = False
 
-    # ---- totals ----------------------------------------------------------------------
+    # ---- totals (exact) ---------------------------------------------------------------
+    # Every decision and every reported figure below is derived from THESE four Decimals, so
+    # the pre-call check, the start/halt decisions, the reconstructed totals, and the audit
+    # summary cannot disagree with one another.
+    @property
+    def hard_stop_exact_usd(self) -> Decimal:
+        return to_money(self.hard_stop_usd)
+
+    @property
+    def prior_exact_usd(self) -> Decimal:
+        return self.reconciliation.total_exact_usd
+
+    @property
+    def run_exact_usd(self) -> Decimal:
+        """Exact sum of every booking. Order-independent and free of float error."""
+        with localcontext(MONEY_CONTEXT):
+            total = MONEY_ZERO
+            for draw_id in sorted(self._booked):
+                total += self._booked[draw_id]
+            return total
+
+    @property
+    def total_spent_exact_usd(self) -> Decimal:
+        with localcontext(MONEY_CONTEXT):
+            return self.prior_exact_usd + self.run_exact_usd
+
+    @property
+    def remaining_exact_usd(self) -> Decimal:
+        with localcontext(MONEY_CONTEXT):
+            return self.hard_stop_exact_usd - self.total_spent_exact_usd
+
+    # ---- totals (float view of the same exact figures) --------------------------------
     @property
     def prior_usd(self) -> float:
-        return self.reconciliation.total_usd
+        return from_money(self.prior_exact_usd)
 
     @property
     def run_usd(self) -> float:
-        return sum(self._booked.values())
+        return from_money(self.run_exact_usd)
 
     @property
     def total_spent_usd(self) -> float:
-        return self.prior_usd + self.run_usd
+        return from_money(self.total_spent_exact_usd)
 
     @property
     def remaining_usd(self) -> float:
-        return self.hard_stop_usd - self.total_spent_usd
+        return from_money(self.remaining_exact_usd)
 
     @property
     def is_exact(self) -> bool:
@@ -827,8 +1065,15 @@ class V7Ledger:
     def booked_draw_ids(self) -> list[str]:
         return sorted(self._booked)
 
-    def spend_by_bucket(self) -> dict:
+    def booked_cost_exact_usd(self, draw_id: str) -> Optional[Decimal]:
+        """The exact amount booked for one draw, or None if it was never booked."""
+        return self._booked.get(draw_id)
+
+    def spend_by_bucket_exact(self) -> dict:
         return dict(self._bucket_spend)
+
+    def spend_by_bucket(self) -> dict:
+        return {bucket: from_money(amount) for bucket, amount in self._bucket_spend.items()}
 
     # ---- booking ---------------------------------------------------------------------
     def book_envelope(self, envelope: RawEnvelope) -> float:
@@ -849,25 +1094,36 @@ class V7Ledger:
             # does not qualify still fails closed.
             if is_unbilled_rejection(envelope.response_body or {}, envelope.http_status,
                                      envelope.response_headers):
-                self._booked[envelope.draw_id] = 0.0
-                return 0.0
+                self._booked[envelope.draw_id] = MONEY_ZERO
+                self._bucket_spend[envelope.bucket] = self._bucket_spend.get(
+                    envelope.bucket, MONEY_ZERO)
+                return from_money(MONEY_ZERO)
             raise CostAccountingError(
                 f"draw {envelope.draw_id} was persisted without a returned cost "
                 f"(generation id {envelope.generation_id!r}); refusing to book 0.0 (R-E2)")
-        cost = float(envelope.cost_usd)
+        cost = to_money(envelope.cost_usd)          # canonical rule, applied at ingestion
         self._booked[envelope.draw_id] = cost
-        self._bucket_spend[envelope.bucket] = self._bucket_spend.get(envelope.bucket, 0.0) + cost
-        return cost
+        with localcontext(MONEY_CONTEXT):
+            self._bucket_spend[envelope.bucket] = (
+                self._bucket_spend.get(envelope.bucket, MONEY_ZERO) + cost)
+        return from_money(cost)
 
     # ---- pre-call gate ---------------------------------------------------------------
     def check_before_call(self, worst_case_cost_usd: float, *, label: str = "call") -> None:
-        """Refuse (raise) a request whose worst-case cost could breach the $8.50 hard stop."""
-        cost = _finite_non_negative(worst_case_cost_usd)
+        """Refuse (raise) a request whose worst-case cost could breach the $8.50 hard stop.
+
+        Exact: a projected total exactly AT the stop is permitted; one quantum over it is
+        refused. No floating-point slack is added (see `EPS`).
+        """
+        cost = _money_or_none(worst_case_cost_usd)
         if cost is None:
             raise ValueError("worst-case cost must be finite and non-negative")
-        if self.total_spent_usd + cost > self.hard_stop_usd + EPS:
+        spent = self.total_spent_exact_usd
+        with localcontext(MONEY_CONTEXT):
+            projected = spent + cost
+        if projected > self.hard_stop_exact_usd:
             raise HardStopExceeded(
-                f"{label} refused: ${self.total_spent_usd:.6f} spent + ${cost:.6f} worst case "
+                f"{label} refused: ${spent:.6f} spent + ${cost:.6f} worst case "
                 f"would breach the ${self.hard_stop_usd:.2f} hard stop")
 
     def may_start_call(self, worst_case_cost_usd: float) -> bool:
@@ -882,22 +1138,25 @@ class V7Ledger:
         """A model may be STARTED only if its conservative complete-run projection plus reserve
         fits under the hard stop given everything already spent. Refusal is a budget exclusion;
         there is no partial run (v7 requirement 4, R-V7-6)."""
-        projected_total = self.total_spent_usd + projection.complete_run_usd
-        allowed = projected_total <= self.hard_stop_usd + EPS
+        spent = self.total_spent_exact_usd
+        complete_run = projection.complete_run_exact_usd
+        with localcontext(MONEY_CONTEXT):
+            projected_total = spent + complete_run
+        allowed = projected_total <= self.hard_stop_exact_usd
         if allowed:
-            reason = (f"complete-run projection ${projection.complete_run_usd:.6f} + "
-                      f"${self.total_spent_usd:.6f} already spent fits the "
+            reason = (f"complete-run projection ${complete_run:.6f} + "
+                      f"${spent:.6f} already spent fits the "
                       f"${self.hard_stop_usd:.2f} hard stop")
         else:
             reason = (f"budget exclusion: complete-run projection "
-                      f"${projection.complete_run_usd:.6f} + ${self.total_spent_usd:.6f} "
+                      f"${complete_run:.6f} + ${spent:.6f} "
                       f"already spent = ${projected_total:.6f} exceeds the "
                       f"${self.hard_stop_usd:.2f} hard stop; no reduced-cell or reduced-S "
                       f"substitute is permitted")
         return StartDecision(allowed=allowed, model=projection.model,
                              endpoint=projection.endpoint,
-                             already_spent_usd=self.total_spent_usd,
-                             projected_total_usd=projected_total,
+                             already_spent_usd=from_money(spent),
+                             projected_total_usd=from_money(projected_total),
                              hard_stop_usd=self.hard_stop_usd, reason=reason)
 
     def start_model(self, projection: ModelProjection) -> StartDecision:
@@ -919,16 +1178,19 @@ class V7Ledger:
         "Finish current model" NEVER overrides the hard stop: on halt the model is reported
         incomplete and no headline is emitted.
         """
-        cost = _finite_non_negative(next_call_worst_case_usd)
+        cost = _money_or_none(next_call_worst_case_usd)
         if cost is None:
             raise ValueError("next-call worst case must be finite and non-negative")
 
-        spent = self.total_spent_usd
-        if spent > self.hard_stop_usd + EPS:
+        spent = self.total_spent_exact_usd
+        stop = self.hard_stop_exact_usd
+        with localcontext(MONEY_CONTEXT):
+            projected = spent + cost
+        if spent > stop:
             reason = (f"realized spend ${spent:.6f} already exceeds the "
                       f"${self.hard_stop_usd:.2f} hard stop")
             halt = True
-        elif spent + cost > self.hard_stop_usd + EPS:
+        elif projected > stop:
             reason = (f"next call worst case ${cost:.6f} on top of realized ${spent:.6f} "
                       f"would breach the ${self.hard_stop_usd:.2f} hard stop")
             halt = True
@@ -941,14 +1203,18 @@ class V7Ledger:
                                 model=self.current_model,
                                 model_incomplete=not self.current_model_complete,
                                 emit_headline=self.current_model_complete,
-                                spent_usd=spent, hard_stop_usd=self.hard_stop_usd)
+                                spent_usd=from_money(spent),
+                                hard_stop_usd=self.hard_stop_usd)
         return HaltDecision(halt=True, reason=reason, model=self.current_model,
                             model_incomplete=True, emit_headline=False,
-                            spent_usd=spent, hard_stop_usd=self.hard_stop_usd)
+                            spent_usd=from_money(spent), hard_stop_usd=self.hard_stop_usd)
 
     # ---- reporting -------------------------------------------------------------------
     def audit_summary(self) -> dict:
+        """JSON-serializable report. Every figure is the float view of the SAME exact money
+        the pre-call check and the halt decision used — never a separately re-derived sum."""
         return {
+            "money_rule": MONEY_RULE,
             "hard_stop_usd": self.hard_stop_usd,
             "prior_usd": self.prior_usd,
             "run_usd": self.run_usd,
@@ -1042,7 +1308,7 @@ def record_validation(store: EnvelopeStore, envelope: RawEnvelope, *, valid: boo
         valid=valid,
         failures=tuple(failures),
         excluded_from_estimands=not valid,
-        booked_cost_usd=float(envelope.cost_usd or 0.0),
+        booked_cost_usd=from_money(to_money(envelope.cost_usd or 0.0)),
         timestamp=timestamp or _utc_now(),
     )
     store.put_derived(record)

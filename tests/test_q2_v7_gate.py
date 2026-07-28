@@ -1,17 +1,28 @@
 """No-network tests for the Q2 Stage-2 v7.2 promotion gate (`alignment.q2_v7.gate`).
 
-Every seam that would touch the network, the wall clock, or a downloaded tokenizer is
-injected here as a plain callable, so the whole suite runs offline and instantly.
+Every seam that would touch the network or the wall clock is injected here as a plain
+callable, so the whole suite runs offline and instantly.
+
+The C2 serialization tests are the exception, deliberately: they use the REAL committed,
+hash-verified tokenizer assets under `out/q2_stage2_tokenizers/` (local file reads, no
+download) and assert FIXED expected token counts, so a changed template, a changed tokenizer
+or a changed rendering convention breaks the suite loudly instead of silently re-pricing the
+study.
 """
 from __future__ import annotations
 
 import json
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from alignment.q2_v7 import gate as G
+
+ROOT = Path(__file__).resolve().parents[1]
+QWEN_TOKENIZER_DIR = ROOT / "out" / "q2_stage2_tokenizers" / "qwen"
+DEEPSEEK_TOKENIZER_DIR = ROOT / "out" / "q2_stage2_tokenizers" / "deepseek"
 
 
 # =======================================================================================
@@ -336,6 +347,233 @@ def test_committed_endpoint_snapshot_binds_all_nine_candidates():
     alibaba = cands[f"{QWEN}::alibaba"]
     assert alibaba.provider_name == "Alibaba"
     assert alibaba.price_prompt_per_token == pytest.approx(3.9e-7)
+
+
+# =======================================================================================
+# 1b. C2 exact chat serialization — REAL committed tokenizer assets, fixed expected counts
+#
+# Frozen C2 applies the pinned tokenizer to "the exact serialized system+user messages as
+# sent". These tests use the committed, hash-verified assets on disk (no network) and pin the
+# resulting integers, so a template/tokenizer/convention change cannot silently re-price the
+# study. The numbers below were produced by the pinned Qwen `chat_template.jinja`
+# (sha256 a4aee8af...) with `add_generation_prompt=True` and no `enable_thinking` override.
+# =======================================================================================
+
+#: Two fixed requests whose exact serialized token counts are asserted below.
+FIXED_MESSAGES_A = [
+    {"role": "system",
+     "content": "You are simulating a single respondent answering an opinion survey."},
+    {"role": "user",
+     "content": "Do you support this policy?\n\n  1. Strongly support\n  2. Support\n"
+                "  3. Strongly oppose\n  4. Oppose\n\nReply with only the number."},
+]
+FIXED_MESSAGES_B = [{"role": "user", "content": "Reply with only the number."}]
+
+#: exact serialized tokens, bare-content tokens, fixed-overhead heuristic tokens
+FIXED_EXPECTED = {"A": (69, 55, 87), "B": (16, 6, 26)}
+
+
+def qwen_pinned() -> G.PinnedTokenizer:
+    """The real pinned Qwen tokenizer + chat template, hash-verified against the manifest."""
+    return G.load_pinned_tokenizer(QWEN, QWEN_TOKENIZER_DIR)
+
+
+def fixed_request(key: str) -> G.RenderedRequest:
+    messages = FIXED_MESSAGES_A if key == "A" else FIXED_MESSAGES_B
+    body = {"model": QWEN, "messages": messages, "max_tokens": 4, "temperature": 0.0}
+    return G.render_request(G.CELL_IDS[0], "fixed_probe", 0, body)
+
+
+def test_pinned_qwen_tokenizer_loads_from_committed_hash_verified_assets():
+    tok = qwen_pinned()
+    assert tok.repo_id == "Qwen/Qwen3.5-397B-A17B"
+    assert tok.revision == "8472618112abcbd45acbcdc58436aff4233c23f7"
+    assert tok.has_chat_template is True
+    assert tok.template.source == "chat_template.jinja"
+    assert tok.template.sha256 == tok.file_sha256["chat_template.jinja"]
+    assert tok.template.sha256 == (
+        "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715")
+    ident = tok.identity()
+    assert ident["repo_id"] == "Qwen/Qwen3.5-397B-A17B"
+    assert ident["add_generation_prompt"] is True
+    assert set(ident["files"]) == {"tokenizer.json", "tokenizer_config.json",
+                                   "chat_template.jinja", "vocab.json", "merges.txt"}
+
+
+def test_pinned_tokenizer_refuses_a_tampered_file(tmp_path):
+    for name in ("tokenizer.json", "tokenizer_config.json", "chat_template.jinja",
+                 "vocab.json", "merges.txt"):
+        (tmp_path / name).write_bytes((QWEN_TOKENIZER_DIR / name).read_bytes())
+    (tmp_path / "chat_template.jinja").write_text("{{ 'tampered' }}")
+    with pytest.raises(G.SpecViolation, match="hashes to"):
+        G.load_pinned_tokenizer(QWEN, tmp_path)
+
+
+def test_exact_serialization_carries_roles_special_tokens_and_generation_prompt():
+    tok = qwen_pinned()
+    text = fixed_request("A").exact_serialization(tok.template)
+    assert text.startswith("<|im_start|>system\n")
+    assert "<|im_start|>user\n" in text
+    assert text.endswith("<|im_start|>assistant\n<think>\n")   # add_generation_prompt=True
+    assert text.count("<|im_end|>") == 2                       # one per sent message
+
+
+@pytest.mark.parametrize("key", ["A", "B"])
+def test_fixed_exact_token_counts_under_the_real_pinned_qwen_template(key):
+    """FIXED expected counts. If the pinned template, the pinned tokenizer or the
+    serialization convention changes, these integers change and this test fails loudly."""
+    tok = qwen_pinned()
+    req = fixed_request(key)
+    exact, content_only, heuristic = FIXED_EXPECTED[key]
+    assert tok.count_messages(req.messages) == exact
+    assert tok(req.payload_text) == content_only
+    assert tok(req.payload_text) + req.template_overhead_tokens == heuristic
+    # The retired heuristic OVERSTATES the exact serialization; conservative, but not frozen.
+    assert heuristic > exact > content_only
+
+
+def test_the_real_study_grid_coordinate_the_auditor_measured_is_exactly_161_tokens():
+    """PS-2's representative request: exact 161, bare content 147, heuristic 179."""
+    from alignment.q2_v7 import study_render as SR
+
+    grid = SR.render_study_grid(QWEN, "alibaba", SR.probe_ids_for())
+    req = grid[0].rendered
+    assert req.coordinate == ("baseline::no_guard", "pol_ai_due_process", 0)
+    tok = qwen_pinned()
+    assert tok.count_messages(req.messages) == 161
+    assert tok(req.payload_text) == 147
+    assert tok(req.payload_text) + req.template_overhead_tokens == 179
+
+
+def test_render_request_carries_the_structured_messages_verbatim():
+    req = fixed_request("A")
+    assert req.is_exactly_serializable is True
+    assert [dict(m) for m in req.messages] == FIXED_MESSAGES_A
+    assert req.payload_text == "\n".join(m["content"] for m in FIXED_MESSAGES_A)
+    bare = G.RenderedRequest("c", "p", 0, "h" * 64, "text")
+    assert bare.messages == () and bare.is_exactly_serializable is False
+
+
+def test_full_grid_projection_uses_the_exact_serialization_when_a_template_exists():
+    tok = qwen_pinned()
+    reqs = [fixed_request("A" if i % 2 else "B") for i in range(2)]
+    reqs = [G.RenderedRequest(G.CELL_IDS[i], f"p{i}", 0, f"{i:064x}", r.payload_text,
+                              r.template_overhead_tokens, r.messages_json)
+            for i, r in enumerate(reqs)]
+    proj = G.project_full_grid(
+        model=QWEN, candidate=candidate(), requests=reqs, tokenizer=tok,
+        completion_allowance_tokens=4, reconciled_prior_gate_spend=0.0, retry_reserve=0.0,
+        expected_requests=2)
+    assert proj.serialization_method == G.SERIALIZATION_EXACT
+    assert proj.serialization_is_frozen_c2 is True
+    # B is index 0 (i % 2 == 0), A is index 1.
+    assert [r.raw_input_tokens for r in proj.rows] == [16, 69]
+    assert [r.content_only_input_tokens for r in proj.rows] == [6, 55]
+    assert [r.projected_input_tokens for r in proj.rows] == [18, 76]   # ceil(11n/10)
+    assert all(len(r.serialized_sha256) == 64 for r in proj.rows)
+    G.require_frozen_c2_serialization(proj)
+    art = proj.as_artifact()
+    assert art["serialization_method"] == G.SERIALIZATION_EXACT
+    assert art["serialization_is_frozen_c2"] is True
+    assert art["tokenizer_identity"]["revision"] == (
+        "8472618112abcbd45acbcdc58436aff4233c23f7")
+    assert art["tokenizer_identity"]["template_sha256"] == tok.template.sha256
+    assert art["rows"][0]["serialization_method"] == G.SERIALIZATION_EXACT
+
+
+def test_exact_path_refuses_a_request_without_structured_messages():
+    tok = qwen_pinned()
+    reqs = [G.RenderedRequest(G.CELL_IDS[0], "p0", 0, f"{0:064x}", "bare text")]
+    with pytest.raises(G.MissingChatTemplate, match="no structured messages"):
+        G.project_full_grid(model=QWEN, candidate=candidate(), requests=reqs, tokenizer=tok,
+                            completion_allowance_tokens=4, reconciled_prior_gate_spend=0.0,
+                            retry_reserve=0.0, expected_requests=1)
+
+
+def test_deepseek_has_no_pinned_chat_template_and_the_projection_refuses_to_guess():
+    """DeepSeek-V4-Pro publishes no chat template at the pinned revision: `chat_template` is
+    null in `tokenizer_config.json` and no `.jinja` file exists. Frozen C2 is therefore not
+    executable for it, and the gate says so instead of silently substituting a heuristic."""
+    tok = G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR)
+    assert tok.repo_id == "deepseek-ai/DeepSeek-V4-Pro"
+    assert tok.has_chat_template is False
+    assert tok.template is None
+    assert tok("hello world") > 0                     # it is still a working tokenizer
+    with pytest.raises(G.MissingChatTemplate, match="AMENDMENT"):
+        tok.serialize(FIXED_MESSAGES_A)
+    with pytest.raises(G.MissingChatTemplate, match="AMENDMENT"):
+        G.load_chat_template(DEEPSEEK_TOKENIZER_DIR, model=DEEPSEEK)
+    assert G.load_chat_template(DEEPSEEK_TOKENIZER_DIR, allow_missing=True) is None
+
+    reqs = [G.RenderedRequest(G.CELL_IDS[0], "p0", 0, f"{0:064x}", "t",
+                              20, fixed_request("B").messages_json)]
+    kw = dict(model=DEEPSEEK, candidate=candidate(DEEPSEEK, "deepseek"), requests=reqs,
+              tokenizer=tok, completion_allowance_tokens=4, reconciled_prior_gate_spend=0.0,
+              retry_reserve=0.0, expected_requests=1)
+    with pytest.raises(G.MissingChatTemplate, match="PRE-OUTCOME DESIGN AMENDMENT"):
+        G.project_full_grid(**kw)
+
+
+def test_the_fixed_overhead_fallback_must_be_opted_into_by_naming_a_signed_amendment():
+    tok = G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR)
+    reqs = [G.RenderedRequest(G.CELL_IDS[0], "p0", 0, f"{0:064x}", "hello there",
+                              20, fixed_request("B").messages_json)]
+    kw = dict(model=DEEPSEEK, candidate=candidate(DEEPSEEK, "deepseek"), requests=reqs,
+              tokenizer=tok, completion_allowance_tokens=4, reconciled_prior_gate_spend=0.0,
+              retry_reserve=0.0, expected_requests=1)
+    with pytest.raises(G.SpecViolation, match="must NAME the signed"):
+        G.project_full_grid(**kw, fixed_overhead_fallback_signed_amendment="  ")
+
+    proj = G.project_full_grid(
+        **kw, fixed_overhead_fallback_signed_amendment="v7.3-C2-amendment-UNSIGNED-EXAMPLE")
+    assert proj.serialization_method == G.SERIALIZATION_FIXED_OVERHEAD
+    assert proj.serialization_is_frozen_c2 is False
+    assert proj.rows[0].raw_input_tokens == tok("hello there") + 20
+    # Even with an amendment recorded, the projection is NOT the frozen C2 method.
+    with pytest.raises(G.MissingChatTemplate, match="not the frozen C2"):
+        G.require_frozen_c2_serialization(proj)
+    assert proj.as_artifact()["fixed_overhead_fallback_signed_amendment"] == (
+        "v7.3-C2-amendment-UNSIGNED-EXAMPLE")
+
+
+def test_an_amendment_is_refused_when_the_frozen_method_is_actually_executable():
+    """Qwen HAS a pinned template, so the exact path is mandatory — not a choice."""
+    tok = qwen_pinned()
+    r = fixed_request("A")
+    reqs = [G.RenderedRequest(G.CELL_IDS[0], "p0", 0, f"{0:064x}", r.payload_text,
+                              r.template_overhead_tokens, r.messages_json)]
+    with pytest.raises(G.SpecViolation, match="fallback is not available"):
+        G.project_full_grid(model=QWEN, candidate=candidate(), requests=reqs, tokenizer=tok,
+                            completion_allowance_tokens=4, reconciled_prior_gate_spend=0.0,
+                            retry_reserve=0.0, expected_requests=1,
+                            fixed_overhead_fallback_signed_amendment="anything")
+
+
+def test_an_injected_str_to_int_seam_is_labelled_as_the_fallback_not_as_frozen_c2():
+    """The offline test seam carries no pinned identity and no template, so a projection built
+    from it is labelled `fixed_overhead_fallback` and cannot pass the C2 check."""
+    proj = G.project_full_grid(
+        model=QWEN, candidate=candidate(), requests=rendered(4), tokenizer=word_tokenizer,
+        completion_allowance_tokens=4, reconciled_prior_gate_spend=0.0, retry_reserve=0.0,
+        expected_requests=4)
+    assert proj.serialization_method == G.SERIALIZATION_FIXED_OVERHEAD
+    assert proj.serialization_is_frozen_c2 is False
+    assert proj.tokenizer_identity is None
+    with pytest.raises(G.MissingChatTemplate, match="no signed pre-outcome"):
+        G.require_frozen_c2_serialization(proj)
+
+
+def test_the_exact_serialization_is_deterministic_across_loads():
+    a, b = qwen_pinned(), qwen_pinned()
+    req = fixed_request("A")
+    assert a.serialize(req.messages) == b.serialize(req.messages)
+    assert a.count_messages(req.messages) == b.count_messages(req.messages)
+
+
+def test_chat_template_render_refuses_an_empty_message_list():
+    tok = qwen_pinned()
+    with pytest.raises(G.SpecViolation, match="empty message list"):
+        tok.template.render([])
 
 
 # =======================================================================================

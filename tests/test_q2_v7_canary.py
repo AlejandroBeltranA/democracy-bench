@@ -10,6 +10,8 @@ NETWORK: none. `FakeTransport` replaces the HTTP seam entirely.
 from __future__ import annotations
 
 import json
+import shutil
+from dataclasses import dataclass
 
 import pytest
 
@@ -206,3 +208,200 @@ def test_request_hash_mismatch_on_replay_raises(store, snapshot, monkeypatch):
     with pytest.raises(C.CanaryError, match="request hash"):
         C.run_one(model=MODEL, tag=TAG, key="k", snapshot=snapshot, store=store,
                   ledger=_ledger(), transport=FakeTransport())
+
+
+# =====================================================================================
+# PS-5 — canary derived records are bound to the FULL envelope hash and verified on reuse
+# =====================================================================================
+
+def _seed(store, snapshot, response=None, status=200, headers=None):
+    """One persisted canary draw, written by the real code path."""
+    payload = _ok_response() if response is None else response
+    result = C.run_one(model=MODEL, tag=TAG, key="k", snapshot=snapshot, store=store,
+                       ledger=_ledger(),
+                       transport=FakeTransport((status, headers or {}, payload)))
+    draw_id = r_draw(MODEL, TAG)
+    return result, draw_id, store.get(draw_id), store.get_derived(draw_id)
+
+
+def _rewrite_derived(store, draw_id, /, **changes):
+    """Overwrite a derived record in place (the store itself refuses overwrites)."""
+    obj = json.loads((store.derived_dir / f"{draw_id.replace('#', '__')}.json").read_text())
+    obj.update(changes)
+    (store.derived_dir / f"{draw_id.replace('#', '__')}.json").write_text(json.dumps(obj))
+
+
+def test_derived_record_is_bound_to_the_full_envelope_hash(store, snapshot):
+    """PS-5 core: the binding is `content_sha256()`, NOT `canonical_sha256(response_body)`."""
+    _, draw_id, env, derived = _seed(store, snapshot)
+    assert derived is not None
+    assert derived.raw_sha256 == env.content_sha256()
+    assert derived.raw_sha256 != L.canonical_sha256(env.response_body or {}), (
+        "the pre-PS-5 body-only binding must no longer be produced")
+
+
+@dataclass
+class _StubStudyRequest:
+    """Minimal `study_run.StudyRequestLike` — only these fields are read by `_replay`."""
+    cell_id: str
+    probe_id: str
+    order_idx: int
+    body: dict
+    request_sha256: str
+
+
+def test_canary_pair_round_trips_through_the_study_replay_binding_check(store, snapshot):
+    """The canary and study replay must not drift apart again: a real canary
+    envelope/derived pair is fed to `study_run._replay`, which is the code that rejects a
+    mismatched binding for the study."""
+    from alignment.q2_v7 import study_run as SR
+
+    _, draw_id, env, derived = _seed(store, snapshot)
+    body, draw = C.planned_draw(MODEL, TAG)
+    request = _StubStudyRequest(cell_id="c", probe_id="p", order_idx=0, body=body,
+                                request_sha256=draw.request_sha256)
+
+    outcome = SR._replay(request, 0, env, store)       # must NOT raise
+    assert outcome.reused is True
+    assert outcome.http_status == 200
+    assert outcome.parse_ok is True
+    assert outcome.failures == ()
+
+    # And the OLD binding is exactly what that check rejects.
+    _rewrite_derived(store, draw_id,
+                     raw_sha256=L.canonical_sha256(env.response_body or {}))
+    with pytest.raises(SR.StudyRunError, match="bound to raw hash"):
+        SR._replay(request, 0, env, store)
+
+
+def test_replay_requires_the_derived_record_to_exist(store, snapshot):
+    _, draw_id, env, derived = _seed(store, snapshot)
+    (store.derived_dir / f"{draw_id.replace('#', '__')}.json").unlink()
+
+    replay = FakeTransport()                           # any call would IndexError
+    with pytest.raises(C.CanaryError, match="no linked derived"):
+        C.run_one(model=MODEL, tag=TAG, key="k", snapshot=snapshot, store=store,
+                  ledger=_ledger(), transport=replay)
+    assert replay.calls == 0, "failing closed must never re-pay for the draw"
+
+
+def test_replay_rejects_a_tampered_derived_record(store, snapshot):
+    """The derived record is edited to claim a different raw hash."""
+    _seed(store, snapshot)
+    draw_id = r_draw(MODEL, TAG)
+    _rewrite_derived(store, draw_id, raw_sha256="a" * 64)
+
+    replay = FakeTransport()
+    with pytest.raises(C.CanaryError, match="bound to raw hash"):
+        C.run_one(model=MODEL, tag=TAG, key="k", snapshot=snapshot, store=store,
+                  ledger=_ledger(), transport=replay)
+    assert replay.calls == 0
+
+
+def test_replay_rejects_a_tampered_envelope(store, snapshot):
+    """The envelope is edited (leaving the request hash intact) so it no longer hashes to
+    the value its derived record is bound to."""
+    _seed(store, snapshot)
+    draw_id = r_draw(MODEL, TAG)
+    path = store.raw_path(draw_id)
+    raw = json.loads(path.read_text())
+    raw["cost_usd"] = 0.0                              # cheaper paid record, same request
+    path.write_text(json.dumps(raw))
+
+    replay = FakeTransport()
+    with pytest.raises(C.CanaryError, match="bound to raw hash"):
+        C.run_one(model=MODEL, tag=TAG, key="k", snapshot=snapshot, store=store,
+                  ledger=_ledger(), transport=replay)
+    assert replay.calls == 0
+
+
+def test_replay_rejects_a_derived_record_filed_under_another_draw(store, snapshot):
+    _seed(store, snapshot)
+    draw_id = r_draw(MODEL, TAG)
+    _rewrite_derived(store, draw_id, draw_id="deadbeef#0")
+    with pytest.raises(C.CanaryError, match="filename/content mismatch"):
+        C.run_one(model=MODEL, tag=TAG, key="k", snapshot=snapshot, store=store,
+                  ledger=_ledger(), transport=FakeTransport())
+
+
+def test_a_persisted_invalid_verdict_stays_invalid_on_replay(store, snapshot):
+    """A record whose derived verdict says INVALID must not be resurrected by a re-parse
+    that happens to succeed."""
+    result, draw_id, env, derived = _seed(store, snapshot)
+    assert result.passed and derived.valid
+    _rewrite_derived(store, draw_id, valid=False, excluded_from_estimands=True,
+                     failures=["audit:provider_mismatch"])
+
+    replay = FakeTransport()
+    second = C.run_one(model=MODEL, tag=TAG, key="k", snapshot=snapshot, store=store,
+                       ledger=_ledger(), transport=replay)
+    assert replay.calls == 0
+    assert second.reused is True
+    assert second.parse_ok is True, "the re-parse itself still succeeds..."
+    assert second.passed is False, "...but the persisted invalid verdict wins"
+    assert "excluded_by_derived_record" in (second.error or "")
+    assert "audit:provider_mismatch" in (second.error or "")
+
+
+def test_conforming_pair_replays_cleanly_with_zero_transport_calls(store, snapshot):
+    first, draw_id, env, derived = _seed(store, snapshot)
+    assert first.passed and not first.reused
+
+    replay = FakeTransport()
+    second = C.run_one(model=MODEL, tag=TAG, key="k", snapshot=snapshot, store=store,
+                       ledger=_ledger(), transport=replay)
+    assert replay.calls == 0, "a persisted draw must never be repaid"
+    assert second.reused and second.passed
+    assert second.http_status == 200
+    assert second.cost_usd == pytest.approx(2.3e-05)
+    # nothing was mutated by the replay
+    assert store.get_derived(draw_id) == derived
+    assert store.get(draw_id) == env
+
+
+def test_a_persisted_failure_keeps_its_failing_derived_record_on_replay(store, snapshot):
+    """The committed DeepSeek 404 shape: the derived record written on the paid attempt is
+    itself invalid, and replay honours it."""
+    _, draw_id, env, derived = _seed(store, snapshot, response=_router_404(), status=404)
+    assert derived is not None and derived.valid is False
+    assert derived.raw_sha256 == env.content_sha256()
+
+    second = C.run_one(model=MODEL, tag=TAG, key="k", snapshot=snapshot, store=store,
+                       ledger=_ledger(), transport=FakeTransport())
+    assert second.reused and not second.passed and second.http_status == 404
+
+
+# --- legacy committed artifacts (written under the OLD binding) ----------------------
+
+LEGACY_DIRS = [
+    ("q2_stage2_v7_canary", "no derived records at all", "no linked derived"),
+    ("q2_stage2_v7_canary_postprivacy", "derived bound to the response body only",
+     "bound to raw hash"),
+]
+
+
+@pytest.mark.parametrize("name,why,match", LEGACY_DIRS,
+                         ids=[d[0] for d in LEGACY_DIRS])
+def test_legacy_canary_artifacts_are_not_usable_as_a_passing_reuse(tmp_path, snapshot,
+                                                                   name, why, match):
+    """The committed pre-PS-5 records are immutable audit history. They are never deleted
+    or rewritten, but their binding cannot be verified, so replaying them FAILS CLOSED and
+    the operator must re-authorize a fresh paid canary ({why})."""
+    src = C.ROOT / "out" / name
+    if not src.exists():                               # pragma: no cover - artifact removed
+        pytest.skip(f"legacy artifact dir {name} is not present")
+    work = tmp_path / name
+    shutil.copytree(src, work)
+    legacy = L.EnvelopeStore(work)
+
+    # The committed draw identities still reproduce exactly from the frozen prompt.
+    assert legacy.get(C.planned_draw(MODEL, TAG)[1].draw_id) is not None
+
+    replay = FakeTransport()
+    with pytest.raises(C.CanaryError, match=match):
+        C.run_one(model=MODEL, tag=TAG, key="k", snapshot=snapshot, store=legacy,
+                  ledger=_ledger(), transport=replay)
+    assert replay.calls == 0, "a fail-closed legacy replay must not re-pay"
+
+    # The originals are untouched by this test.
+    assert (src / "raw").exists()

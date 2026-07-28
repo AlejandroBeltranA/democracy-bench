@@ -29,7 +29,9 @@ computed:
 NETWORK: none. Every seam that would touch the network or the wall clock (`Tokenizer`,
 `EndpointProbe`, `Sender`, `Sleeper`, `Clock`) is an injected callable, so the whole module is
 exercised offline. Endpoint probe RESULTS arrive as injected data; this module never issues a
-request and never downloads a tokenizer.
+request and never downloads a tokenizer. The C2 serialization helpers (`load_chat_template`,
+`load_pinned_tokenizer`) read ALREADY-COMMITTED local files and verify them against the pinned
+SHA-256s in the endpoint snapshot; they never fetch, and an unverifiable file is a hard error.
 
 Frozen structure (cells, probes, orders, contrasts, protective mass) is INHERITED from the
 frozen local/Stage-2 modules rather than restated here.
@@ -85,6 +87,22 @@ class SpecViolation(GateError):
 
 class IncompleteModel(GateError):
     """The full-run completeness gate failed; no headline estimand may be emitted."""
+
+
+class MissingChatTemplate(GateError):
+    """The frozen C2 method needs the pinned chat serialization and it is not available.
+
+    Raised when a projection would have to fall back to the fixed-overhead heuristic — either
+    because the model's pinned assets carry no chat template at all (DeepSeek-V4-Pro at the
+    pinned revision: `tokenizer_config.chat_template` is null and the repo publishes no
+    `chat_template.jinja`), or because a caller asked for the exact serialization of a request
+    that carries no structured messages.
+
+    This is deliberately NOT recoverable by a default argument. Frozen C2 says the pinned
+    tokenizer is applied to "the exact serialized system+user messages as sent"; substituting
+    a per-message constant is a different method and needs a signed pre-outcome design
+    amendment before any projection built from it may authorize spend.
+    """
 
 
 # =======================================================================================
@@ -165,8 +183,247 @@ Tokenizer = Callable[[str], int]
 """Injectable seam: the pinned official tokenizer as a pure `str -> int` token counter.
 
 C2 pins `repo_id` + exact `revision` + tokenizer-file SHA-256s in the committed endpoint
-snapshot. This module never loads or downloads one; the caller supplies the callable.
+snapshot. This module never downloads one; the caller supplies the callable (or builds a
+`PinnedTokenizer` from the committed local files with `load_pinned_tokenizer`).
 """
+
+Messages = Sequence[Mapping[str, Any]]
+
+#: The pinned Qwen template file, as named in `manifest.json["tokenizers"][...]["files"]`.
+CHAT_TEMPLATE_FILENAME = "chat_template.jinja"
+
+#: Frozen C2 serialization keywords. `add_generation_prompt=True` is the "as sent" assistant
+#: turn. `enable_thinking` is deliberately LEFT UNDEFINED, which is what the published
+#: template does by default (`apply_chat_template` with no extra kwargs). For the pinned Qwen
+#: template the alternative (`enable_thinking=False`, which emits an empty `<think></think>`
+#: block) adds exactly 2 tokens per request; that difference is inside the frozen 10% margin,
+#: which for a ~161-token request is ~16 tokens.
+GENERATION_PROMPT = True
+
+#: The two places a Hugging Face repo may publish a chat template, in the order C2 reads them.
+_TEMPLATE_SOURCES = (CHAT_TEMPLATE_FILENAME, "tokenizer_config.chat_template")
+
+
+@dataclass(frozen=True)
+class ChatTemplate:
+    """The pinned Jinja chat template, with its identity, applied to structured messages.
+
+    `render` is the exact serialization frozen C2 requires: roles, turn delimiters, special
+    tokens and the generation prompt, produced by the model's OWN published template rather
+    than by a per-message constant. The rendering environment mirrors the reference
+    implementation: an immutable sandbox with `trim_blocks`/`lstrip_blocks` enabled, the
+    `loopcontrols` extension, a `tojson` filter and a `raise_exception` global.
+    """
+    source: str                 # "chat_template.jinja" | "tokenizer_config.chat_template"
+    text: str
+    sha256: str
+    origin: str = ""            # the local path the template was read from (evidence only)
+
+    @classmethod
+    def from_text(cls, text: str, *, source: str, origin: str = "") -> "ChatTemplate":
+        return cls(source=source, text=text,
+                   sha256=hashlib.sha256(text.encode()).hexdigest(), origin=origin)
+
+    def identity(self) -> dict:
+        return {"template_source": self.source, "template_sha256": self.sha256,
+                "template_origin": self.origin,
+                "add_generation_prompt": GENERATION_PROMPT}
+
+    def _compiled(self):
+        cached = _TEMPLATE_CACHE.get(self.sha256)
+        if cached is None:
+            cached = _compile_chat_template(self.text)
+            _TEMPLATE_CACHE[self.sha256] = cached
+        return cached
+
+    def render(self, messages: Messages,
+               *, add_generation_prompt: bool = GENERATION_PROMPT) -> str:
+        """The exact serialized request string the pinned tokenizer is applied to."""
+        msgs = [dict(m) for m in messages]
+        if not msgs:
+            raise SpecViolation("cannot serialize an empty message list")
+        return self._compiled().render(messages=msgs,
+                                       add_generation_prompt=bool(add_generation_prompt))
+
+
+_TEMPLATE_CACHE: dict[str, Any] = {}
+
+
+def _compile_chat_template(text: str):
+    """Compile the pinned template with the reference chat-template environment.
+
+    Jinja2 is already present in the environment; it is imported lazily so that importing this
+    module never depends on it, and so the failure names the missing package precisely.
+    """
+    try:
+        import jinja2                                          # noqa: F401
+        from jinja2.ext import loopcontrols
+        from jinja2.sandbox import ImmutableSandboxedEnvironment
+    except ImportError as exc:                                  # pragma: no cover
+        raise MissingChatTemplate(
+            "the pinned chat template cannot be rendered because jinja2 is unavailable "
+            f"({exc}); frozen C2 has no fallback that does not require a signed amendment"
+        ) from None
+
+    def _raise_exception(message: str) -> NoReturn:
+        raise SpecViolation(f"pinned chat template refused these messages: {message}")
+
+    env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True,
+                                        extensions=[loopcontrols])
+    env.globals["raise_exception"] = _raise_exception
+    env.filters["tojson"] = lambda value, **kw: json.dumps(value, **kw)
+    return env.from_string(text)
+
+
+def load_chat_template(directory: Path | str, *, allow_missing: bool = False,
+                       model: str = "") -> Optional[ChatTemplate]:
+    """Read the pinned chat template out of a LOCAL committed tokenizer directory.
+
+    Reads `chat_template.jinja` when present, otherwise `tokenizer_config.json`'s
+    `chat_template` field. Never fetches anything. When neither exists the model has no
+    published serialization at the pinned revision and frozen C2 cannot be executed for it:
+    `MissingChatTemplate` is raised unless the caller explicitly asks for `allow_missing`.
+    """
+    directory = Path(directory)
+    path = directory / CHAT_TEMPLATE_FILENAME
+    if path.exists():
+        return ChatTemplate.from_text(path.read_text(), source=CHAT_TEMPLATE_FILENAME,
+                                      origin=str(path))
+    config = directory / "tokenizer_config.json"
+    if config.exists():
+        text = (json.loads(config.read_text()) or {}).get("chat_template")
+        if isinstance(text, str) and text.strip():
+            return ChatTemplate.from_text(text, source="tokenizer_config.chat_template",
+                                          origin=str(config))
+    if allow_missing:
+        return None
+    raise MissingChatTemplate(
+        f"no chat template in the pinned assets at {directory}"
+        + (f" for {model!r}" if model else "")
+        + f" (looked for {' and '.join(_TEMPLATE_SOURCES)}). Frozen C2 applies the pinned "
+        "tokenizer to the EXACT serialized messages; without a published template that "
+        "serialization cannot be reconstructed from the pinned files, so the projection "
+        "requires an APPROVED PRE-OUTCOME DESIGN AMENDMENT specifying a conservative "
+        "substitute method. No such amendment may be assumed here.")
+
+
+@dataclass(frozen=True)
+class PinnedTokenizer:
+    """The pinned official tokenizer AS A C2 INSTRUMENT: identity + exact serialization.
+
+    It is still a plain `Tokenizer` (`str -> int`) so every existing caller keeps working, but
+    it additionally carries the repo id, revision, verified file hashes and the pinned chat
+    template, and it can count the EXACT serialized messages rather than a bare content
+    concatenation. `project_full_grid` recognises it and REQUIRES the template path whenever a
+    template is present — the exact method is not opt-in.
+    """
+    model: str
+    repo_id: str
+    revision: str
+    file_sha256: Mapping[str, str]
+    count_text: Tokenizer
+    template: Optional[ChatTemplate] = None
+    directory: str = ""
+
+    # --- backward compatibility: a PinnedTokenizer IS a `Tokenizer` -------------------
+    def __call__(self, text: str) -> int:
+        return int(self.count_text(text))
+
+    @property
+    def has_chat_template(self) -> bool:
+        return self.template is not None
+
+    def serialize(self, messages: Messages) -> str:
+        """The exact serialized request string, or a loud refusal."""
+        if self.template is None:
+            raise MissingChatTemplate(
+                f"{self.model!r} (repo {self.repo_id} at revision {self.revision}) publishes "
+                "no chat template at the pinned revision, so the exact serialized input "
+                "frozen C2 requires cannot be reconstructed from the pinned files. A "
+                "projection for this model requires an APPROVED PRE-OUTCOME DESIGN AMENDMENT "
+                "naming the substitute method; pass "
+                "`fixed_overhead_fallback_signed_amendment=<amendment id>` only when such an "
+                "amendment exists and is signed.")
+        return self.template.render(messages)
+
+    def count_messages(self, messages: Messages) -> int:
+        """Token count of the EXACT serialized system+user messages (frozen C2)."""
+        return int(self.count_text(self.serialize(messages)))
+
+    def identity(self) -> dict:
+        """Everything a reviewer needs to reproduce a projected count byte for byte."""
+        out: dict[str, Any] = {
+            "repo_id": self.repo_id,
+            "revision": self.revision,
+            "files": dict(self.file_sha256),
+            "directory": self.directory,
+            "has_chat_template": self.has_chat_template,
+        }
+        out.update(self.template.identity() if self.template
+                   else {"template_source": None, "template_sha256": None,
+                         "template_origin": "", "add_generation_prompt": GENERATION_PROMPT})
+        return out
+
+
+def load_pinned_tokenizer(
+    model: str,
+    directory: Path | str,
+    *,
+    snapshot_path: Path | str = ENDPOINT_SNAPSHOT,
+    spec: Optional[Mapping[str, Any]] = None,
+    count_text: Optional[Tokenizer] = None,
+) -> PinnedTokenizer:
+    """Build a `PinnedTokenizer` from the COMMITTED local files, hash-verified against the
+    pinned snapshot. A local read only — never a download, never a fallback.
+
+    Every file the snapshot pins must be present and must hash to the pinned SHA-256; an
+    unverifiable tokenizer means no projection, which means no promotion. A model whose pinned
+    assets carry no chat template loads successfully but cannot serialize: the refusal happens
+    where a projection would be built, so the error names the amendment requirement.
+    """
+    if spec is None:
+        data = json.loads(Path(snapshot_path).read_text())
+        spec = (data.get("tokenizers") or {}).get(model)
+    if not isinstance(spec, Mapping):
+        raise SpecViolation(f"the committed snapshot pins no tokenizer for {model!r}")
+
+    directory = Path(directory)
+    files = dict(spec.get("files") or {})
+    if not files:
+        raise SpecViolation(f"the pinned tokenizer for {model!r} lists no files to verify")
+    for name, expected in files.items():
+        path = directory / name
+        if not path.exists():
+            raise SpecViolation(
+                f"pinned tokenizer file {name} is absent from {directory} (repo "
+                f"{spec.get('repo_id')} at revision {spec.get('revision')})")
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != expected:
+            raise SpecViolation(
+                f"pinned tokenizer file {name} hashes to {digest} != committed {expected}")
+
+    if count_text is None:
+        try:
+            from tokenizers import Tokenizer as HFTokenizer     # type: ignore
+        except ImportError as exc:                              # pragma: no cover
+            raise SpecViolation(f"the `tokenizers` package is required: {exc}") from None
+        hf = HFTokenizer.from_file(str(directory / "tokenizer.json"))
+
+        def count_text(text: str) -> int:                       # noqa: F811
+            return len(hf.encode(text).ids)
+
+    template = load_chat_template(directory, allow_missing=True, model=model)
+    if template is not None and template.source == CHAT_TEMPLATE_FILENAME:
+        pinned_template_hash = files.get(CHAT_TEMPLATE_FILENAME)
+        if pinned_template_hash and pinned_template_hash != template.sha256:
+            raise SpecViolation(
+                f"chat template hashes to {template.sha256} != committed "
+                f"{pinned_template_hash}")
+
+    return PinnedTokenizer(model=model, repo_id=str(spec.get("repo_id", "")),
+                           revision=str(spec.get("revision", "")), file_sha256=files,
+                           count_text=count_text, template=template,
+                           directory=str(directory))
 
 
 @dataclass(frozen=True)
@@ -200,21 +457,50 @@ class EndpointCandidate:
 class RenderedRequest:
     """One of the 528 unique cell-probe-order request bodies, already rendered and hashed.
 
-    `payload_text` is the exact serialized system+user message content as sent — the string the
-    pinned tokenizer is applied to.
+    `messages_json` is the STRUCTURED system+user messages exactly as sent, in wire order —
+    the frozen C2 input, because the pinned chat template must be applied to roles and
+    contents, not to contents alone. It is stored as canonical JSON so the dataclass stays
+    frozen, hashable and byte-reproducible; read it through `.messages`.
+
+    `payload_text` is the bare concatenation of the message CONTENTS. It is retained for
+    backward compatibility and as a diagnostic (`content_only_input_tokens` in the artifact),
+    but it is NOT the C2 tokenizer input: it omits roles, turn delimiters, special tokens and
+    the generation prompt.
     """
     cell_id: str
     probe_id: str
     order_idx: int
     request_sha256: str
     payload_text: str
-    #: R-C4: tokens the chat template adds beyond `payload_text` (roles, delimiters, special
-    #: tokens, generation prompt). Zero when the tokenizer itself applies the pinned template.
+    #: Fixed-overhead FALLBACK ONLY (see `chat_template_overhead`): a per-message constant
+    #: standing in for the serialization when no pinned template is available. Never used on
+    #: the frozen C2 path — an exact serialization counts those tokens for real.
     template_overhead_tokens: int = 0
+    #: Canonical JSON of the structured messages; "" when the caller supplied none.
+    messages_json: str = ""
 
     @property
     def coordinate(self) -> tuple[str, str, int]:
         return (self.cell_id, self.probe_id, self.order_idx)
+
+    @property
+    def messages(self) -> tuple[dict, ...]:
+        """The structured messages as sent (empty when the request carries none)."""
+        if not self.messages_json:
+            return ()
+        return tuple(json.loads(self.messages_json))
+
+    @property
+    def is_exactly_serializable(self) -> bool:
+        return bool(self.messages_json)
+
+    def exact_serialization(self, template: ChatTemplate) -> str:
+        """The frozen C2 tokenizer input: the pinned template applied to these messages."""
+        if not self.is_exactly_serializable:
+            raise MissingChatTemplate(
+                f"rendered request {self.request_sha256[:16]} at {self.coordinate} carries no "
+                "structured messages, so the exact C2 serialization cannot be reproduced")
+        return template.render(self.messages)
 
 
 def canonical_request_sha256(body: Mapping) -> str:
@@ -224,28 +510,35 @@ def canonical_request_sha256(body: Mapping) -> str:
     return hashlib.sha256(canon.encode()).hexdigest()
 
 
-#: R-C4: chat-template overhead the served model bills but a bare content concatenation
-#: omits — role markers, turn delimiters, special tokens and the generation prompt. These
-#: are NOT covered by the 10% drift margin (for short prompts template overhead alone can
-#: exceed 10%), so they are counted explicitly and conservatively.
+#: FALLBACK CONSTANTS — NOT the frozen C2 method. ###################################
 #:
-#: Empirical basis: the frozen-envelope canary on `qwen/qwen3.5-397b-a17b @ alibaba`
-#: (out/q2_stage2_v7_canary/) billed prompt_tokens=53 for a two-message request whose raw
-#: content tokenizes to ~35, i.e. ~18 tokens of template overhead across 2 messages plus the
-#: generation prompt. The constants below round that UP; a projection that overstates cost
-#: can only refuse an affordable run, never authorize an unaffordable one.
+#: A per-message constant standing in for the chat serialization when the model publishes no
+#: template at its pinned revision. It is a heuristic: it approximates role markers, turn
+#: delimiters, special tokens and the generation prompt with a fixed number instead of
+#: counting them. Frozen C2 (`paper/Q2_STAGE2_HOSTED_DESIGN.md`, "C2") applies the pinned
+#: tokenizer to "the exact serialized system+user messages as sent", so USING THESE CONSTANTS
+#: FOR A STUDY PROJECTION REQUIRES A SIGNED PRE-OUTCOME DESIGN AMENDMENT. `project_full_grid`
+#: refuses them unless `fixed_overhead_fallback_signed_amendment` names one.
 #:
-#: The exact pinned chat template remains the preferred method: pass `template_overhead=0`
-#: and a tokenizer that applies the pinned template itself, and these constants drop out.
+#: Measured against the real pinned Qwen template on all 528 rendered study requests, this
+#: heuristic is 18 tokens HIGHER than the exact serialization for every request (exact 161 vs
+#: heuristic 179 vs bare content 147 on the first grid coordinate). Overstating cost can only
+#: refuse an affordable run, never authorize an unaffordable one — but conservative is not the
+#: same as preregistered, which is why the exact path is mandatory when a template exists.
 CHAT_TEMPLATE_TOKENS_PER_MESSAGE = 12
 CHAT_TEMPLATE_GENERATION_PROMPT_TOKENS = 8
+
+#: Artifact labels for the two serialization methods. Only the first is frozen C2.
+SERIALIZATION_EXACT = "pinned_chat_template"
+SERIALIZATION_FIXED_OVERHEAD = "fixed_overhead_fallback"
 
 
 def chat_template_overhead(n_messages: int,
                            per_message: int = CHAT_TEMPLATE_TOKENS_PER_MESSAGE,
                            generation_prompt: int = CHAT_TEMPLATE_GENERATION_PROMPT_TOKENS
                            ) -> int:
-    """Conservative token overhead the chat template adds on top of raw message content."""
+    """FALLBACK ONLY: the fixed-overhead stand-in for the chat serialization. See the
+    constants above — a study projection built on this needs a signed amendment."""
     return int(n_messages) * int(per_message) + int(generation_prompt)
 
 
@@ -253,17 +546,22 @@ def render_request(cell_id: str, probe_id: str, order_idx: int, body: Mapping,
                    *, template_overhead: Optional[int] = None) -> RenderedRequest:
     """Build a `RenderedRequest` from an exact request body.
 
-    The tokenizer input is the message contents in wire order PLUS an explicit chat-template
-    overhead (R-C4). A bare concatenation omits roles, delimiters, special tokens and the
-    generation prompt, and therefore understates what the provider actually bills.
+    The STRUCTURED messages are carried through verbatim (`messages_json`), because the frozen
+    C2 tokenizer input is the pinned chat template applied to roles AND contents. The bare
+    content concatenation (`payload_text`) and the fixed-overhead constant are retained only
+    for backward compatibility and for the amendment-gated fallback; neither is used when a
+    pinned template is available.
     """
-    messages = body.get("messages") or []
+    messages = list(body.get("messages") or [])
     payload_text = "\n".join(str(m.get("content", "")) for m in messages)
     overhead = (chat_template_overhead(len(messages)) if template_overhead is None
                 else int(template_overhead))
+    messages_json = (json.dumps(messages, sort_keys=True, separators=(",", ":"))
+                     if messages else "")
     return RenderedRequest(cell_id=cell_id, probe_id=probe_id, order_idx=int(order_idx),
                            request_sha256=canonical_request_sha256(body),
-                           payload_text=payload_text, template_overhead_tokens=overhead)
+                           payload_text=payload_text, template_overhead_tokens=overhead,
+                           messages_json=messages_json)
 
 
 def completion_allowance(observed_billed_completion_tokens: int | Iterable[int] = ()) -> int:
@@ -298,7 +596,13 @@ def projected_input_tokens(raw_tokens: int) -> int:
 
 @dataclass(frozen=True)
 class ProjectionRow:
-    """One of the 528 rows of the per-candidate cost artifact."""
+    """One of the 528 rows of the per-candidate cost artifact.
+
+    `raw_input_tokens` is the count the frozen 10% margin is applied to. On the C2 path it is
+    the token count of the EXACT serialized request (`serialization_method ==
+    "pinned_chat_template"`); `content_only_input_tokens` records what a bare content
+    concatenation would have given, so a reviewer can see the serialization actually happened.
+    """
     request_sha256: str
     cell_id: str
     probe_id: str
@@ -307,6 +611,9 @@ class ProjectionRow:
     projected_input_tokens: int
     draws: int
     input_cost_for_draws: float
+    serialization_method: str = SERIALIZATION_FIXED_OVERHEAD
+    content_only_input_tokens: Optional[int] = None
+    serialized_sha256: Optional[str] = None
 
     def as_dict(self) -> dict:
         return {
@@ -318,6 +625,9 @@ class ProjectionRow:
             "projected_input_tokens": self.projected_input_tokens,
             "draws": self.draws,
             "input_cost_for_draws": self.input_cost_for_draws,
+            "serialization_method": self.serialization_method,
+            "content_only_input_tokens": self.content_only_input_tokens,
+            "serialized_sha256": self.serialized_sha256,
         }
 
 
@@ -345,10 +655,22 @@ class CostProjection:
     # smoke term in `total`: adding one is the double-count bug R-V7-2 names.
     smoke_draws_inside_grid: int = SMOKE_DRAWS_PER_MODEL
     smoke_counted_once: bool = True
+    #: Which serialization produced `raw_input_tokens`. Only `SERIALIZATION_EXACT` is the
+    #: frozen C2 method; anything else needs a signed pre-outcome design amendment.
+    serialization_method: str = SERIALIZATION_FIXED_OVERHEAD
+    #: repo id, revision, verified file hashes, template identity — everything needed to
+    #: reproduce every projected count byte for byte.
+    tokenizer_identity: Optional[Mapping[str, Any]] = None
+    #: The amendment id supplied when the fixed-overhead fallback was used, else None.
+    fixed_overhead_fallback_signed_amendment: Optional[str] = None
 
     @property
     def total_draws(self) -> int:
         return self.n_requests * self.draws_per_request
+
+    @property
+    def serialization_is_frozen_c2(self) -> bool:
+        return self.serialization_method == SERIALIZATION_EXACT
 
     def as_artifact(self) -> dict:
         """The per-candidate artifact C2 requires: every request hash, projected tokens,
@@ -359,6 +681,11 @@ class CostProjection:
             "model": self.model,
             "endpoint_tag": self.endpoint_tag,
             "method": "documented tokenizer (C2); fixed 10% input safety margin",
+            "serialization_method": self.serialization_method,
+            "serialization_is_frozen_c2": self.serialization_is_frozen_c2,
+            "fixed_overhead_fallback_signed_amendment":
+                self.fixed_overhead_fallback_signed_amendment,
+            "tokenizer_identity": dict(self.tokenizer_identity or {}),
             "input_token_safety_margin": INPUT_TOKEN_SAFETY_MARGIN,
             "n_requests": self.n_requests,
             "draws_per_request": self.draws_per_request,
@@ -394,6 +721,7 @@ def project_full_grid(
     draws_per_request: int = DRAWS_PER_COORDINATE,
     expected_requests: int = N_COORDINATES,
     stop: float = GLOBAL_STUDY_STOP,
+    fixed_overhead_fallback_signed_amendment: Optional[str] = None,
 ) -> CostProjection:
     """The frozen C2 full-grid projection.
 
@@ -405,6 +733,25 @@ def project_full_grid(
 
     Promotion requires `total <= 8.50`. The 240 smoke draws are counted ONCE: they are the
     first five draws of 48 of these 528 coordinates and are already inside the 25-draw term.
+
+    **`input_tokens(request)` is the EXACT serialization** (frozen C2: "the exact serialized
+    system+user messages as sent"). When `tokenizer` is a `PinnedTokenizer` carrying the
+    model's pinned chat template, that template is applied to the structured messages —
+    including roles, special tokens and the generation prompt — and the resulting token IDs
+    are counted. This is NOT optional: a pinned tokenizer WITH a template always takes this
+    path, and every request must carry its structured messages.
+
+    A `PinnedTokenizer` WITHOUT a template (DeepSeek-V4-Pro at the pinned revision publishes
+    none) raises `MissingChatTemplate` unless `fixed_overhead_fallback_signed_amendment` names
+    an approved pre-outcome design amendment; that argument is deliberately verbose and has no
+    usable default, because a projection built on the fixed-overhead heuristic is a different
+    method from the preregistered one and must never be produced by accident.
+
+    A bare `Callable[[str], int]` (the injected offline test seam) still works and still uses
+    the fixed-overhead fallback, but the resulting projection is labelled
+    `serialization_method="fixed_overhead_fallback"` in every row and in the artifact, and
+    `serialization_is_frozen_c2` is False. `require_frozen_c2_serialization` turns that label
+    into a hard refusal wherever a projection is about to authorize spend.
     """
     if candidate.model != model:
         raise SpecViolation(
@@ -422,6 +769,31 @@ def project_full_grid(
     if reconciled_prior_gate_spend < 0 or retry_reserve < 0:
         raise SpecViolation("prior/gate spend and retry reserve must both be non-negative")
 
+    amendment = fixed_overhead_fallback_signed_amendment
+    if amendment is not None and not str(amendment).strip():
+        raise SpecViolation(
+            "fixed_overhead_fallback_signed_amendment must NAME the signed pre-outcome design "
+            "amendment; an empty string is not an approval")
+
+    pinned = tokenizer if isinstance(tokenizer, PinnedTokenizer) else None
+    if pinned is not None and pinned.has_chat_template:
+        method = SERIALIZATION_EXACT
+        if amendment is not None:
+            raise SpecViolation(
+                f"{pinned.model!r} publishes a pinned chat template, so frozen C2 is "
+                "executable exactly; the fixed-overhead fallback is not available and no "
+                "amendment applies")
+    elif pinned is not None:
+        # A pinned tokenizer with NO published template: the frozen method cannot be run.
+        if amendment is None:
+            pinned.serialize([{"role": "user", "content": ""}])   # raises MissingChatTemplate
+            raise MissingChatTemplate("unreachable")              # pragma: no cover
+        method = SERIALIZATION_FIXED_OVERHEAD
+    else:
+        # An injected `str -> int` seam carries no identity and no template. It cannot be the
+        # frozen method, so the projection it produces is labelled as the fallback.
+        method = SERIALIZATION_FIXED_OVERHEAD
+
     seen_hashes: set[str] = set()
     seen_coords: set[tuple[str, str, int]] = set()
     rows: list[ProjectionRow] = []
@@ -435,9 +807,25 @@ def project_full_grid(
             raise SpecViolation(f"duplicate coordinate in the grid: {req.coordinate}")
         seen_hashes.add(req.request_sha256)
         seen_coords.add(req.coordinate)
-        # R-C4: bill the chat-template overhead too, then apply the 10% drift margin. The
-        # margin covers tokenizer-vs-provider drift; it does not cover omitted serialization.
-        raw = int(tokenizer(req.payload_text)) + int(req.template_overhead_tokens)
+        content_only: Optional[int] = None
+        serialized_sha: Optional[str] = None
+        if method == SERIALIZATION_EXACT:
+            assert pinned is not None and pinned.template is not None
+            if not req.is_exactly_serializable:
+                raise MissingChatTemplate(
+                    f"request {req.request_sha256[:16]} at {req.coordinate} carries no "
+                    "structured messages; frozen C2 tokenizes the exact serialized "
+                    "system+user messages, which cannot be reconstructed from a bare content "
+                    "concatenation")
+            serialized = req.exact_serialization(pinned.template)
+            raw = int(pinned(serialized))
+            serialized_sha = hashlib.sha256(serialized.encode()).hexdigest()
+            content_only = int(pinned(req.payload_text))
+        else:
+            # FALLBACK (amendment-gated for a pinned tokenizer): a bare content concatenation
+            # plus a per-message constant. Not the frozen C2 serialization.
+            content_only = int(tokenizer(req.payload_text))
+            raw = content_only + int(req.template_overhead_tokens)
         projected = projected_input_tokens(raw)
         rows.append(ProjectionRow(
             request_sha256=req.request_sha256,
@@ -448,6 +836,9 @@ def project_full_grid(
             projected_input_tokens=projected,
             draws=draws_per_request,
             input_cost_for_draws=projected * draws_per_request * in_price,
+            serialization_method=method,
+            content_only_input_tokens=content_only,
+            serialized_sha256=serialized_sha,
         ))
 
     projected_tokens_total = sum(r.projected_input_tokens for r in rows)
@@ -474,7 +865,29 @@ def project_full_grid(
         total=total,
         stop=float(stop),
         fits=bool(total <= stop),
+        serialization_method=method,
+        tokenizer_identity=(pinned.identity() if pinned is not None else None),
+        fixed_overhead_fallback_signed_amendment=amendment,
     )
+
+
+def require_frozen_c2_serialization(projection: CostProjection) -> None:
+    """Fail closed unless the projection used the frozen C2 serialization.
+
+    Frozen C2 applies the pinned tokenizer to the exact serialized system+user messages. A
+    projection built from the fixed-overhead heuristic is a DIFFERENT method and may not
+    authorize spend on its own; it needs a signed pre-outcome design amendment, whose id this
+    check reports when one was supplied.
+    """
+    if projection.serialization_is_frozen_c2:
+        return
+    amendment = projection.fixed_overhead_fallback_signed_amendment
+    raise MissingChatTemplate(
+        f"the projection for {projection.model!r} @ {projection.endpoint_tag!r} used "
+        f"{projection.serialization_method!r}, not the frozen C2 pinned chat serialization"
+        + (f" (declared amendment: {amendment!r})" if amendment else
+           "; no signed pre-outcome design amendment was supplied")
+        + " — it may not authorize paid execution")
 
 
 def write_projection_artifact(path: Path | str, projection: CostProjection) -> str:

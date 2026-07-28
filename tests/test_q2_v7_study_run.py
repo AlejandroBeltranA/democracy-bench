@@ -11,6 +11,7 @@ injected word counter; sleeps and the clock are injected.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from functools import lru_cache
@@ -934,18 +935,604 @@ def test_cli_runs_exactly_one_stage_and_never_auto_advances(monkeypatch, run_dir
         assert called == [stage]                     # exactly one stage, no successor
 
 
-def test_cli_stage_names_are_the_four_frozen_steps():
-    assert S.STAGES == ("walk", "project", "smoke", "full")
+def test_cli_stage_names_are_the_five_frozen_steps():
+    """`authorize` sits between `project` and `smoke` because the frozen staged authorization
+    (v7 requirement 4) makes the recorded promotion+funding decisions a PRECONDITION of the
+    240-call smoke. The earlier four-stage tuple encoded the defect PS-1 names: there was no
+    stage that could create the records the smoke is required to check."""
+    assert S.STAGES == ("walk", "project", "authorize", "smoke", "full")
     assert set(S._DISPATCH) == set(S.STAGES)
+    assert "authorize" not in S.PAID_STAGES
 
 
 def test_usage_line_documents_the_required_acknowledgement():
     assert "--i-have-authorized-paid-spend" in S.USAGE
-    assert "{walk,project,smoke,full}" in S.USAGE
+    assert "{walk,project,authorize,smoke,full}" in S.USAGE
 
 
 # =======================================================================================
 # 8. Conformance with the real renderer, when it is present
+# =======================================================================================
+
+# =======================================================================================
+# 9. PS-4 — every paid wire attempt is durable, booked, and linked to its sampling draw
+# =======================================================================================
+
+def paid_429(cost=4e-07):
+    """A 429 that DID incur prompt cost: it carries a generation id and a usage block, so it
+    is not a provable unbilled router rejection and must be booked."""
+    return (429, {}, {"error": {"code": 429, "message": "rate limited"},
+                      "id": "gen-429-paid",
+                      "usage": {"prompt_tokens": 53, "completion_tokens": 0,
+                                "total_tokens": 53, "cost": cost}})
+
+
+def unreconcilable_500():
+    """A 5xx that reached a provider (generation id + usage) but returned NO cost."""
+    return (500, {}, {"error": {"code": 500, "message": "upstream failure"},
+                      "id": "gen-500",
+                      "usage": {"prompt_tokens": 53, "completion_tokens": 0,
+                                "total_tokens": 53}})
+
+
+def _execute_one(run_dir, transport, ledger=None, draw_index=0, snapshot=None):
+    """Run ONE study draw through the real execution path (retries included)."""
+    request = fake_smoke_grid()[0]
+    return S.execute_plan(plan=[(request, draw_index)], model=MODEL, tag=PRIMARY_TAG, key=KEY,
+                          store=S.study_store(run_dir), ledger=ledger or empty_ledger(),
+                          transport=transport, worst_case_usd=_worst_case,
+                          stage=S.SMOKE_STAGE, bucket=S.SMOKE_BUCKET,
+                          sleep=lambda _s: None, clock=_stub_clock(),
+                          snapshot=snapshot if snapshot is not None else real_snapshot())
+
+
+def _full_grid_study_ids():
+    return [I.draw_id(r.request_sha256, i) for r in fake_study_grid()
+            for i in range(I.DRAWS_PER_COORDINATE)]
+
+
+def test_attempt_identities_never_collide_with_a_manifest_bound_sampling_draw():
+    sha = fake_smoke_grid()[0].request_sha256
+    sampling = {I.draw_id(sha, i) for i in range(I.DRAWS_PER_COORDINATE)}
+    attempts: set[str] = set()
+    for draw_index in range(I.DRAWS_PER_COORDINATE):
+        ids = S.attempt_draw_ids(sha, draw_index)
+        assert len(ids) == G.MAX_ATTEMPTS
+        assert not (set(ids) & attempts)        # distinct per (draw, attempt)
+        attempts |= set(ids)
+    assert not (attempts & sampling)            # and never a sampling identity
+    assert len(attempts) == I.DRAWS_PER_COORDINATE * G.MAX_ATTEMPTS
+    with pytest.raises(S.StudyRunError):
+        S.attempt_draw_index(0, G.MAX_ATTEMPTS)
+
+
+def test_a_paid_429_then_success_persists_and_books_both_attempts(run_dir, snapshot):
+    """R-E1/R-C3: the paid non-terminal response used to live only in memory."""
+    ledger = empty_ledger()
+    transport = FakeTransport(script=[paid_429(4e-07),
+                                      ok(PRIMARY_TAG, snapshot, cost=2e-06)])
+    run = _execute_one(run_dir, transport, ledger=ledger)
+    assert transport.calls == 2
+    assert ledger.run_usd == pytest.approx(4e-07 + 2e-06)
+    assert len(S.attempt_store(run_dir).envelopes()) == 2
+    assert len(S.attempt_store(run_dir).derived_records()) == 2
+    # ...and exactly ONE terminal sampling outcome enters the 13,200-draw study store.
+    assert len(S.study_store(run_dir).envelopes()) == 1
+    assert run.outcomes[0].http_status == 200 and run.outcomes[0].valid
+
+
+def test_paid_retry_exhaustion_books_every_attempt(run_dir, snapshot):
+    ledger = empty_ledger()
+    transport = FakeTransport(default=lambda body, n: paid_429(1e-07))
+    run = _execute_one(run_dir, transport, ledger=ledger)
+    assert transport.calls == G.MAX_ATTEMPTS == 5
+    assert ledger.run_usd == pytest.approx(5 * 1e-07)
+    assert len(S.attempt_store(run_dir).envelopes()) == 5
+    assert len(S.study_store(run_dir).envelopes()) == 1
+    assert run.outcomes[0].http_status == 429 and not run.outcomes[0].valid
+
+
+def test_an_attempt_with_an_unreconcilable_cost_fails_closed_after_persisting(run_dir,
+                                                                              snapshot):
+    ledger = empty_ledger()
+    transport = FakeTransport(script=[unreconcilable_500(),
+                                      ok(PRIMARY_TAG, snapshot, cost=2e-06)])
+    with pytest.raises(S.StudyRunError, match="reconciliation"):
+        _execute_one(run_dir, transport, ledger=ledger)
+    # Failing closed is right, but the evidence is durable FIRST.
+    assert len(S.attempt_store(run_dir).envelopes()) == 2
+    statuses = sorted(e.http_status for e in S.attempt_store(run_dir).envelopes())
+    assert statuses == [200, 500]
+
+
+def test_restart_after_a_paid_retry_rebuilds_the_same_cumulative_total(run_dir, snapshot):
+    ledger = empty_ledger()
+    transport = FakeTransport(script=[paid_429(4e-07),
+                                      ok(PRIMARY_TAG, snapshot, cost=2e-06)])
+    _execute_one(run_dir, transport, ledger=ledger)
+
+    rebuilt = S.open_ledger(run_dir, model=MODEL, endpoint=PRIMARY_TAG,
+                            study_draw_ids=_full_grid_study_ids())
+    assert rebuilt.run_usd == pytest.approx(4e-07 + 2e-06)   # the retry is NOT lost
+    second = FakeTransport(default=lambda body, n: ok(PRIMARY_TAG, snapshot))
+    run = _execute_one(run_dir, second, ledger=rebuilt)
+    assert second.calls == 0                                  # replayed, never repaid
+    assert run.outcomes[0].reused
+
+
+def test_restart_after_an_unreconcilable_attempt_still_fails_closed(run_dir, snapshot):
+    transport = FakeTransport(script=[unreconcilable_500(),
+                                      ok(PRIMARY_TAG, snapshot, cost=2e-06)])
+    with pytest.raises(S.StudyRunError):
+        _execute_one(run_dir, transport)
+    with pytest.raises(L.CostAccountingError):
+        S.open_ledger(run_dir, model=MODEL, endpoint=PRIMARY_TAG,
+                      study_draw_ids=_full_grid_study_ids())
+
+
+def test_a_smoke_keeps_one_sampling_outcome_and_one_attempt_per_draw(run_dir, snapshot):
+    ledger = empty_ledger()
+    _run_smoke(run_dir, FakeTransport(default=lambda body, n: ok(PRIMARY_TAG, snapshot,
+                                                                 cost=3e-06)),
+               ledger=ledger)
+    assert len(S.study_store(run_dir).envelopes()) == 240
+    assert len(S.attempt_store(run_dir).envelopes()) == 240
+    assert ledger.run_usd == pytest.approx(240 * 3e-06)       # booked once, not twice
+
+
+# =======================================================================================
+# 10. PS-3 — projection artifacts are content-addressed, immutable, bound and verified
+# =======================================================================================
+
+def _test_binding() -> S.DesignBinding:
+    return S.DesignBinding(design_sha256="a" * 64, item_bank_sha256="b" * 64,
+                           payload_sha256="c" * 64, guard_sha256="d" * 64,
+                           runner_revision="test-rev")
+
+
+def _projection(snapshot, tag=PRIMARY_TAG, reserve=0.05):
+    candidate = S.gate_candidates(snapshot, MODEL)[f"{MODEL}::{tag}"]
+    return S.build_projection(model=MODEL, candidate=candidate,
+                              requests=fake_study_grid(tag=tag), tokenizer=word_tokenizer,
+                              ledger=empty_ledger(), retry_reserve_usd=reserve)
+
+
+def _study_manifest(snapshot, tag=PRIMARY_TAG):
+    return S.build_study_manifest(model=MODEL, endpoint_tag=tag,
+                                  requests=fake_study_grid(tag=tag), probe_ids=PROBE_IDS,
+                                  snapshot_sha256=snapshot.sha256, binding=_test_binding())
+
+
+def _bind(run_dir, snapshot, projection, manifest=None):
+    path = S.write_projection(run_dir, projection)
+    S.write_projection_binding(run_dir, projection, snapshot=snapshot,
+                               manifest=manifest or _study_manifest(snapshot),
+                               artifact_path=path)
+    return path
+
+
+def _rewrite(path: Path, text: str) -> None:
+    path.chmod(0o644)
+    path.write_text(text)
+
+
+def test_projection_artifacts_are_content_addressed_and_immutable_by_content(run_dir,
+                                                                             snapshot):
+    projection = _projection(snapshot)
+    path = S.write_projection(run_dir, projection)
+    assert S.projection_sha256(projection)[:16] in path.name
+    assert S.write_projection(run_dir, projection) == path       # identical bytes resume
+    _rewrite(path, path.read_text().replace('"fits":true', '"fits":false', 1))
+    with pytest.raises(S.ProjectionIntegrityError):
+        S.write_projection(run_dir, projection)
+
+
+def test_a_corrected_projection_gets_a_new_identity_and_cannot_take_over_the_bound_one(
+        run_dir, snapshot):
+    """PS-3.4: correcting the C2 method must NOT silently retain the stale artifact."""
+    first = _projection(snapshot, reserve=0.05)
+    original = _bind(run_dir, snapshot, first)
+    corrected = _projection(snapshot, reserve=0.06)      # different inputs -> different bytes
+    new_path = S.write_projection(run_dir, corrected)
+    assert new_path != original                          # unambiguous, content-addressed
+    with pytest.raises(S.ProjectionIntegrityError):
+        S.write_projection_binding(run_dir, corrected, snapshot=snapshot,
+                                   manifest=_study_manifest(snapshot),
+                                   artifact_path=new_path)
+
+
+def test_verify_projection_accepts_the_bound_artifact(run_dir, snapshot):
+    projection = _projection(snapshot)
+    manifest = _study_manifest(snapshot)
+    _bind(run_dir, snapshot, projection, manifest)
+    artifact, digest = S.verify_projection(run_dir, model=MODEL, tag=PRIMARY_TAG,
+                                           snapshot=snapshot, manifest=manifest,
+                                           requests=fake_study_grid())
+    assert len(artifact["rows"]) == 528
+    assert digest == S.projection_sha256(projection)
+    lookup = S.worst_case_lookup(artifact)
+    assert lookup(artifact["rows"][0]["request_sha256"]) > 0
+
+
+def test_verify_projection_refuses_an_unbound_artifact(run_dir, snapshot):
+    S.write_projection(run_dir, _projection(snapshot))            # written but never bound
+    with pytest.raises(S.ProjectionIntegrityError):
+        S.verify_projection(run_dir, model=MODEL, tag=PRIMARY_TAG, snapshot=snapshot,
+                            manifest=_study_manifest(snapshot), requests=fake_study_grid())
+
+
+def test_verify_projection_refuses_an_edited_artifact(run_dir, snapshot):
+    projection = _projection(snapshot)
+    manifest = _study_manifest(snapshot)
+    path = _bind(run_dir, snapshot, projection, manifest)
+    _rewrite(path, path.read_text().replace('"retry_reserve":0.05', '"retry_reserve":0.01', 1))
+    with pytest.raises(S.ProjectionIntegrityError, match="edited"):
+        S.verify_projection(run_dir, model=MODEL, tag=PRIMARY_TAG, snapshot=snapshot,
+                            manifest=manifest, requests=fake_study_grid())
+
+
+def test_verify_projection_refuses_a_grid_or_manifest_it_did_not_price(run_dir, snapshot):
+    projection = _projection(snapshot)
+    manifest = _study_manifest(snapshot)
+    _bind(run_dir, snapshot, projection, manifest)
+    with pytest.raises(S.ProjectionIntegrityError):               # another endpoint's grid
+        S.verify_projection(run_dir, model=MODEL, tag=PRIMARY_TAG, snapshot=snapshot,
+                            manifest=manifest, requests=fake_study_grid(tag=SEQUENCE[1]))
+    with pytest.raises(S.ProjectionIntegrityError, match="manifest"):
+        S.verify_projection(run_dir, model=MODEL, tag=PRIMARY_TAG, snapshot=snapshot,
+                            manifest=_study_manifest(snapshot, tag=SEQUENCE[1]),
+                            requests=fake_study_grid())
+
+
+def test_verify_projection_recomputes_the_arithmetic_even_against_a_reforged_binding(
+        run_dir, snapshot):
+    """A forged record cannot make an understated total pass: the totals are re-derived."""
+    projection = _projection(snapshot)
+    manifest = _study_manifest(snapshot)
+    path = _bind(run_dir, snapshot, projection, manifest)
+
+    artifact = json.loads(path.read_text())
+    artifact["total"] = artifact["total"] / 2
+    body = json.dumps(artifact, sort_keys=True, separators=(",", ":")).encode()
+    path.chmod(0o644)
+    path.write_bytes(body)
+
+    record_path = S.projection_binding_path(run_dir, MODEL, PRIMARY_TAG)
+    record = json.loads(record_path.read_text())
+    record["artifact_sha256"] = hashlib.sha256(body).hexdigest()
+    record["total"] = artifact["total"]
+    payload = {k: v for k, v in record.items() if k != "binding_sha256"}
+    record["binding_sha256"] = S._binding_digest(payload)
+    _rewrite(record_path, json.dumps(record, sort_keys=True, separators=(",", ":")))
+
+    with pytest.raises(S.ProjectionIntegrityError, match="total"):
+        S.verify_projection(run_dir, model=MODEL, tag=PRIMARY_TAG, snapshot=snapshot,
+                            manifest=manifest, requests=fake_study_grid())
+
+
+def test_verify_projection_refuses_an_edited_binding_record(run_dir, snapshot):
+    projection = _projection(snapshot)
+    manifest = _study_manifest(snapshot)
+    _bind(run_dir, snapshot, projection, manifest)
+    record_path = S.projection_binding_path(run_dir, MODEL, PRIMARY_TAG)
+    record = json.loads(record_path.read_text())
+    record["endpoint_tag"] = SEQUENCE[1]
+    _rewrite(record_path, json.dumps(record, sort_keys=True, separators=(",", ":")))
+    with pytest.raises(S.ProjectionIntegrityError, match="binding_sha256"):
+        S.verify_projection(run_dir, model=MODEL, tag=PRIMARY_TAG, snapshot=snapshot,
+                            manifest=manifest, requests=fake_study_grid())
+
+
+def test_the_binding_record_pins_the_snapshot_and_the_c2_tokenizer_identity(run_dir,
+                                                                            snapshot):
+    projection = _projection(snapshot)
+    _bind(run_dir, snapshot, projection)
+    record = S.load_projection_binding(run_dir, MODEL, PRIMARY_TAG)
+    assert record["endpoint_snapshot_sha256"] == snapshot.sha256
+    pinned = snapshot.tokenizers[MODEL]
+    assert record["tokenizer"]["repo_id"] == pinned["repo_id"]
+    assert record["tokenizer"]["revision"] == pinned["revision"]
+    assert record["tokenizer"]["files"] == {k: v for k, v in sorted(pinned["files"].items())}
+
+
+# =======================================================================================
+# 11. PS-1 — the staged authorization, enforced BEFORE any transport can exist
+# =======================================================================================
+
+DEEPSEEK = "deepseek/deepseek-v4-pro"
+
+
+class TransportFactory:
+    """Stands in for `SingleAttemptTransport`, counting CONSTRUCTIONS as well as calls.
+
+    A refused authorization must produce zero of both: the runner may not even build the object
+    that could send a request.
+    """
+
+    def __init__(self, default=None, forbid=False):
+        self.default = default
+        self.forbid = forbid
+        self.constructed = 0
+        self.transports: list[FakeTransport] = []
+
+    def __call__(self, *args, **kwargs):
+        self.constructed += 1
+        if self.forbid:
+            raise AssertionError("a transport was constructed despite a refused authorization")
+        transport = FakeTransport(default=self.default)
+        self.transports.append(transport)
+        return transport
+
+    @property
+    def calls(self) -> int:
+        return sum(t.calls for t in self.transports)
+
+
+def _cli_wire(body, n):
+    """Qwen succeeds on its primary endpoint; DeepSeek is a hard-4xx capability exclusion."""
+    tag = (body.get("provider") or {}).get("only", ["?"])[0]
+    if body.get("model") == DEEPSEEK:
+        return hard_404(tag)
+    return ok(tag, real_snapshot(), cost=1e-06)
+
+
+_FAKE_TEMPLATE_TEXT = (
+    "{% for m in messages %}<|im_start|>{{ m['role'] }}\n{{ m['content'] }}<|im_end|>\n"
+    "{% endfor %}{% if add_generation_prompt %}<|im_start|>assistant\n{% endif %}"
+)
+
+
+def _fake_pinned_tokenizer(model: str):
+    """An offline `PinnedTokenizer` that takes the exact frozen-C2 serialization path.
+
+    Deterministic word counting, but a real template object, so `project_full_grid` dispatches
+    to the exact path and the projection is labelled `serialization_is_frozen_c2`.
+    """
+    import hashlib
+    return G.PinnedTokenizer(
+        model=model, repo_id=f"fake/{model}", revision="0" * 40,
+        file_sha256={"tokenizer.json": "0" * 64},
+        count_text=word_tokenizer,
+        template=G.ChatTemplate(
+            source="fake_chat_template.jinja", text=_FAKE_TEMPLATE_TEXT,
+            sha256=hashlib.sha256(_FAKE_TEMPLATE_TEXT.encode()).hexdigest(),
+            origin="test-fake"),
+        directory=None)
+
+
+def _install_study_fakes(monkeypatch):
+    monkeypatch.setattr(S, "probe_ids_for", lambda primary="ENG": list(PROBE_IDS))
+    monkeypatch.setattr(S, "render_study_grid",
+                        lambda model, tag, probes: fake_study_grid(model, tag))
+    monkeypatch.setattr(S, "render_smoke_grid",
+                        lambda model, tag, probes: fake_smoke_grid(model, tag))
+    monkeypatch.setattr(S, "default_binding", lambda primary="ENG": _test_binding())
+    monkeypatch.setattr(S, "default_reconciliation",
+                        lambda: L.ReconciliationResult(reconciled_usd=0.0, record_count=0))
+    # PS-2: the fake must satisfy FROZEN C2, not the fixed-overhead fallback. `_stage_project`
+    # calls `require_frozen_c2_serialization`, so a bare `str -> int` seam here would make
+    # every authorization test fail for the wrong reason — and, worse, tempt someone to delete
+    # the guard that stops a heuristic projection reaching the smoke. Wrapping the offline
+    # word tokenizer in a real `PinnedTokenizer` WITH a template keeps these tests about the
+    # authorization flow while still exercising the exact-serialization path.
+    monkeypatch.setattr(
+        S, "pinned_tokenizer",
+        lambda model, snapshot, tokenizer_dir: _fake_pinned_tokenizer(model))
+
+
+class AuthorizedRun:
+    """A run directory driven through the REAL CLI stages, with no network anywhere."""
+
+    def __init__(self, run_dir: Path, monkeypatch):
+        self.run_dir = run_dir
+        self.monkeypatch = monkeypatch
+        self.factory = TransportFactory(default=_cli_wire)
+        monkeypatch.setattr(S, "SingleAttemptTransport", self.factory)
+
+    def main(self, stage, *extra, model=MODEL):
+        return S.main([stage, "--model", model, "--run-dir", str(self.run_dir),
+                       "--i-have-authorized-paid-spend", "--tokenizer-dir", str(self.run_dir),
+                       "--retry-reserve", "0.01", *extra])
+
+    def smoke(self):
+        """Attempt the smoke with a transport that REFUSES to be constructed."""
+        self.factory = TransportFactory(forbid=True)
+        self.monkeypatch.setattr(S, "SingleAttemptTransport", self.factory)
+        return self.main("smoke")
+
+    # ---- artifacts, for tampering ------------------------------------------------------
+    def promotion_path(self, model=MODEL) -> Path:
+        return S.promotion_authorization_path(self.run_dir, model)
+
+    def funding_path(self) -> Path:
+        return S.funding_authorization_path(self.run_dir)
+
+    def reforge(self, path: Path, **changes) -> None:
+        """Rewrite a record with a VALID binding digest — proving the checks are semantic."""
+        record = json.loads(path.read_text())
+        record.update(changes)
+        payload = {k: v for k, v in record.items() if k != "binding_sha256"}
+        record["binding_sha256"] = S._binding_digest(payload)
+        _rewrite(path, json.dumps(record, sort_keys=True, separators=(",", ":")))
+
+
+@pytest.fixture()
+def authorized(run_dir, monkeypatch):
+    """walk -> project -> authorize(qwen) -> authorize(deepseek) -> authorize(funding)."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    _install_study_fakes(monkeypatch)
+    run = AuthorizedRun(run_dir, monkeypatch)
+    assert run.main("walk") == 0
+    assert run.main("project") == 0
+    assert run.main("walk", model=DEEPSEEK) == 1                # capability exclusion
+    assert run.main("authorize") == 0
+    assert run.main("authorize", model=DEEPSEEK) == 1           # recorded AS an exclusion
+    assert run.main("authorize", "--record-funding", "--funding-decision",
+                    "panel funded to the frozen $8.50 stop") == 0
+    return run
+
+
+def test_the_authorize_stage_records_both_decisions_and_makes_no_paid_call(authorized):
+    before = authorized.factory.calls
+    assert S.main(["authorize", "--model", MODEL, "--run-dir", str(authorized.run_dir),
+                   "--i-have-authorized-paid-spend"]) == 0      # idempotent, byte-identical
+    assert authorized.factory.calls == before                   # no wire call at all
+    promotion = S.load_promotion_authorization(authorized.run_dir, MODEL)
+    funding = S.load_funding_authorization(authorized.run_dir)
+    assert promotion["promoted_tag"] == PRIMARY_TAG
+    assert promotion["excluded"] is False
+    assert funding["authorized"] is True
+    assert funding["hard_stop_usd"] == pytest.approx(L.HARD_STOP_USD)
+    assert funding["reconciled_prior_usd"] == pytest.approx(0.0)
+    assert funding["available_headroom_usd"] == pytest.approx(L.HARD_STOP_USD)
+    # The two-model scheme: one record per model, ONE panel funding record binding both.
+    assert {m["model"] for m in funding["models"]} == set(G.PANEL_ORDER)
+    excluded = [m for m in funding["models"] if m["model"] == DEEPSEEK][0]
+    assert excluded["excluded"] is True and excluded["endpoint_tag"] is None
+
+
+def test_the_promotion_record_is_derived_from_the_on_disk_walk_and_projection(authorized):
+    """PS-1.2: no endpoint tag and no amount is transcribed by hand."""
+    promotion = S.load_promotion_authorization(authorized.run_dir, MODEL)
+    walk_bytes = S.walk_record_path(authorized.run_dir, MODEL).read_bytes()
+    assert promotion["walk_record_sha256"] == hashlib.sha256(walk_bytes).hexdigest()
+    assert promotion["promoted_tag"] == json.loads(walk_bytes)["promoted_tag"]
+    binding = S.load_projection_binding(authorized.run_dir, MODEL, PRIMARY_TAG)
+    assert promotion["projection_artifact_sha256"] == binding["artifact_sha256"]
+    artifact = S.read_projection(authorized.run_dir / binding["artifact_filename"])
+    assert promotion["projection_total_usd"] == pytest.approx(artifact["total"])
+    assert promotion["manifest_sha256"] == binding["manifest_sha256"]
+
+
+def test_the_authorization_records_are_write_once(authorized):
+    with pytest.raises(S.AuthorizationError):
+        S.record_funding_authorization(
+            authorized.run_dir, decision="a different decision", authorized=True,
+            reconciliation=L.ReconciliationResult(reconciled_usd=0.0, record_count=0))
+
+
+def test_the_smoke_runs_once_both_authorizations_are_recorded(authorized):
+    before = authorized.factory.calls                    # the walk's synthetic probes
+    assert authorized.main("smoke") == 0
+    assert authorized.factory.calls - before == 240
+    assert len(S.study_store(authorized.run_dir).envelopes()) == 240
+    record = json.loads(S.smoke_record_path(authorized.run_dir, MODEL).read_text())
+    assert record["promoted"] is True
+
+
+def test_the_smoke_refuses_without_a_promotion_record_and_sends_nothing(authorized, capsys):
+    path = authorized.promotion_path()
+    path.chmod(0o644)
+    path.unlink()
+    assert authorized.smoke() == 1
+    assert authorized.factory.constructed == 0
+    assert "AuthorizationError" in capsys.readouterr().err
+
+
+def test_the_smoke_refuses_without_a_funding_record_and_sends_nothing(authorized):
+    path = authorized.funding_path()
+    path.chmod(0o644)
+    path.unlink()
+    assert authorized.smoke() == 1
+    assert authorized.factory.constructed == 0
+
+
+def test_the_smoke_refuses_a_recorded_funding_refusal_and_sends_nothing(authorized):
+    authorized.reforge(authorized.funding_path(), authorized=False,
+                       decision="funding refused pending review")
+    assert authorized.smoke() == 1
+    assert authorized.factory.constructed == 0
+
+
+def test_the_smoke_refuses_a_malformed_record_and_sends_nothing(authorized):
+    _rewrite(authorized.promotion_path(), '{"schema": "q2_v7.study_run.'
+             'model_promotion_authorization.v1", "model": "' + MODEL + '"}')
+    assert authorized.smoke() == 1
+    assert authorized.factory.constructed == 0
+    # ...and an unparseable file is refused just as loudly.
+    _rewrite(authorized.promotion_path(), "not json at all")
+    assert authorized.smoke() == 1
+    assert authorized.factory.constructed == 0
+
+
+def test_the_smoke_refuses_a_stale_record_and_sends_nothing(authorized):
+    """The walk evidence moved after the promotion was authorized."""
+    walk = S.walk_record_path(authorized.run_dir, MODEL)
+    record = json.loads(walk.read_text())
+    record["probes"] = []
+    walk.write_text(json.dumps(record, sort_keys=True, indent=1))
+    assert authorized.smoke() == 1
+    assert authorized.factory.constructed == 0
+
+
+def test_the_smoke_refuses_a_cross_model_record_and_sends_nothing(authorized):
+    """DeepSeek's record, moved onto Qwen's filename, authorizes nothing."""
+    deepseek = authorized.promotion_path(DEEPSEEK).read_text()
+    _rewrite(authorized.promotion_path(MODEL), deepseek)
+    assert authorized.smoke() == 1
+    assert authorized.factory.constructed == 0
+
+
+def test_the_smoke_refuses_a_wrong_manifest_record_and_sends_nothing(authorized):
+    authorized.reforge(authorized.promotion_path(), manifest_sha256="e" * 64)
+    assert authorized.smoke() == 1
+    assert authorized.factory.constructed == 0
+
+
+def test_the_smoke_refuses_a_record_bound_to_another_projection_and_sends_nothing(authorized):
+    authorized.reforge(authorized.promotion_path(), projection_artifact_sha256="f" * 64)
+    assert authorized.smoke() == 1
+    assert authorized.factory.constructed == 0
+
+
+def test_the_smoke_refuses_when_the_funding_record_covers_another_model(authorized):
+    funding = json.loads(authorized.funding_path().read_text())
+    authorized.reforge(authorized.funding_path(),
+                       models=[m for m in funding["models"] if m["model"] != MODEL])
+    assert authorized.smoke() == 1
+    assert authorized.factory.constructed == 0
+
+
+def test_the_smoke_refuses_when_prior_reconciled_spend_has_moved(authorized, monkeypatch):
+    monkeypatch.setattr(S, "default_reconciliation",
+                        lambda: L.ReconciliationResult(reconciled_usd=0.5, record_count=1))
+    assert authorized.smoke() == 1
+    assert authorized.factory.constructed == 0
+
+
+def test_the_smoke_refuses_when_the_bound_projection_artifact_is_edited(authorized):
+    binding = S.load_projection_binding(authorized.run_dir, MODEL, PRIMARY_TAG)
+    path = authorized.run_dir / binding["artifact_filename"]
+    _rewrite(path, path.read_text().replace('"fits":true', '"fits":false', 1))
+    assert authorized.smoke() == 1
+    assert authorized.factory.constructed == 0
+
+
+def test_the_full_run_is_gated_by_the_same_authorization(authorized):
+    path = authorized.funding_path()
+    path.chmod(0o644)
+    path.unlink()
+    authorized.factory = TransportFactory(forbid=True)
+    authorized.monkeypatch.setattr(S, "SingleAttemptTransport", authorized.factory)
+    assert S.main(["full", "--model", MODEL, "--run-dir", str(authorized.run_dir),
+                   "--i-have-authorized-paid-spend"]) == 1
+    assert authorized.factory.constructed == 0
+
+
+def test_an_excluded_model_can_never_be_authorized_for_a_paid_stage(authorized):
+    record = S.load_promotion_authorization(authorized.run_dir, DEEPSEEK)
+    assert record["excluded"] is True
+    assert record["promoted_tag"] is None
+    assert record["projection_artifact_sha256"] is None
+    authorized.factory = TransportFactory(forbid=True)
+    authorized.monkeypatch.setattr(S, "SingleAttemptTransport", authorized.factory)
+    assert S.main(["smoke", "--model", DEEPSEEK, "--run-dir", str(authorized.run_dir),
+                   "--i-have-authorized-paid-spend"]) == 1
+    assert authorized.factory.constructed == 0
+
+
+# =======================================================================================
+# 12. Conformance with the real renderer, when it is present
 # =======================================================================================
 
 def test_real_renderer_matches_the_frozen_counts_and_coordinates(snapshot):

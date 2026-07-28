@@ -8,21 +8,25 @@ NOTHING here touches the network. Every response is a literal dict.
 from __future__ import annotations
 
 import json
+import random
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
 from alignment.q2_v7.ledger import (EPS, FORCE_OVERWRITTEN_CANARY, HARD_STOP_USD,
+                                    MONEY_DECIMAL_PLACES, MONEY_QUANTUM_USD, MONEY_ROUNDING,
                                     CostAccountingError, DerivedRecord, DoubleBookingError,
                                     DrawIdentity, EnvelopeExistsError, EnvelopeStore,
                                     HardStopExceeded, ManifestBindingError, ModelProjection,
                                     NonReconciledComponent, RawEnvelope, ReconciliationError,
                                     ReconciliationResult, RunManifest, V7Ledger,
                                     build_envelope, canonical_sha256,
-                                    estimand_eligible_draw_ids, is_cache_hit,
-                                    reconcile_prior_spend, reconstruct_ledger, record_response,
-                                    record_validation, redact_headers, redact_request_body,
-                                    returned_cost)
+                                    estimand_eligible_draw_ids, from_money, is_cache_hit,
+                                    money_sum, reconcile_prior_spend, reconstruct_ledger,
+                                    record_response, record_validation, redact_headers,
+                                    redact_request_body, returned_cost, to_money)
 
 # ---------------------------------------------------------------------------------------
 # fixtures / builders
@@ -625,3 +629,274 @@ def test_draw_identity_validates_its_inputs():
 
 def test_canonical_sha256_is_key_order_independent():
     assert canonical_sha256({"a": 1, "b": 2}) == canonical_sha256({"b": 2, "a": 1})
+
+
+# =======================================================================================
+# PS-6 — money is exact: one canonical quantization rule, no float drift at the stop
+#
+# A ledger that can report spend ABOVE its own ceiling is not trustworthy at $8.50 either.
+# Ten returned costs of 0.0001 sum in binary float to 0.0010000000000000002. These tests
+# assert the invariant directly; none of them weakens it.
+# =======================================================================================
+
+def _sha(n: int) -> str:
+    """A distinct valid 64-hex draw sha for index n."""
+    return f"{n:064x}"
+
+
+def _envelope(draw: DrawIdentity, cost: float, *, bucket: str = "study") -> RawEnvelope:
+    return build_envelope(draw=draw, request_body=_request(), request_headers=_headers(),
+                          response_body=_response(cost), response_headers=_resp_headers(),
+                          http_status=200, bucket=bucket, model=QWEN, provider="alibaba",
+                          stage="study", timestamp="2026-07-28T00:00:00Z")
+
+
+def _book_all(store: Optional[EnvelopeStore], ledger: V7Ledger, costs) -> list[DrawIdentity]:
+    """Book each cost through the real ingestion path; persist too when a store is given."""
+    draws = []
+    for i, cost in enumerate(costs):
+        draw = DrawIdentity(_sha(i), 0)
+        env = _envelope(draw, cost)
+        if store is not None:
+            store.put(env)
+        ledger.book_envelope(env)
+        draws.append(draw)
+    return draws
+
+
+def test_the_canonical_quantization_rule_is_the_documented_one():
+    """One rule, documented in the module docstring: nearest 1e-12 USD, ties away from zero."""
+    assert MONEY_DECIMAL_PLACES == 12
+    assert MONEY_QUANTUM_USD == Decimal("0.000000000001")
+    assert MONEY_ROUNDING == ROUND_HALF_UP
+
+    # The rule erases binary representation noise rather than compounding it.
+    assert to_money(0.0001) == Decimal("0.000100000000000")
+    assert to_money(0.0001).as_tuple().exponent == -MONEY_DECIMAL_PLACES
+    # ... and it is a NEAREST rule: rounding up here is exactly what re-creates the defect.
+    assert to_money(0.0001) < Decimal(0.0001)                 # float 0.0001 is slightly above
+    assert to_money(Decimal("0.0000000000005")) == Decimal("0.000000000001")   # tie -> away
+    assert to_money(0.0) == Decimal(0)
+    # A strictly positive amount is never booked as free.
+    assert to_money(1e-15) == MONEY_QUANTUM_USD
+    # Idempotent, and a lossless round trip through the float-compatible boundary.
+    assert to_money(to_money(0.0000207)) == to_money(0.0000207)
+    assert to_money(from_money(to_money(0.0000207))) == to_money(0.0000207)
+
+
+def test_the_exact_ten_times_one_ten_thousandth_boundary_case(tmp_path: Path):
+    """PS-6 verbatim: ten returned costs of 0.0001 against a 0.001 stop.
+
+    In binary float the ten costs sum to 0.0010000000000000002 and the ledger reports MORE
+    than its own ceiling. Exact money must report EXACTLY the stop, and the tenth call must
+    be permitted while an eleventh is refused.
+    """
+    store = EnvelopeStore(tmp_path / "run")
+    manifest = _manifest(*(f"{_sha(i)}#0" for i in range(11)))
+    ledger = V7Ledger(reconciliation=ReconciliationResult(reconciled_usd=0.0, record_count=0),
+                      hard_stop_usd=0.001, manifest=manifest)
+
+    for i in range(10):
+        ledger.check_before_call(0.0001)             # every one of the ten is permitted
+        env = _envelope(DrawIdentity(_sha(i), 0), 0.0001)
+        store.put(env)
+        ledger.book_envelope(env)
+
+    naive = 0.0
+    for _ in range(10):
+        naive += 0.0001
+    assert naive == 0.0010000000000000002 > 0.001, "the float defect PS-6 reports still exists"
+    assert ledger.total_spent_exact_usd == Decimal("0.001000000000000")
+    assert ledger.total_spent_usd <= ledger.hard_stop_usd
+    assert ledger.remaining_exact_usd == 0
+    assert ledger.must_halt_before_next_call(0.0).halt is False
+
+    with pytest.raises(HardStopExceeded):            # the eleventh would breach
+        ledger.check_before_call(0.0001)
+    assert ledger.may_start_call(0.0001) is False
+    assert ledger.must_halt_before_next_call(0.0001).halt is True
+
+
+def test_many_small_costs_never_push_the_total_over_the_stop_by_float_error():
+    """1,320 draws at 0.0001 against a $0.132 stop: exactly the stop, never a hair over."""
+    n = 1_320
+    manifest = _manifest(*(f"{_sha(i)}#0" for i in range(n)))
+    ledger = V7Ledger(reconciliation=ReconciliationResult(reconciled_usd=0.0, record_count=0),
+                      hard_stop_usd=0.132, manifest=manifest)
+
+    for i in range(n):
+        ledger.check_before_call(0.0001)
+        ledger.book_envelope(_envelope(DrawIdentity(_sha(i), 0), 0.0001))
+
+    naive = 0.0
+    for _ in range(n):
+        naive += 0.0001
+    assert naive > 0.132, "naive float accumulation drifts above the stop"
+
+    assert ledger.total_spent_exact_usd == Decimal("0.132000000000000")
+    assert ledger.total_spent_usd <= ledger.hard_stop_usd
+    assert ledger.run_usd <= ledger.hard_stop_usd
+    assert ledger.remaining_usd == 0.0
+
+
+def test_a_cost_exactly_at_the_stop_is_permitted_and_one_cent_over_is_refused():
+    ledger = _fresh_ledger(_manifest(), prior=8.00)
+
+    ledger.check_before_call(0.50)                   # lands exactly on $8.50
+    assert ledger.may_start_call(0.50) is True
+    assert ledger.may_start_model(_projection(QWEN, 0.50)).allowed is True
+
+    with pytest.raises(HardStopExceeded):
+        ledger.check_before_call(0.51)               # one cent over
+    assert ledger.may_start_call(0.51) is False
+    assert ledger.may_start_model(_projection(QWEN, 0.51)).allowed is False
+
+
+def test_cap_comparisons_are_exact_and_add_no_epsilon_slack():
+    """EPS survives only as a compatibility constant; no comparison may still add it."""
+    ledger = _fresh_ledger(_manifest(), prior=8.50)
+    assert ledger.remaining_exact_usd == 0
+    ledger.check_before_call(0.0)                                   # exactly at the stop: ok
+    with pytest.raises(HardStopExceeded):
+        ledger.check_before_call(float(MONEY_QUANTUM_USD))          # one quantum over: refused
+    assert ledger.may_start_call(EPS) is False
+    assert ledger.must_halt_before_next_call(float(MONEY_QUANTUM_USD)).halt is True
+
+
+def test_every_reported_figure_shares_the_one_exact_rule(tmp_path: Path):
+    """prior/run/total/remaining, the pre-call check, the start and halt decisions, and the
+    serialized summary are all views of the SAME quantized Decimals — they cannot disagree."""
+    store = EnvelopeStore(tmp_path / "run")
+    manifest = _manifest(*(f"{_sha(i)}#0" for i in range(3)))
+    prior = ReconciliationResult(reconciled_usd=0.0315, record_count=3,
+                                 components=(FORCE_OVERWRITTEN_CANARY,))
+    ledger = V7Ledger(reconciliation=prior, manifest=manifest)
+    _book_all(store, ledger, [0.0001, 0.0002, 0.0003])
+
+    exact_prior = to_money(0.0315) + to_money(0.0000207)
+    exact_run = money_sum([0.0001, 0.0002, 0.0003])
+    assert ledger.prior_exact_usd == exact_prior
+    assert ledger.run_exact_usd == exact_run
+    assert ledger.total_spent_exact_usd == exact_prior + exact_run
+    assert ledger.remaining_exact_usd == to_money(HARD_STOP_USD) - (exact_prior + exact_run)
+
+    # float views are the same numbers, not separately re-derived sums
+    assert ledger.prior_usd == from_money(exact_prior)
+    assert ledger.run_usd == from_money(exact_run)
+    assert ledger.total_spent_usd == from_money(exact_prior + exact_run)
+    assert ledger.remaining_usd == from_money(ledger.remaining_exact_usd)
+    assert money_sum(ledger.spend_by_bucket().values()) == exact_run
+    assert money_sum(ledger.spend_by_bucket_exact().values()) == exact_run
+
+    summary = ledger.audit_summary()
+    assert summary["total_spent_usd"] == ledger.total_spent_usd
+    assert summary["remaining_usd"] == ledger.remaining_usd
+    assert summary["run_usd"] == ledger.run_usd
+    assert summary["prior_usd"] == ledger.prior_usd
+    assert summary["money_rule"]["rounding"] == MONEY_ROUNDING
+    assert summary["money_rule"]["unit_usd"] == str(MONEY_QUANTUM_USD)
+    json.dumps(summary)                              # every reported figure stays serializable
+
+    # the boundary the pre-call check enforces is the boundary `remaining` advertises
+    ledger.check_before_call(ledger.remaining_usd)
+    with pytest.raises(HardStopExceeded):
+        ledger.check_before_call(ledger.remaining_usd + float(MONEY_QUANTUM_USD))
+
+    # ... and the start/halt decisions agree with both
+    start = ledger.may_start_model(_projection(QWEN, ledger.remaining_usd))
+    assert start.allowed is True and start.headroom_exact_usd == 0
+    assert ledger.must_halt_before_next_call(ledger.remaining_usd).halt is False
+
+
+def test_reconstruct_then_compare_is_exactly_equal_after_a_restart(tmp_path: Path):
+    """R-E3 under the exact rule: a restarted process reproduces the SAME total, to the
+    quantum, not merely to within float tolerance."""
+    store = EnvelopeStore(tmp_path / "run")
+    costs = [0.0001] * 10 + [0.0000207, 0.000646, 0.000194, 2e-06, 4.5]
+    manifest = _manifest(*(f"{_sha(i)}#0" for i in range(len(costs))))
+    prior = ReconciliationResult(reconciled_usd=0.0315, record_count=3,
+                                 components=(FORCE_OVERWRITTEN_CANARY,))
+    ledger = V7Ledger(reconciliation=prior, manifest=manifest)
+    _book_all(store, ledger, costs)
+
+    restarted = reconstruct_ledger(EnvelopeStore(tmp_path / "run"), manifest=manifest,
+                                   reconciliation=prior)
+
+    assert restarted.run_exact_usd == ledger.run_exact_usd
+    assert restarted.prior_exact_usd == ledger.prior_exact_usd
+    assert restarted.total_spent_exact_usd == ledger.total_spent_exact_usd
+    assert restarted.remaining_exact_usd == ledger.remaining_exact_usd
+    assert restarted.total_spent_usd == ledger.total_spent_usd       # exact float equality
+    assert restarted.run_exact_usd == money_sum(costs)
+    assert restarted.booked_draw_ids() == ledger.booked_draw_ids()
+    assert restarted.audit_summary() == ledger.audit_summary()
+    for draw_id in ledger.booked_draw_ids():
+        assert (restarted.booked_cost_exact_usd(draw_id)
+                == ledger.booked_cost_exact_usd(draw_id))
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2, 3, 4])
+def test_property_total_equals_the_exact_sum_of_the_quantized_bookings(tmp_path: Path, seed):
+    """Property: for many random small costs, `total_spent_usd` IS the exact sum of the
+    quantized bookings, and never exceeds a stop set at that sum."""
+    rng = random.Random(seed)
+    n = 300
+    costs = [rng.choice([rng.uniform(1e-07, 1e-03), rng.uniform(1e-06, 1e-05),
+                         round(rng.uniform(0, 1e-04), 8)]) for _ in range(n)]
+
+    manifest = _manifest(*(f"{_sha(i)}#0" for i in range(n)))
+    ledger = V7Ledger(reconciliation=ReconciliationResult(reconciled_usd=0.0, record_count=0),
+                      manifest=manifest)
+    draws = _book_all(None, ledger, costs)
+
+    expected = money_sum(costs)
+    assert ledger.run_exact_usd == expected
+    assert ledger.total_spent_exact_usd == expected
+    assert ledger.total_spent_usd == from_money(expected)
+    assert money_sum(ledger.booked_cost_exact_usd(d.draw_id) for d in draws) == expected
+
+    # every persisted cost is already quantized, so a round trip through disk changes nothing
+    store = EnvelopeStore(tmp_path / f"run{seed}")
+    head = costs[:40]
+    _book_all(store, V7Ledger(reconciliation=ledger.reconciliation, manifest=manifest), head)
+    reread = reconstruct_ledger(EnvelopeStore(tmp_path / f"run{seed}"), manifest=manifest)
+    assert reread.run_exact_usd == money_sum(head)
+
+    # a stop set exactly at the realized total is met, never breached
+    at_stop = V7Ledger(reconciliation=ReconciliationResult(reconciled_usd=from_money(expected),
+                                                           record_count=n),
+                       hard_stop_usd=from_money(expected), manifest=_manifest())
+    assert at_stop.total_spent_usd <= at_stop.hard_stop_usd
+    assert at_stop.remaining_exact_usd == 0
+    assert at_stop.must_halt_before_next_call(0.0).halt is False
+
+
+def test_a_positive_cost_is_never_quantized_down_to_free(tmp_path: Path):
+    """Sub-quantum spend rounds UP to one quantum: a paid call is never booked as free (R-E2
+    in miniature). This is the one documented exception to nearest-rounding."""
+    store = EnvelopeStore(tmp_path / "run")
+    draw = DrawIdentity(SHA_A, 0)
+    ledger = _fresh_ledger(_manifest(draw.draw_id))
+    call = _post(store, ledger, draw, cost=1e-15)
+    assert call.booked_cost_usd > 0.0
+    assert ledger.run_exact_usd == MONEY_QUANTUM_USD
+    assert store.get(draw.draw_id).cost_exact_usd == MONEY_QUANTUM_USD
+
+
+def test_projection_and_reconciliation_totals_use_the_same_rule():
+    """The two other places money is summed — the complete-run projection and prior-spend
+    reconciliation — quantize identically, so no total can disagree with another."""
+    projection = ModelProjection(model=QWEN, endpoint="alibaba",
+                                 projected_input_cost_usd=0.0001,
+                                 projected_completion_cost_usd=0.0001,
+                                 retry_reserve_usd=0.0001)
+    assert projection.complete_run_exact_usd == Decimal("0.000300000000000")
+    assert projection.complete_run_usd == from_money(money_sum([0.0001] * 3))
+
+    result = ReconciliationResult(reconciled_usd=0.0001, record_count=1,
+                                  components=(NonReconciledComponent(
+                                      label="x", upper_bound_usd=0.0002, reason="r"),))
+    assert result.non_reconciled_exact_usd == Decimal("0.000200000000000")
+    assert result.total_exact_usd == Decimal("0.000300000000000")
+    assert result.total_usd == projection.complete_run_usd
+    assert result.to_dict()["total_usd"] == result.total_usd
