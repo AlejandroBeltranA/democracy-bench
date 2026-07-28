@@ -1,13 +1,71 @@
-# Q2 Stage-2 v7.2 code review — live execution gate not passed
+# Q2 Stage-2 v7.2 code review — Qwen smoke authorized
 
 Reviewer: Codex  
 Date: 2026-07-28  
 Reviewed branch: `phase4-floor-guards`  
-Current reviewed HEAD: `091b948` — *Close PS-1--PS-6 from the pre-smoke re-audit; frozen C2 serialization is now enforced*
+Current reviewed HEAD: `45a78fb3316736b120a84082b88bf91b493f947b` — *Close PS-7 and PS-8; pin the DeepSeek serializer under signed amendment AMD-V72-01*
 
 Original review baseline: `4d0c5ac` — *Build hardened Q2 Stage-2 v7.2 runner; synthetic canary passes on Qwen3.5-397B*
 
-Current implementation scope: cumulative Stage-2 code from `80399d7` through `091b948`
+Current implementation scope: cumulative Stage-2 code from `80399d7` through `45a78fb`
+
+## Final smoke-gate review — `45a78fb`
+
+### Verdict
+
+**PASS — Claude is authorized to run the Qwen 240-draw outcome-blinded smoke now.**
+
+This authorization includes only the fresh prerequisite walk/project/promotion/funding
+stages and the Qwen smoke. It does not authorize the DeepSeek smoke or either full
+13,200-draw study.
+
+No smoke-blocking defect was reproduced in the final commit:
+
+- **PS-7 closed.** The exact-money gate runs inside the sender immediately before every
+  `_post_once`, including every retry. The paid-429 boundary regression uses a
+  `$0.0000006` stop, a `$0.0000004` paid 429, and a `$0.0000004` proposed retry. It passes
+  with exactly one transport call; the retry is refused and the run halts incomplete.
+- **PS-8 closed.** AMD-V72-01 explicitly pins DeepSeek's vendor encoder, revision, local
+  bytes, SHA-256, entry point, and rendering flags. The checked-in encoder SHA-256 is
+  `bdbd57c132a1b3725042323d02b98b9d1df28e5f388f134399555d041f5055e0`; the updated
+  endpoint snapshot SHA-256 is
+  `d9a5d0e061bf222ee7d12bd056c0f7ccaeadfab16db47da1fcf581d52dd3a72b`.
+  Real-asset tests pin the serialization, expected counts, repeatability, and a valid
+  frozen-C2 DeepSeek projection. That projection flows through the same model-promotion
+  and panel-funding authorization scheme as Qwen.
+- **Stale evidence is refused.** The new snapshot digest invalidates the historical
+  projection records. Runner regressions confirm that edited or stale walk, manifest,
+  projection, promotion, funding, and reconciliation evidence prevents transport
+  construction.
+
+Independent focused no-network test record:
+
+```text
+python -m pytest -q \
+  tests/test_q2_v7_envelope.py \
+  tests/test_q2_v7_gate.py \
+  tests/test_q2_v7_ledger.py \
+  tests/test_q2_v7_study_run.py \
+  tests/test_q2_v7_conformance.py \
+  tests/test_q2_v7_interlock.py \
+  tests/test_q2_v7_study_render.py \
+  tests/test_q2_v7_study_conformance.py \
+  tests/test_q2_v7_canary.py
+
+744 passed, 1 skipped in 285.72s
+```
+
+The PS-7 boundary regression was also run alone:
+
+```text
+tests/test_q2_v7_study_run.py::test_a_retry_cannot_breach_the_hard_stop
+1 passed in 0.82s
+```
+
+No network request or paid call was made during this review. The implementation process was
+no longer attached/running, the final commit had landed, and the repository was stable and
+clean before these review-document edits. Claude should use a fresh run directory and obey
+the staged sequence in `paper/Q2_STAGE2_V72_SMOKE_HANDOFF.md`.
 
 ## Finalization re-review — `091b948`
 

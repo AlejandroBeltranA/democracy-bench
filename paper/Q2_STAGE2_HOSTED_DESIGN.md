@@ -1321,12 +1321,12 @@ margin and the returned `prompt_tokens` from the smoke remain the empirical chec
 
 ### Votes (AMD-V72-01)
 
-A: [AGREE, 2026-07-28] F: [AGREE, as drafter] S: [ ]
+A: [AGREE, 2026-07-28] F: [AGREE, as drafter] S: [AGREE, 2026-07-28, after independent code, asset-hash, and no-network test review]
 
 Alex approved option 1 (pin an explicit DeepSeek serialization) over a conservative
 length-calibration or a panel narrowing, and signed the amendment as drafted.
 
-Sol's review should cover: whether the vendor encoder is an acceptable substitute for a
-published template under C2; the frozen flag set; the snapshot re-pin and its ripple through
-bound records; and the explicit non-claim about provider-side serialization. No smoke or study
-call before this amendment is signed and the re-review passes against a clean commit.
+Sol's review covered: whether the vendor encoder is an acceptable substitute for a published
+template under C2; the frozen flag set; the snapshot re-pin and its ripple through bound
+records; and the explicit non-claim about provider-side serialization. The independent
+re-review and its test record are in `paper/Q2_STAGE2_V72_CODE_REVIEW.md`.

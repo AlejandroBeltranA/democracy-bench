@@ -6,18 +6,17 @@ Reviewer/authorization gate: Codex
 
 ## Current status
 
-**WAITING FOR FINAL COMMIT AND CODEX AUTHORIZATION. DO NOT SEND THE SMOKE YET.**
+**AUTHORIZED — RUN QWEN SMOKE NOW.**
 
-The broad review is finished. Do not reopen settled issues or perform another architectural
-rewrite. Complete only the two remaining smoke gates below, commit the exact result, and let
-the active Codex monitor review that commit.
+The final smoke-gate review is complete. Do not reopen settled issues or perform another
+architectural rewrite. Execute the staged commands below from the reviewed implementation.
 
-## Required final changes
+## Verified final closures
 
-### 1. PS-7 — hard stop before every retry
+### 1. PS-7 — hard stop before every retry: closed
 
-The exact-money ledger must be checked immediately before every actual `_post_once`,
-including retries.
+The exact-money ledger is checked immediately before every actual `_post_once`, including
+retries.
 
 Acceptance test:
 
@@ -28,10 +27,10 @@ Acceptance test:
 
 The retry must not be sent after the first attempt is booked.
 
-### 2. PS-8 — deterministic DeepSeek C2 input
+### 2. PS-8 — deterministic DeepSeek C2 input: closed
 
-Commit the narrow pre-outcome amendment and every implementation input it names. The
-DeepSeek serialization/calibration must be:
+The signed narrow pre-outcome amendment and every implementation input it names are
+committed. The DeepSeek serialization is:
 
 - explicit in `paper/Q2_STAGE2_HOSTED_DESIGN.md`;
 - deterministic;
@@ -46,22 +45,24 @@ passed.
 
 ## Commit and review handoff
 
-1. Finish PS-7 and PS-8.
-2. Run the focused no-network pre-smoke tests.
-3. Commit all code, tests, amendment text, pinned inputs, and updated snapshot evidence.
-4. Leave the worktree stable.
-5. The active Codex monitor will review the new commit immediately.
-
-Codex will update this file to one of:
-
-- `AUTHORIZED — RUN QWEN SMOKE NOW`; or
-- `HOLD — <one concrete reproduced blocker>`.
-
-No paid smoke should run before the explicit `AUTHORIZED` marker appears below.
+The final implementation commit and its focused no-network tests have been independently
+reviewed. The explicit authorization marker appears below.
 
 ## Authorization
 
-**PENDING — NOT YET AUTHORIZED**
+**AUTHORIZED — RUN QWEN SMOKE NOW**
+
+Reviewed commit:
+`45a78fb3316736b120a84082b88bf91b493f947b`.
+
+Independent focused no-network result: **744 passed, 1 skipped in 285.72s**. The paid-429
+hard-stop boundary regression also passed alone (**1 passed in 0.82s**). The reviewed
+DeepSeek encoder and endpoint-snapshot hashes match AMD-V72-01, the real-asset frozen-C2
+projection succeeds, and stale or edited authorization inputs fail closed.
+
+Claude is authorized to execute the fresh prerequisite walk/project/promotion/funding stages
+listed below and then the **Qwen 240-draw outcome-blinded smoke immediately**. This does not
+authorize a DeepSeek smoke or either full 13,200-draw study.
 
 ## Commands after authorization
 
