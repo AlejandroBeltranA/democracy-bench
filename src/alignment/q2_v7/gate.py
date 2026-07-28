@@ -30,8 +30,10 @@ NETWORK: none. Every seam that would touch the network or the wall clock (`Token
 `EndpointProbe`, `Sender`, `Sleeper`, `Clock`) is an injected callable, so the whole module is
 exercised offline. Endpoint probe RESULTS arrive as injected data; this module never issues a
 request and never downloads a tokenizer. The C2 serialization helpers (`load_chat_template`,
-`load_pinned_tokenizer`) read ALREADY-COMMITTED local files and verify them against the pinned
-SHA-256s in the endpoint snapshot; they never fetch, and an unverifiable file is a hard error.
+`load_vendor_encoder`, `load_pinned_tokenizer`) read ALREADY-COMMITTED local files and verify
+them against the pinned SHA-256s in the endpoint snapshot; they never fetch, and an
+unverifiable file is a hard error. The vendor-encoder backend imports a pinned, hash-verified
+stdlib-only module by path and calls one function in it; its bytes are checked BEFORE import.
 
 Frozen structure (cells, probes, orders, contrasts, protective mass) is INHERITED from the
 frozen local/Stage-2 modules rather than restated here.
@@ -44,6 +46,7 @@ import os
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Callable, Iterable, Mapping, NoReturn, Optional, Sequence
 
 import numpy as np
@@ -93,10 +96,14 @@ class MissingChatTemplate(GateError):
     """The frozen C2 method needs the pinned chat serialization and it is not available.
 
     Raised when a projection would have to fall back to the fixed-overhead heuristic — either
-    because the model's pinned assets carry no chat template at all (DeepSeek-V4-Pro at the
-    pinned revision: `tokenizer_config.chat_template` is null and the repo publishes no
-    `chat_template.jinja`), or because a caller asked for the exact serialization of a request
-    that carries no structured messages.
+    because the model's pinned assets carry no exact serialization at all, or because a caller
+    asked for the exact serialization of a request that carries no structured messages.
+
+    A model may reach the exact serialization by EITHER pinned route: a published Jinja chat
+    template (Qwen3.5-397B-A17B), or the vendor's own published prompt encoder pinned under
+    signed amendment AMD-V72-01 (DeepSeek-V4-Pro, whose pinned revision publishes no template
+    at all: `tokenizer_config.chat_template` is null and the repo carries no
+    `chat_template.jinja`). Neither route present => this error.
 
     This is deliberately NOT recoverable by a default argument. Frozen C2 says the pinned
     tokenizer is applied to "the exact serialized system+user messages as sent"; substituting
@@ -307,22 +314,234 @@ def load_chat_template(directory: Path | str, *, allow_missing: bool = False,
         "substitute method. No such amendment may be assumed here.")
 
 
+# ---------------------------------------------------------------------------------------
+# C2 serialization backend 2 — the vendor's OWN pinned encoder (amendment AMD-V72-01)
+# ---------------------------------------------------------------------------------------
+#
+# `deepseek-ai/DeepSeek-V4-Pro` publishes NO Jinja chat template at the pinned revision
+# `b5968e9190ef611bbf34a7229255be88a0e937c1`: `tokenizer_config.chat_template` is null and no
+# `.jinja` file exists anywhere in the repo. It DOES publish its own official prompt encoder,
+# `encoding_dsv4.py`, which is the code the vendor itself uses to turn structured messages
+# into the exact prompt string. Signed pre-outcome amendment AMD-V72-01 adopts that module,
+# pinned byte-for-byte and at frozen rendering flags, as this model's exact C2 serialization.
+#
+# Using the vendor's own code — rather than a hand-transcribed template — is the whole point:
+# it removes transcription risk, which is what pinning exists to eliminate. The module imports
+# only the standard library (`typing`, `copy`, `json`, `re`).
+#
+# This is NOT the fixed-overhead heuristic and must never be confused with it: it counts role
+# markers, special tokens and the assistant generation prompt for real, exactly as the Jinja
+# path does for Qwen.
+
+#: The pinned DeepSeek encoder, as named in `manifest.json["tokenizers"][...]["files"]`.
+VENDOR_ENCODER_FILENAME = "encoding_dsv4.py"
+
+#: The frozen `serialization` block the snapshot must declare for a vendor-encoder model.
+#: `load_pinned_tokenizer` refuses any block that does not match this exactly — the snapshot
+#: is the record, and these constants are the reviewed values that record must carry.
+VENDOR_ENCODER_METHOD = "vendor_encoder"
+VENDOR_ENCODER_ENTRY_POINT = "encode_messages"
+VENDOR_ENCODER_AMENDMENT = "AMD-V72-01"
+
+#: Frozen rendering flags. `thinking_mode="chat"` is the reasoning-off serialization matching
+#: the frozen `reasoning: {"effort": "none"}` envelope; `add_default_bos_token=True` emits the
+#: BOS the served prompt carries; `drop_thinking=True` and `reasoning_effort=None` are the
+#: vendor defaults and are pinned explicitly so a future default change cannot move the count.
+#: The encoder always terminates the prompt with the assistant turn, which is this backend's
+#: equivalent of `add_generation_prompt=True`.
+VENDOR_ENCODER_FLAGS: Mapping[str, Any] = MappingProxyType({
+    "thinking_mode": "chat",
+    "add_default_bos_token": True,
+    "drop_thinking": True,
+    "reasoning_effort": None,
+})
+
+_VENDOR_MODULE_CACHE: dict[str, Any] = {}
+
+
+def _load_vendor_encoder_module(path: Path, expected_sha256: str) -> Any:
+    """Import the pinned encoder module BY PATH after verifying its bytes.
+
+    The hash is checked BEFORE the file is executed, so a swapped or tampered encoder never
+    runs. The module is loaded into a private, sha-suffixed module name and is deliberately NOT
+    registered in `sys.modules`: nothing else in the process can import it by name, and nothing
+    beyond the module's own top level (constants and function definitions over stdlib imports)
+    is executed. Only `encode_messages` is ever called.
+    """
+    if not path.exists():
+        raise SpecViolation(
+            f"the pinned vendor serializer {path.name} is absent from {path.parent}; the "
+            "frozen C2 serialization for this model cannot be executed")
+    data = path.read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != str(expected_sha256).lower():
+        raise SpecViolation(
+            f"pinned vendor serializer {path.name} hashes to {digest} != committed "
+            f"{expected_sha256} — refusing to execute an unpinned serializer")
+    cached = _VENDOR_MODULE_CACHE.get(digest)
+    if cached is not None:
+        return cached
+    import importlib.util
+    import sys
+
+    spec = importlib.util.spec_from_file_location(f"_q2v7_vendor_encoder_{digest[:16]}", path)
+    if spec is None or spec.loader is None:                      # pragma: no cover
+        raise SpecViolation(f"cannot build an import spec for the pinned serializer {path}")
+    module = importlib.util.module_from_spec(spec)
+    # Do not drop a `__pycache__` into the pinned-asset directory: that directory is frozen
+    # evidence, and importing it must leave no trace.
+    previous, sys.dont_write_bytecode = sys.dont_write_bytecode, True
+    try:
+        spec.loader.exec_module(module)                          # stdlib-only module
+    finally:
+        sys.dont_write_bytecode = previous
+    _VENDOR_MODULE_CACHE[digest] = module
+    return module
+
+
+@dataclass(frozen=True)
+class VendorEncoder:
+    """The vendor's OWN pinned prompt encoder, applied to structured messages.
+
+    Interface-compatible with `ChatTemplate` (`source`, `sha256`, `origin`, `identity()`,
+    `render()`), so `PinnedTokenizer`, `RenderedRequest.exact_serialization` and
+    `project_full_grid` treat the two exact backends identically. It is a DIFFERENT method from
+    the Jinja template and says so in every artifact: `serialization_method` is
+    `"pinned_vendor_encoder"`, and the amendment that approved it is carried alongside.
+    """
+    source: str                       # the module filename, e.g. "encoding_dsv4.py"
+    sha256: str                       # SHA-256 of the module bytes, verified before import
+    origin: str = ""                  # local path the module was read from (evidence only)
+    entry_point: str = VENDOR_ENCODER_ENTRY_POINT
+    flags_json: str = json.dumps(dict(VENDOR_ENCODER_FLAGS), sort_keys=True,
+                                 separators=(",", ":"))
+    amendment: str = VENDOR_ENCODER_AMENDMENT
+
+    @property
+    def flags(self) -> dict:
+        """The frozen keyword arguments `entry_point` is called with."""
+        return json.loads(self.flags_json)
+
+    def identity(self) -> dict:
+        return {
+            "template_source": self.source,
+            "template_sha256": self.sha256,
+            "template_origin": self.origin,
+            "add_generation_prompt": GENERATION_PROMPT,
+            "serialization_backend": VENDOR_ENCODER_METHOD,
+            "serializer_module": self.source,
+            "serializer_sha256": self.sha256,
+            "serializer_entry_point": self.entry_point,
+            "serializer_flags": self.flags,
+            "serialization_amendment": self.amendment,
+        }
+
+    def _entry(self) -> Callable[..., str]:
+        module = _load_vendor_encoder_module(Path(self.origin), self.sha256)
+        fn = getattr(module, self.entry_point, None)
+        if not callable(fn):
+            raise SpecViolation(
+                f"the pinned serializer {self.source} publishes no callable "
+                f"{self.entry_point!r}")
+        return fn
+
+    def render(self, messages: Messages,
+               *, add_generation_prompt: bool = GENERATION_PROMPT) -> str:
+        """The exact serialized request string the pinned tokenizer is applied to."""
+        msgs = [dict(m) for m in messages]
+        if not msgs:
+            raise SpecViolation("cannot serialize an empty message list")
+        if not add_generation_prompt:
+            raise SpecViolation(
+                f"the pinned vendor serializer {self.source} always terminates the prompt "
+                "with the assistant turn; `add_generation_prompt=False` is not a serialization "
+                "it can produce, and suppressing it is not the frozen method")
+        out = self._entry()(msgs, **self.flags)
+        if not isinstance(out, str) or not out:
+            raise SpecViolation(
+                f"the pinned serializer {self.source}.{self.entry_point} returned "
+                f"{type(out).__name__}, not a non-empty prompt string")
+        return out
+
+
+def load_vendor_encoder(directory: Path | str, block: Mapping[str, Any], *,
+                        files: Mapping[str, str], model: str = "") -> VendorEncoder:
+    """Build a `VendorEncoder` from a snapshot `serialization` block, fail-closed.
+
+    Every field of the block must match the reviewed constants above and the module's SHA-256
+    must be pinned in the SAME snapshot entry's `files` map, so a serializer can only be
+    swapped by editing the snapshot — which changes the snapshot digest that
+    `envelope.load_snapshot` binds.
+    """
+    where = f" for {model!r}" if model else ""
+    method = str(block.get("method", ""))
+    if method != VENDOR_ENCODER_METHOD:
+        raise SpecViolation(
+            f"unknown pinned serialization method {method!r}{where}; the only approved "
+            f"non-template method is {VENDOR_ENCODER_METHOD!r} (amendment "
+            f"{VENDOR_ENCODER_AMENDMENT})")
+    module_name = str(block.get("module", ""))
+    if module_name != VENDOR_ENCODER_FILENAME:
+        raise SpecViolation(
+            f"pinned serializer module {module_name!r}{where} is not the reviewed "
+            f"{VENDOR_ENCODER_FILENAME!r}")
+    entry_point = str(block.get("entry_point", ""))
+    if entry_point != VENDOR_ENCODER_ENTRY_POINT:
+        raise SpecViolation(
+            f"pinned serializer entry point {entry_point!r}{where} is not the reviewed "
+            f"{VENDOR_ENCODER_ENTRY_POINT!r}")
+    amendment = str(block.get("amendment", ""))
+    if amendment != VENDOR_ENCODER_AMENDMENT:
+        raise SpecViolation(
+            f"pinned serialization{where} declares amendment {amendment!r}, not the signed "
+            f"pre-outcome amendment {VENDOR_ENCODER_AMENDMENT}")
+    flags = block.get("flags")
+    if not isinstance(flags, Mapping) or dict(flags) != dict(VENDOR_ENCODER_FLAGS):
+        raise SpecViolation(
+            f"pinned serialization flags{where} are {dict(flags or {})!r}, not the frozen "
+            f"{dict(VENDOR_ENCODER_FLAGS)!r} — a projection at different flags is a different "
+            "method and would need its own signed amendment")
+    expected = files.get(module_name)
+    if not isinstance(expected, str) or not expected.strip():
+        raise SpecViolation(
+            f"the snapshot pins no SHA-256 for the serializer {module_name!r}{where}; an "
+            "unpinned serializer may never be executed")
+    path = Path(directory) / module_name
+    _load_vendor_encoder_module(path, expected)     # verifies bytes, then imports
+    return VendorEncoder(source=module_name, sha256=expected.lower(), origin=str(path),
+                         entry_point=entry_point,
+                         flags_json=json.dumps(dict(flags), sort_keys=True,
+                                               separators=(",", ":")),
+                         amendment=amendment)
+
+
+#: The two exact C2 serialization backends. Both are duck-type compatible.
+Serialization = Any     # ChatTemplate | VendorEncoder
+
+
 @dataclass(frozen=True)
 class PinnedTokenizer:
     """The pinned official tokenizer AS A C2 INSTRUMENT: identity + exact serialization.
 
     It is still a plain `Tokenizer` (`str -> int`) so every existing caller keeps working, but
-    it additionally carries the repo id, revision, verified file hashes and the pinned chat
-    template, and it can count the EXACT serialized messages rather than a bare content
-    concatenation. `project_full_grid` recognises it and REQUIRES the template path whenever a
-    template is present — the exact method is not opt-in.
+    it additionally carries the repo id, revision, verified file hashes and the pinned exact
+    serializer, and it can count the EXACT serialized messages rather than a bare content
+    concatenation. `project_full_grid` recognises it and REQUIRES the exact path whenever a
+    serializer is present — the exact method is not opt-in.
+
+    `template` holds whichever exact backend the model's pinned assets support: a
+    `ChatTemplate` (published Jinja template — Qwen) or a `VendorEncoder` (the vendor's own
+    pinned encoder under amendment AMD-V72-01 — DeepSeek). The field keeps its original name so
+    every existing caller and artifact key is unchanged; `has_chat_template` still means
+    specifically "a Jinja chat template", while `has_exact_serialization` means "either exact
+    backend is available".
     """
     model: str
     repo_id: str
     revision: str
     file_sha256: Mapping[str, str]
     count_text: Tokenizer
-    template: Optional[ChatTemplate] = None
+    template: Optional[Serialization] = None
     directory: str = ""
 
     # --- backward compatibility: a PinnedTokenizer IS a `Tokenizer` -------------------
@@ -331,19 +550,44 @@ class PinnedTokenizer:
 
     @property
     def has_chat_template(self) -> bool:
+        """True only for a published JINJA chat template. DeepSeek publishes none."""
+        return isinstance(self.template, ChatTemplate)
+
+    @property
+    def has_exact_serialization(self) -> bool:
+        """True when EITHER pinned exact backend is available — the frozen-C2 dispatch."""
         return self.template is not None
+
+    @property
+    def serializer(self) -> Optional[Serialization]:
+        """The exact serializer, under a backend-neutral name."""
+        return self.template
+
+    @property
+    def serialization_method(self) -> str:
+        """The artifact label for this tokenizer's exact backend, or the fallback label."""
+        if isinstance(self.template, ChatTemplate):
+            return SERIALIZATION_EXACT
+        if isinstance(self.template, VendorEncoder):
+            return SERIALIZATION_VENDOR_ENCODER
+        return SERIALIZATION_FIXED_OVERHEAD
+
+    @property
+    def serialization_amendment(self) -> Optional[str]:
+        """The signed pre-outcome amendment that approved this backend, if any."""
+        return getattr(self.template, "amendment", None)
 
     def serialize(self, messages: Messages) -> str:
         """The exact serialized request string, or a loud refusal."""
         if self.template is None:
             raise MissingChatTemplate(
                 f"{self.model!r} (repo {self.repo_id} at revision {self.revision}) publishes "
-                "no chat template at the pinned revision, so the exact serialized input "
-                "frozen C2 requires cannot be reconstructed from the pinned files. A "
-                "projection for this model requires an APPROVED PRE-OUTCOME DESIGN AMENDMENT "
-                "naming the substitute method; pass "
-                "`fixed_overhead_fallback_signed_amendment=<amendment id>` only when such an "
-                "amendment exists and is signed.")
+                "no chat template at the pinned revision and the committed snapshot pins no "
+                "approved vendor serializer for it, so the exact serialized input frozen C2 "
+                "requires cannot be reconstructed from the pinned files. A projection for this "
+                "model requires an APPROVED PRE-OUTCOME DESIGN AMENDMENT naming the substitute "
+                "method; pass `fixed_overhead_fallback_signed_amendment=<amendment id>` only "
+                "when such an amendment exists and is signed.")
         return self.template.render(messages)
 
     def count_messages(self, messages: Messages) -> int:
@@ -358,6 +602,8 @@ class PinnedTokenizer:
             "files": dict(self.file_sha256),
             "directory": self.directory,
             "has_chat_template": self.has_chat_template,
+            "has_exact_serialization": self.has_exact_serialization,
+            "serialization_method": self.serialization_method,
         }
         out.update(self.template.identity() if self.template
                    else {"template_source": None, "template_sha256": None,
@@ -377,9 +623,20 @@ def load_pinned_tokenizer(
     pinned snapshot. A local read only — never a download, never a fallback.
 
     Every file the snapshot pins must be present and must hash to the pinned SHA-256; an
-    unverifiable tokenizer means no projection, which means no promotion. A model whose pinned
-    assets carry no chat template loads successfully but cannot serialize: the refusal happens
-    where a projection would be built, so the error names the amendment requirement.
+    unverifiable tokenizer means no projection, which means no promotion.
+
+    The exact serializer is chosen from the pinned assets, never guessed:
+
+    * a published Jinja `chat_template.jinja` / `tokenizer_config.chat_template` => `ChatTemplate`;
+    * otherwise, if the snapshot entry carries an approved `serialization` block (amendment
+      AMD-V72-01), the vendor's own pinned encoder => `VendorEncoder`, hash-verified before it
+      is imported and called with the frozen flags;
+    * otherwise no serializer at all. Such a tokenizer still loads, but it cannot serialize:
+      the refusal happens where a projection would be built, so the error names the amendment
+      requirement.
+
+    A model may not have both. A snapshot that pins a vendor serializer for a model that also
+    publishes a Jinja template is ambiguous about which bytes were priced, and is refused.
     """
     if spec is None:
         data = json.loads(Path(snapshot_path).read_text())
@@ -412,13 +669,25 @@ def load_pinned_tokenizer(
         def count_text(text: str) -> int:                       # noqa: F811
             return len(hf.encode(text).ids)
 
-    template = load_chat_template(directory, allow_missing=True, model=model)
+    template: Optional[Serialization] = load_chat_template(directory, allow_missing=True,
+                                                           model=model)
     if template is not None and template.source == CHAT_TEMPLATE_FILENAME:
         pinned_template_hash = files.get(CHAT_TEMPLATE_FILENAME)
         if pinned_template_hash and pinned_template_hash != template.sha256:
             raise SpecViolation(
                 f"chat template hashes to {template.sha256} != committed "
                 f"{pinned_template_hash}")
+
+    block = spec.get("serialization")
+    if block is not None:
+        if not isinstance(block, Mapping):
+            raise SpecViolation(
+                f"the pinned 'serialization' block for {model!r} is not a mapping")
+        if template is not None:
+            raise SpecViolation(
+                f"{model!r} publishes a chat template AND the snapshot pins a vendor "
+                "serializer for it; the frozen method would be ambiguous, so this is refused")
+        template = load_vendor_encoder(directory, block, files=files, model=model)
 
     return PinnedTokenizer(model=model, repo_id=str(spec.get("repo_id", "")),
                            revision=str(spec.get("revision", "")), file_sha256=files,
@@ -494,8 +763,12 @@ class RenderedRequest:
     def is_exactly_serializable(self) -> bool:
         return bool(self.messages_json)
 
-    def exact_serialization(self, template: ChatTemplate) -> str:
-        """The frozen C2 tokenizer input: the pinned template applied to these messages."""
+    def exact_serialization(self, template: "Serialization") -> str:
+        """The frozen C2 tokenizer input: the pinned serializer applied to these messages.
+
+        `template` is either a `ChatTemplate` or a `VendorEncoder`; both render the exact
+        prompt string the pinned tokenizer is then applied to.
+        """
         if not self.is_exactly_serializable:
             raise MissingChatTemplate(
                 f"rendered request {self.request_sha256[:16]} at {self.coordinate} carries no "
@@ -528,9 +801,16 @@ def canonical_request_sha256(body: Mapping) -> str:
 CHAT_TEMPLATE_TOKENS_PER_MESSAGE = 12
 CHAT_TEMPLATE_GENERATION_PROMPT_TOKENS = 8
 
-#: Artifact labels for the two serialization methods. Only the first is frozen C2.
+#: Artifact labels for the three serialization methods. The first two are EXACT (frozen C2:
+#: the pinned tokenizer applied to the exact serialized system+user messages as sent) and are
+#: reported distinctly, because they are different pinned inputs and a reviewer must be able to
+#: tell from the artifact which one priced the grid. The third is the heuristic.
 SERIALIZATION_EXACT = "pinned_chat_template"
+SERIALIZATION_VENDOR_ENCODER = "pinned_vendor_encoder"
 SERIALIZATION_FIXED_OVERHEAD = "fixed_overhead_fallback"
+
+#: The serialization methods that ARE frozen C2 and may therefore authorize paid execution.
+FROZEN_C2_SERIALIZATIONS = (SERIALIZATION_EXACT, SERIALIZATION_VENDOR_ENCODER)
 
 
 def chat_template_overhead(n_messages: int,
@@ -663,6 +943,10 @@ class CostProjection:
     tokenizer_identity: Optional[Mapping[str, Any]] = None
     #: The amendment id supplied when the fixed-overhead fallback was used, else None.
     fixed_overhead_fallback_signed_amendment: Optional[str] = None
+    #: The signed pre-outcome amendment that approved a non-template EXACT backend
+    #: (`AMD-V72-01` for the pinned DeepSeek vendor encoder), else None. This is NOT a fallback
+    #: approval: the method it names still counts every special token for real.
+    serialization_amendment: Optional[str] = None
 
     @property
     def total_draws(self) -> int:
@@ -670,7 +954,7 @@ class CostProjection:
 
     @property
     def serialization_is_frozen_c2(self) -> bool:
-        return self.serialization_method == SERIALIZATION_EXACT
+        return self.serialization_method in FROZEN_C2_SERIALIZATIONS
 
     def as_artifact(self) -> dict:
         """The per-candidate artifact C2 requires: every request hash, projected tokens,
@@ -685,6 +969,7 @@ class CostProjection:
             "serialization_is_frozen_c2": self.serialization_is_frozen_c2,
             "fixed_overhead_fallback_signed_amendment":
                 self.fixed_overhead_fallback_signed_amendment,
+            "serialization_amendment": self.serialization_amendment,
             "tokenizer_identity": dict(self.tokenizer_identity or {}),
             "input_token_safety_margin": INPUT_TOKEN_SAFETY_MARGIN,
             "n_requests": self.n_requests,
@@ -736,16 +1021,19 @@ def project_full_grid(
 
     **`input_tokens(request)` is the EXACT serialization** (frozen C2: "the exact serialized
     system+user messages as sent"). When `tokenizer` is a `PinnedTokenizer` carrying the
-    model's pinned chat template, that template is applied to the structured messages —
+    model's pinned exact serializer, that serializer is applied to the structured messages —
     including roles, special tokens and the generation prompt — and the resulting token IDs
-    are counted. This is NOT optional: a pinned tokenizer WITH a template always takes this
-    path, and every request must carry its structured messages.
+    are counted. This is NOT optional: a pinned tokenizer WITH a serializer always takes this
+    path, and every request must carry its structured messages. Either pinned backend counts:
+    the published Jinja template (`pinned_chat_template`, Qwen) or the vendor's own pinned
+    encoder under amendment AMD-V72-01 (`pinned_vendor_encoder`, DeepSeek-V4-Pro, whose pinned
+    revision publishes no template at all). The artifact records which one was used.
 
-    A `PinnedTokenizer` WITHOUT a template (DeepSeek-V4-Pro at the pinned revision publishes
-    none) raises `MissingChatTemplate` unless `fixed_overhead_fallback_signed_amendment` names
-    an approved pre-outcome design amendment; that argument is deliberately verbose and has no
-    usable default, because a projection built on the fixed-overhead heuristic is a different
-    method from the preregistered one and must never be produced by accident.
+    A `PinnedTokenizer` with NEITHER backend raises `MissingChatTemplate` unless
+    `fixed_overhead_fallback_signed_amendment` names an approved pre-outcome design amendment;
+    that argument is deliberately verbose and has no usable default, because a projection built
+    on the fixed-overhead heuristic is a different method from the preregistered one and must
+    never be produced by accident.
 
     A bare `Callable[[str], int]` (the injected offline test seam) still works and still uses
     the fixed-overhead fallback, but the resulting projection is labelled
@@ -776,15 +1064,15 @@ def project_full_grid(
             "amendment; an empty string is not an approval")
 
     pinned = tokenizer if isinstance(tokenizer, PinnedTokenizer) else None
-    if pinned is not None and pinned.has_chat_template:
-        method = SERIALIZATION_EXACT
+    if pinned is not None and pinned.has_exact_serialization:
+        method = pinned.serialization_method
         if amendment is not None:
             raise SpecViolation(
-                f"{pinned.model!r} publishes a pinned chat template, so frozen C2 is "
-                "executable exactly; the fixed-overhead fallback is not available and no "
-                "amendment applies")
+                f"{pinned.model!r} carries a pinned exact serializer "
+                f"({pinned.serializer.source}), so frozen C2 is executable exactly; the "
+                "fixed-overhead fallback is not available and no amendment applies")
     elif pinned is not None:
-        # A pinned tokenizer with NO published template: the frozen method cannot be run.
+        # A pinned tokenizer with NO exact serializer: the frozen method cannot be run.
         if amendment is None:
             pinned.serialize([{"role": "user", "content": ""}])   # raises MissingChatTemplate
             raise MissingChatTemplate("unreachable")              # pragma: no cover
@@ -809,7 +1097,7 @@ def project_full_grid(
         seen_coords.add(req.coordinate)
         content_only: Optional[int] = None
         serialized_sha: Optional[str] = None
-        if method == SERIALIZATION_EXACT:
+        if method in FROZEN_C2_SERIALIZATIONS:
             assert pinned is not None and pinned.template is not None
             if not req.is_exactly_serializable:
                 raise MissingChatTemplate(
@@ -868,16 +1156,24 @@ def project_full_grid(
         serialization_method=method,
         tokenizer_identity=(pinned.identity() if pinned is not None else None),
         fixed_overhead_fallback_signed_amendment=amendment,
+        serialization_amendment=(pinned.serialization_amendment
+                                 if pinned is not None and method in FROZEN_C2_SERIALIZATIONS
+                                 else None),
     )
 
 
 def require_frozen_c2_serialization(projection: CostProjection) -> None:
     """Fail closed unless the projection used the frozen C2 serialization.
 
-    Frozen C2 applies the pinned tokenizer to the exact serialized system+user messages. A
-    projection built from the fixed-overhead heuristic is a DIFFERENT method and may not
+    Frozen C2 applies the pinned tokenizer to the exact serialized system+user messages. Both
+    pinned EXACT backends satisfy it — the published Jinja template and, under signed
+    pre-outcome amendment AMD-V72-01, the vendor's own pinned encoder — because both count
+    roles, special tokens and the generation prompt for real.
+
+    A projection built from the fixed-overhead heuristic is a DIFFERENT method and may not
     authorize spend on its own; it needs a signed pre-outcome design amendment, whose id this
-    check reports when one was supplied.
+    check reports when one was supplied. Naming an amendment does NOT convert the heuristic
+    into frozen C2: this function still refuses it.
     """
     if projection.serialization_is_frozen_c2:
         return

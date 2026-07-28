@@ -1548,3 +1548,51 @@ def test_real_renderer_matches_the_frozen_counts_and_coordinates(snapshot):
         assert by_coordinate[key] == request.request_sha256      # smoke IS inside the grid
     assert len(S.plan_full_draws(grid)) == 13_200
     assert len(S.plan_smoke_draws(smoke)) == 240
+
+
+# =======================================================================================
+# PS-7 — the hard stop is checked before EVERY wire call, including retries
+# =======================================================================================
+
+def test_a_retry_cannot_breach_the_hard_stop(tmp_path, monkeypatch):
+    """Codex's PS-7 reproduction, verbatim.
+
+    `execute_plan` gates each logical draw, but the C3 ladder can send up to five times and
+    PS-4 books every attempt. Before the fix: stop $0.0000006, a paid 429 costing $0.0000004
+    followed by a retry costing $0.0000004 -> spent $0.0000008, halted=False. The first call
+    is legitimately allowed; the second must be refused because its worst case breaches it.
+    """
+    _install_study_fakes(monkeypatch)
+    req = fake_study_grid(MODEL, PRIMARY_TAG)[0]
+    store = L.EnvelopeStore(tmp_path / "study")
+
+    queued = [(429, {}, ok_body(cost=0.0000004)), (200, {}, ok_body(cost=0.0000004))]
+
+    class Paid:
+        calls = 0
+
+        def post(self, body, headers, timeout=60.0):
+            type(self).calls += 1
+            status, hdrs, payload = queued.pop(0)
+            return status, hdrs, json.dumps(payload)
+
+    transport = Paid()
+    study_ids = {I.draw_id(req.request_sha256, i) for i in range(I.DRAWS_PER_COORDINATE)}
+    ledger = L.V7Ledger(
+        reconciliation=L.ReconciliationResult(reconciled_usd=0.0, record_count=0),
+        hard_stop_usd=0.0000006,
+        manifest=L.RunManifest.from_draw_ids(
+            study_ids | S.authorised_attempt_draw_ids(study_ids),
+            model=MODEL, endpoint=PRIMARY_TAG))
+
+    run = S.execute_plan(plan=[(req, 0)], model=MODEL, tag=PRIMARY_TAG, key="k", store=store,
+                         ledger=ledger, transport=transport,
+                         worst_case_usd=lambda sha: 0.0000004,
+                         stage="study", bucket="study",
+                         sleep=lambda s: None, clock=lambda: 0.0)
+
+    assert Paid.calls == 1, (
+        f"the retry was sent despite breaching the stop ({Paid.calls} wire calls)")
+    assert ledger.total_spent_usd <= ledger.hard_stop_usd, (
+        f"spent ${ledger.total_spent_usd:.10f} > stop ${ledger.hard_stop_usd:.10f}")
+    assert run.halted, "a stop reached mid-ladder must halt the run"

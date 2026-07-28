@@ -11,6 +11,7 @@ study.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -372,6 +373,11 @@ FIXED_MESSAGES_B = [{"role": "user", "content": "Reply with only the number."}]
 #: exact serialized tokens, bare-content tokens, fixed-overhead heuristic tokens
 FIXED_EXPECTED = {"A": (69, 55, 87), "B": (16, 6, 26)}
 
+#: The same two requests under the PINNED DEEPSEEK vendor encoder (AMD-V72-01) and the pinned
+#: DeepSeek tokenizer: exact serialized tokens, bare-content tokens. Different vocabulary and a
+#: different serialization, hence different integers from `FIXED_EXPECTED`.
+DEEPSEEK_FIXED_EXPECTED = {"A": (52, 48), "B": (10, 6)}
+
 
 def qwen_pinned() -> G.PinnedTokenizer:
     """The real pinned Qwen tokenizer + chat template, hash-verified against the manifest."""
@@ -490,22 +496,173 @@ def test_exact_path_refuses_a_request_without_structured_messages():
                             retry_reserve=0.0, expected_requests=1)
 
 
-def test_deepseek_has_no_pinned_chat_template_and_the_projection_refuses_to_guess():
-    """DeepSeek-V4-Pro publishes no chat template at the pinned revision: `chat_template` is
-    null in `tokenizer_config.json` and no `.jinja` file exists. Frozen C2 is therefore not
-    executable for it, and the gate says so instead of silently substituting a heuristic."""
+def test_deepseek_publishes_no_jinja_template_so_the_pinned_vendor_encoder_is_the_backend():
+    """PS-8 / AMD-V72-01.
+
+    DeepSeek-V4-Pro still publishes NO chat template at the pinned revision: `chat_template`
+    is null in `tokenizer_config.json` and no `.jinja` file exists in the repo. What CHANGED
+    relative to the pre-amendment state is not that fact but the resolution: the snapshot now
+    pins the vendor's OWN published encoder (`encoding_dsv4.py`) as the model's exact C2
+    serialization, so `load_chat_template` still finds nothing while `load_pinned_tokenizer`
+    reaches the exact method by the second, hash-verified route.
+    """
     tok = G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR)
     assert tok.repo_id == "deepseek-ai/DeepSeek-V4-Pro"
-    assert tok.has_chat_template is False
-    assert tok.template is None
+    assert tok.revision == "b5968e9190ef611bbf34a7229255be88a0e937c1"
     assert tok("hello world") > 0                     # it is still a working tokenizer
-    with pytest.raises(G.MissingChatTemplate, match="AMENDMENT"):
-        tok.serialize(FIXED_MESSAGES_A)
+
+    # Unchanged: there is no Jinja template anywhere in the pinned assets.
+    assert tok.has_chat_template is False
     with pytest.raises(G.MissingChatTemplate, match="AMENDMENT"):
         G.load_chat_template(DEEPSEEK_TOKENIZER_DIR, model=DEEPSEEK)
     assert G.load_chat_template(DEEPSEEK_TOKENIZER_DIR, allow_missing=True) is None
 
-    reqs = [G.RenderedRequest(G.CELL_IDS[0], "p0", 0, f"{0:064x}", "t",
+    # New: the pinned vendor encoder IS an exact serializer, and it is labelled as its own
+    # method so no reviewer can mistake it for the Qwen template path.
+    assert tok.has_exact_serialization is True
+    assert isinstance(tok.template, G.VendorEncoder)
+    assert tok.serialization_method == G.SERIALIZATION_VENDOR_ENCODER
+    assert tok.serialization_amendment == "AMD-V72-01"
+    assert tok.serializer is tok.template
+    assert tok.template.source == G.VENDOR_ENCODER_FILENAME == "encoding_dsv4.py"
+    assert tok.template.entry_point == "encode_messages"
+    assert tok.template.flags == {"thinking_mode": "chat", "add_default_bos_token": True,
+                                  "drop_thinking": True, "reasoning_effort": None}
+    ident = tok.identity()
+    assert ident["has_chat_template"] is False
+    assert ident["has_exact_serialization"] is True
+    assert ident["serialization_method"] == G.SERIALIZATION_VENDOR_ENCODER
+    assert ident["serialization_amendment"] == "AMD-V72-01"
+
+
+def test_the_pinned_deepseek_serializer_is_the_exact_reviewed_bytes():
+    """The serializer is evidence, not a convenience: pin its SHA-256 so swapping the file —
+    even for a "better" version of the vendor's own code — fails loudly rather than silently
+    re-pricing the grid."""
+    path = DEEPSEEK_TOKENIZER_DIR / "encoding_dsv4.py"
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    assert digest == (
+        "bdbd57c132a1b3725042323d02b98b9d1df28e5f388f134399555d041f5055e0")
+    assert path.stat().st_size == 27908
+    snapshot = json.loads(G.ENDPOINT_SNAPSHOT.read_text())
+    assert snapshot["tokenizers"][DEEPSEEK]["files"]["encoding_dsv4.py"] == digest
+    # The vendor module imports the standard library ONLY — nothing is fetched or shelled out.
+    source = path.read_text()
+    imports = sorted({ln.split()[1].split(".")[0] for ln in source.splitlines()
+                      if ln.startswith(("import ", "from "))})
+    assert imports == ["copy", "json", "re", "typing"]
+
+
+def test_deepseek_exact_serialization_and_token_count_are_the_frozen_expected_values():
+    """Expected-count test against the REAL pinned assets: exact bytes out of the vendor
+    encoder, exact token count under the pinned DeepSeek tokenizer."""
+    tok = G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR)
+    pair = [{"role": "system", "content": "SYS"}, {"role": "user", "content": "USR"}]
+    assert tok.serialize(pair) == (
+        "<｜begin▁of▁sentence｜>SYS<｜User｜>USR<｜Assistant｜></think>")
+    assert tok.count_messages(pair) == 8
+
+    for key, (exact, content_only) in DEEPSEEK_FIXED_EXPECTED.items():
+        messages = FIXED_MESSAGES_A if key == "A" else FIXED_MESSAGES_B
+        text = tok.serialize(messages)
+        assert text.startswith("<｜begin▁of▁sentence｜>")
+        assert text.endswith("<｜Assistant｜></think>")   # the generation prompt, counted
+        assert tok.count_messages(messages) == exact
+        assert tok("\n".join(m["content"] for m in messages)) == content_only
+        assert exact > content_only                     # special tokens are counted for real
+
+
+def test_a_real_rendered_deepseek_study_request_has_the_frozen_expected_token_count():
+    """The same fixed-count discipline on a REAL rendered study request (the first grid
+    coordinate), not a toy pair: exact 143 under the pinned vendor encoder, bare content 139,
+    retired heuristic 171."""
+    from alignment.q2_v7 import study_render as SR
+
+    grid = SR.render_study_grid(DEEPSEEK, "deepseek", SR.probe_ids_for())
+    req = grid[0].rendered
+    assert req.coordinate == ("baseline::no_guard", "pol_ai_due_process", 0)
+    tok = G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR)
+    serialized = req.exact_serialization(tok.template)
+    assert serialized.startswith(
+        "<｜begin▁of▁sentence｜>You are simulating a single respondent")
+    assert serialized.endswith("<｜Assistant｜></think>")
+    assert tok.count_messages(req.messages) == 143
+    assert tok(req.payload_text) == 139
+    assert tok(req.payload_text) + req.template_overhead_tokens == 171
+
+
+def test_a_deepseek_projection_is_frozen_c2_via_the_pinned_vendor_encoder():
+    """PS-8's whole point: DeepSeek can now reach panel funding authorization, but ONLY through
+    the pinned, hash-verified serializer — never through the fixed-overhead heuristic."""
+    tok = G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR)
+    reqs = [G.RenderedRequest(G.CELL_IDS[i], f"p{i}", 0, f"{i:064x}", r.payload_text,
+                              r.template_overhead_tokens, r.messages_json)
+            for i, r in enumerate(fixed_request(k) for k in ("B", "A"))]
+    proj = G.project_full_grid(
+        model=DEEPSEEK, candidate=candidate(DEEPSEEK, "deepseek"), requests=reqs,
+        tokenizer=tok, completion_allowance_tokens=4, reconciled_prior_gate_spend=0.0,
+        retry_reserve=0.0, expected_requests=2)
+    assert proj.serialization_method == G.SERIALIZATION_VENDOR_ENCODER
+    assert proj.serialization_is_frozen_c2 is True
+    assert proj.serialization_amendment == "AMD-V72-01"
+    exact_b, content_b = DEEPSEEK_FIXED_EXPECTED["B"]
+    exact_a, content_a = DEEPSEEK_FIXED_EXPECTED["A"]
+    assert [r.raw_input_tokens for r in proj.rows] == [exact_b, exact_a]
+    assert [r.content_only_input_tokens for r in proj.rows] == [content_b, content_a]
+    assert all(len(r.serialized_sha256) == 64 for r in proj.rows)
+    assert all(r.serialization_method == G.SERIALIZATION_VENDOR_ENCODER for r in proj.rows)
+    # This is the check `_stage_project` runs before any authorization: it must now PASS.
+    G.require_frozen_c2_serialization(proj)
+    art = proj.as_artifact()
+    assert art["serialization_is_frozen_c2"] is True
+    assert art["serialization_method"] == G.SERIALIZATION_VENDOR_ENCODER
+    assert art["serialization_amendment"] == "AMD-V72-01"
+    assert art["fixed_overhead_fallback_signed_amendment"] is None
+    ident = art["tokenizer_identity"]
+    assert ident["serializer_sha256"] == (
+        "bdbd57c132a1b3725042323d02b98b9d1df28e5f388f134399555d041f5055e0")
+    assert ident["serializer_flags"]["thinking_mode"] == "chat"
+    # Distinct from Qwen's label, so the artifact never conflates the two exact backends.
+    assert G.SERIALIZATION_VENDOR_ENCODER != G.SERIALIZATION_EXACT
+    assert set(G.FROZEN_C2_SERIALIZATIONS) == {G.SERIALIZATION_EXACT,
+                                               G.SERIALIZATION_VENDOR_ENCODER}
+
+
+def test_the_heuristic_is_still_refused_for_deepseek_now_that_an_exact_backend_exists():
+    """The amendment approved ONE substitute — the vendor's own encoder. It did not reopen the
+    fixed-overhead path: naming an amendment for a model that CAN serialize exactly is refused
+    outright, exactly as it is for Qwen."""
+    tok = G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR)
+    r = fixed_request("A")
+    reqs = [G.RenderedRequest(G.CELL_IDS[0], "p0", 0, f"{0:064x}", r.payload_text,
+                              r.template_overhead_tokens, r.messages_json)]
+    kw = dict(model=DEEPSEEK, candidate=candidate(DEEPSEEK, "deepseek"), requests=reqs,
+              tokenizer=tok, completion_allowance_tokens=4, reconciled_prior_gate_spend=0.0,
+              retry_reserve=0.0, expected_requests=1)
+    with pytest.raises(G.SpecViolation, match="must NAME the signed"):
+        G.project_full_grid(**kw, fixed_overhead_fallback_signed_amendment="  ")
+    with pytest.raises(G.SpecViolation, match="fallback is not available"):
+        G.project_full_grid(**kw, fixed_overhead_fallback_signed_amendment="AMD-V72-01")
+    with pytest.raises(G.SpecViolation, match="fallback is not available"):
+        G.project_full_grid(**kw,
+                            fixed_overhead_fallback_signed_amendment="anything-else")
+
+
+def test_a_model_with_no_serializer_at_all_still_refuses_to_guess(tmp_path):
+    """The pre-amendment refusal is intact for any model whose pinned assets carry NEITHER
+    backend: this is the state DeepSeek was in before AMD-V72-01, reproduced here by dropping
+    the `serialization` block from its snapshot entry."""
+    spec = json.loads(G.ENDPOINT_SNAPSHOT.read_text())["tokenizers"][DEEPSEEK]
+    spec = {k: v for k, v in spec.items() if k != "serialization"}
+    spec["files"] = {k: v for k, v in spec["files"].items() if k != "encoding_dsv4.py"}
+    tok = G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR, spec=spec)
+    assert tok.has_exact_serialization is False
+    assert tok.template is None
+    assert tok.serialization_method == G.SERIALIZATION_FIXED_OVERHEAD
+    with pytest.raises(G.MissingChatTemplate, match="AMENDMENT"):
+        tok.serialize(FIXED_MESSAGES_A)
+
+    reqs = [G.RenderedRequest(G.CELL_IDS[0], "p0", 0, f"{0:064x}", "hello there",
                               20, fixed_request("B").messages_json)]
     kw = dict(model=DEEPSEEK, candidate=candidate(DEEPSEEK, "deepseek"), requests=reqs,
               tokenizer=tok, completion_allowance_tokens=4, reconciled_prior_gate_spend=0.0,
@@ -513,27 +670,92 @@ def test_deepseek_has_no_pinned_chat_template_and_the_projection_refuses_to_gues
     with pytest.raises(G.MissingChatTemplate, match="PRE-OUTCOME DESIGN AMENDMENT"):
         G.project_full_grid(**kw)
 
-
-def test_the_fixed_overhead_fallback_must_be_opted_into_by_naming_a_signed_amendment():
-    tok = G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR)
-    reqs = [G.RenderedRequest(G.CELL_IDS[0], "p0", 0, f"{0:064x}", "hello there",
-                              20, fixed_request("B").messages_json)]
-    kw = dict(model=DEEPSEEK, candidate=candidate(DEEPSEEK, "deepseek"), requests=reqs,
-              tokenizer=tok, completion_allowance_tokens=4, reconciled_prior_gate_spend=0.0,
-              retry_reserve=0.0, expected_requests=1)
-    with pytest.raises(G.SpecViolation, match="must NAME the signed"):
-        G.project_full_grid(**kw, fixed_overhead_fallback_signed_amendment="  ")
-
     proj = G.project_full_grid(
         **kw, fixed_overhead_fallback_signed_amendment="v7.3-C2-amendment-UNSIGNED-EXAMPLE")
     assert proj.serialization_method == G.SERIALIZATION_FIXED_OVERHEAD
     assert proj.serialization_is_frozen_c2 is False
+    assert proj.serialization_amendment is None
     assert proj.rows[0].raw_input_tokens == tok("hello there") + 20
-    # Even with an amendment recorded, the projection is NOT the frozen C2 method.
+    # Even with an amendment recorded, the heuristic projection is NOT the frozen C2 method.
     with pytest.raises(G.MissingChatTemplate, match="not the frozen C2"):
         G.require_frozen_c2_serialization(proj)
     assert proj.as_artifact()["fixed_overhead_fallback_signed_amendment"] == (
         "v7.3-C2-amendment-UNSIGNED-EXAMPLE")
+
+
+def test_a_tampered_vendor_serializer_is_refused_before_it_is_ever_executed(tmp_path):
+    """The hash is checked BEFORE the module is imported, so a swapped serializer never runs.
+    A file that would obviously have been caught at runtime is used deliberately: the point is
+    that it is rejected by its bytes, not by its behaviour."""
+    for name in ("tokenizer.json", "tokenizer_config.json", "encoding_dsv4.py"):
+        (tmp_path / name).write_bytes((DEEPSEEK_TOKENIZER_DIR / name).read_bytes())
+    (tmp_path / "encoding_dsv4.py").write_text(
+        "raise SystemExit('this must never execute')\n")
+    with pytest.raises(G.SpecViolation, match="hashes to"):
+        G.load_pinned_tokenizer(DEEPSEEK, tmp_path)
+
+    # A single flipped byte inside the real serializer is equally fatal.
+    real = (DEEPSEEK_TOKENIZER_DIR / "encoding_dsv4.py").read_text()
+    (tmp_path / "encoding_dsv4.py").write_text(real + "\n# harmless-looking comment\n")
+    with pytest.raises(G.SpecViolation, match="hashes to"):
+        G.load_pinned_tokenizer(DEEPSEEK, tmp_path)
+
+    # And an absent serializer is refused rather than skipped.
+    (tmp_path / "encoding_dsv4.py").unlink()
+    with pytest.raises(G.SpecViolation, match="absent"):
+        G.load_pinned_tokenizer(DEEPSEEK, tmp_path)
+
+
+@pytest.mark.parametrize("field,value,match", [
+    ("method", "hand_transcribed_template", "unknown pinned serialization method"),
+    ("module", "encoding_other.py", "is not the reviewed"),
+    ("entry_point", "encode", "entry point"),
+    ("amendment", "AMD-V72-02", "signed pre-outcome amendment"),
+])
+def test_a_snapshot_that_declares_an_unreviewed_serializer_is_refused(field, value, match):
+    """The snapshot is the record, but it may only record the values that were reviewed; a
+    serializer swapped in the manifest alone never reaches execution."""
+    spec = json.loads(G.ENDPOINT_SNAPSHOT.read_text())["tokenizers"][DEEPSEEK]
+    spec["serialization"] = dict(spec["serialization"], **{field: value})
+    with pytest.raises(G.SpecViolation, match=match):
+        G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR, spec=spec)
+
+
+@pytest.mark.parametrize("flags", [
+    {"thinking_mode": "thinking", "add_default_bos_token": True, "drop_thinking": True,
+     "reasoning_effort": None},
+    {"thinking_mode": "chat", "add_default_bos_token": False, "drop_thinking": True,
+     "reasoning_effort": None},
+    {"thinking_mode": "chat", "add_default_bos_token": True, "drop_thinking": True,
+     "reasoning_effort": "high"},
+    {"thinking_mode": "chat"},
+])
+def test_the_vendor_encoder_rendering_flags_are_frozen(flags):
+    """Different flags are a different serialization and therefore a different price. Only the
+    reviewed combination is executable."""
+    spec = json.loads(G.ENDPOINT_SNAPSHOT.read_text())["tokenizers"][DEEPSEEK]
+    spec["serialization"] = dict(spec["serialization"], flags=flags)
+    with pytest.raises(G.SpecViolation, match="flags"):
+        G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR, spec=spec)
+
+
+def test_a_serializer_may_not_be_pinned_for_a_model_that_publishes_a_template():
+    """Two exact backends for one model would leave it ambiguous which bytes were priced."""
+    doc = json.loads(G.ENDPOINT_SNAPSHOT.read_text())["tokenizers"]
+    spec = dict(doc[QWEN], serialization=doc[DEEPSEEK]["serialization"])
+    with pytest.raises(G.SpecViolation, match="ambiguous"):
+        G.load_pinned_tokenizer(QWEN, QWEN_TOKENIZER_DIR, spec=spec)
+
+
+def test_the_vendor_encoder_serialization_is_deterministic_across_loads():
+    a = G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR)
+    b = G.load_pinned_tokenizer(DEEPSEEK, DEEPSEEK_TOKENIZER_DIR)
+    assert a.serialize(FIXED_MESSAGES_A) == b.serialize(FIXED_MESSAGES_A)
+    assert a.count_messages(FIXED_MESSAGES_A) == b.count_messages(FIXED_MESSAGES_A)
+    with pytest.raises(G.SpecViolation, match="empty message list"):
+        a.template.render([])
+    with pytest.raises(G.SpecViolation, match="add_generation_prompt"):
+        a.template.render(FIXED_MESSAGES_A, add_generation_prompt=False)
 
 
 def test_an_amendment_is_refused_when_the_frozen_method_is_actually_executable():

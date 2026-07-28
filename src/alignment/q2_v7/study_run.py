@@ -118,6 +118,14 @@ class StudyRunError(RuntimeError):
     """Fail-closed runner failure."""
 
 
+class HardStopReached(StudyRunError):
+    """A wire call was refused because it would breach the $8.50 hard stop (PS-7).
+
+    Raised from inside the retry ladder so the ladder terminates WITHOUT sending, rather than
+    letting a retry spend past a stop its predecessor was legitimately allowed under.
+    """
+
+
 class CapabilityExclusion(StudyRunError):
     """No endpoint in the model's frozen sequence passed (a)+(b)+(c).
 
@@ -1844,7 +1852,8 @@ def _send_draw(*, request: StudyRequestLike, draw_index: int, model: str, tag: s
                transport: Transport, stage: str, bucket: str, sleep: G.Sleeper,
                clock: G.Clock, max_attempts: int,
                snapshot: Optional[E.Snapshot] = None,
-               attempts: Optional[L.EnvelopeStore] = None) -> DrawOutcome:
+               attempts: Optional[L.EnvelopeStore] = None,
+               worst_case_call_usd: float = 0.0) -> DrawOutcome:
     """Send ONE study draw under the frozen C3 retry policy, persisting EVERY attempt (PS-4).
 
     Each wire attempt is persisted and booked under its own immutable attempt identity in the
@@ -1874,6 +1883,14 @@ def _send_draw(*, request: StudyRequestLike, draw_index: int, model: str, tag: s
     attempt_failures: list[tuple[str, ...]] = []
 
     def send() -> G.AttemptOutcome:
+        # PS-7: the hard stop must be checked immediately before EVERY wire call, not once
+        # per logical draw. `execute_plan` gates the draw, but the C3 ladder can then send up
+        # to five times; each earlier attempt is booked (PS-4), so a retry can breach the stop
+        # after its predecessor was legitimately allowed. Reserving all five up front is the
+        # wrong fix -- it would halt otherwise valid draws whose retries are never used.
+        decision = ledger.must_halt_before_next_call(worst_case_call_usd)
+        if decision.halt:
+            raise HardStopReached(decision.reason)
         wire = _post_once(transport, request.body, headers)
         index = len(wires)
         wires.append(wire)
@@ -1978,17 +1995,26 @@ def execute_plan(*, plan: Sequence[tuple[StudyRequestLike, int]], model: str, ta
             n_reused += 1
             continue
 
-        decision = ledger.must_halt_before_next_call(worst_case_usd(request.request_sha256))
+        worst_case = worst_case_usd(request.request_sha256)
+        decision = ledger.must_halt_before_next_call(worst_case)
         if decision.halt:
             halted = True
             halt_reason = decision.reason
             break
 
-        outcomes.append(_send_draw(
-            request=request, draw_index=draw_index, model=model, tag=tag, headers=headers,
-            store=store, ledger=ledger, transport=transport, stage=stage, bucket=bucket,
-            sleep=sleep, clock=clock, max_attempts=max_attempts, snapshot=snapshot,
-            attempts=attempts))
+        try:
+            outcomes.append(_send_draw(
+                request=request, draw_index=draw_index, model=model, tag=tag, headers=headers,
+                store=store, ledger=ledger, transport=transport, stage=stage, bucket=bucket,
+                sleep=sleep, clock=clock, max_attempts=max_attempts, snapshot=snapshot,
+                attempts=attempts, worst_case_call_usd=worst_case))
+        except HardStopReached as exc:
+            # PS-7: a RETRY would have breached the stop. Everything already sent is durable
+            # and booked; the ladder stopped without sending again. The run halts here and the
+            # model is reported incomplete with no headline.
+            halted = True
+            halt_reason = str(exc)
+            break
         n_sent += 1
 
     return PlanRun(outcomes=tuple(outcomes), halted=halted, halt_reason=halt_reason,

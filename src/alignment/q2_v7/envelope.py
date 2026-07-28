@@ -55,7 +55,17 @@ MAX_TOKENS: int = 4
 REASONING_OFF: dict = {"effort": "none"}
 #: v7.2 C1: the bound snapshot artifact and its digest.
 SNAPSHOT_PATH = "out/q2_stage2_endpoint_snapshot/manifest.json"
-SNAPSHOT_SHA256 = "4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f"
+#: SHA-256 of the committed `manifest.json`.
+#:
+#: v7.2 closure froze this at
+#: `4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f`. Signed pre-outcome
+#: amendment **AMD-V72-01** (PS-8) added the pinned DeepSeek vendor serializer
+#: (`encoding_dsv4.py`, its SHA-256 and its frozen rendering flags) to the DeepSeek tokenizer
+#: entry — the only edit — which re-digests the manifest to the value below. No candidate,
+#: price, endpoint or raw-file hash changed.
+SNAPSHOT_SHA256 = "d9a5d0e061bf222ee7d12bd056c0f7ccaeadfab16db47da1fcf581d52dd3a72b"
+SNAPSHOT_SHA256_PRE_AMD_V72_01 = (
+    "4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f")
 #: C1 proof: OpenRouter must have routed directly, first attempt, one candidate, no BYOK.
 REQUIRED_STRATEGY = "direct"
 REQUIRED_ATTEMPT = 1

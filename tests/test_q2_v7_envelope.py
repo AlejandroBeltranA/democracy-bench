@@ -214,6 +214,14 @@ def test_blank_key_fails_closed(bad):
 
 def test_snapshot_binds_to_the_frozen_sha256(snap):
     assert snap.sha256 == E.SNAPSHOT_SHA256
+    # AMD-V72-01 (PS-8) re-digested the manifest when the pinned DeepSeek vendor serializer was
+    # added. Both the current and the superseded digests are pinned here as literals so a
+    # silent edit to either the constant or the artifact fails loudly.
+    assert E.SNAPSHOT_SHA256 == (
+        "d9a5d0e061bf222ee7d12bd056c0f7ccaeadfab16db47da1fcf581d52dd3a72b")
+    assert E.SNAPSHOT_SHA256_PRE_AMD_V72_01 == (
+        "4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f")
+    assert E.SNAPSHOT_SHA256 != E.SNAPSHOT_SHA256_PRE_AMD_V72_01
     assert snap.sha256 == hashlib.sha256(SNAPSHOT.read_bytes()).hexdigest()
 
 
@@ -259,6 +267,29 @@ def test_snapshot_exposes_raw_file_hashes_and_tokenizers(snap):
     assert snap.raw_file_sha256["qwen_qwen3.5-397b-a17b_endpoints.json"].startswith("75f6ac9d")
     assert snap.tokenizers[QWEN]["revision"] == "8472618112abcbd45acbcdc58436aff4233c23f7"
     assert len(snap.sources) == 2
+
+
+def test_snapshot_pins_the_deepseek_vendor_serializer_under_amd_v72_01(snap):
+    """PS-8 / AMD-V72-01. DeepSeek-V4-Pro publishes no Jinja chat template at the pinned
+    revision, so the snapshot pins the vendor's OWN encoder — its bytes, its entry point and
+    its rendering flags — as that model's exact C2 serialization. Qwen is untouched and still
+    reaches the exact method through its published template."""
+    ds = snap.tokenizers[DEEPSEEK]
+    assert ds["revision"] == "b5968e9190ef611bbf34a7229255be88a0e937c1"
+    assert ds["files"]["encoding_dsv4.py"] == (
+        "bdbd57c132a1b3725042323d02b98b9d1df28e5f388f134399555d041f5055e0")
+    block = ds["serialization"]
+    assert block["amendment"] == "AMD-V72-01"
+    assert block["method"] == "vendor_encoder"
+    assert block["module"] == "encoding_dsv4.py"
+    assert block["entry_point"] == "encode_messages"
+    assert block["flags"] == {"thinking_mode": "chat", "add_default_bos_token": True,
+                              "drop_thinking": True, "reasoning_effort": None}
+    assert block["expected_example"]["serialized"] == (
+        "<｜begin▁of▁sentence｜>SYS<｜User｜>USR<｜Assistant｜></think>")
+    # Qwen keeps the Jinja path and gains no serialization block.
+    assert "serialization" not in snap.tokenizers[QWEN]
+    assert "chat_template.jinja" in snap.tokenizers[QWEN]["files"]
 
 
 def test_snapshot_fails_closed_on_sha_mismatch():

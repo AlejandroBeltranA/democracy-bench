@@ -1087,6 +1087,15 @@ even then, only the minimal synthetic capability canary.
 
 Immutable snapshot fetched by a free, read-only catalog GET (no paid or study call):
 
+> **[SUPERSEDED DIGEST — see AMD-V72-01 at end of file.** The manifest digest below was
+> accurate at v7.2 sign-off and is retained as the historical record. AMD-V72-01 adds the
+> pinned DeepSeek serializer to the snapshot, so the current digest is
+> `d9a5d0e061bf222ee7d12bd056c0f7ccaeadfab16db47da1fcf581d52dd3a72b`. Nothing else in the
+> snapshot changed; the superseded value is kept in code as
+> `envelope.SNAPSHOT_SHA256_PRE_AMD_V72_01`. Sol's v7.2 verification and vote later in this
+> file quote the superseded digest and are deliberately left unedited — they were correct when
+> signed.**]**
+
 - artifact dir: `out/q2_stage2_endpoint_snapshot/`
 - `manifest.json` — **SHA-256 `4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f`**
   - `qwen_qwen3.5-397b-a17b_endpoints.json` — SHA-256 `75f6ac9dea5c6890…`
@@ -1212,3 +1221,112 @@ study/smoke call.
 after the hardened runner passes R-E1--R-E7, S-F1--S-F6, and every v7.2 no-network test, this
 vote authorizes the minimal synthetic canary. The endpoint-promotion gate, 240-draw smoke, and
 13,200-call study remain separately staged exactly as specified above.
+
+## AMD-V72-01 — pinned DeepSeek chat serialization (PRE-OUTCOME amendment; proposed by Fable 2026-07-28, for Alex + Sol)
+
+**Status.** PROPOSED, PRE-OUTCOME. Narrow: it changes ONE frozen input — how the DeepSeek
+side of the C2 cost projection obtains its exact serialized model input. It does not touch
+the panel, the cells, probes, orders, estimands, sampling volume, the $8.50 stop, the
+promotion rules, or the blinding interlock. No substantive outcome has been viewed. No smoke
+or study call is authorized by this amendment.
+
+### Why an amendment is required
+
+Frozen C2 requires applying each model's pinned official tokenizer to the **exact serialized
+system+user input** for all 528 requests. For `qwen/qwen3.5-397b-a17b` that is satisfied by the
+published `chat_template.jinja`, already pinned and hash-verified.
+
+`deepseek/deepseek-v4-pro` publishes **no chat template in any form** at the pinned revision
+`b5968e9190ef611bbf34a7229255be88a0e937c1`: `tokenizer_config.chat_template` is null, there is
+no `.jinja` file, and the complete 75-entry repository listing contains none. The frozen method
+therefore requires an input the pinned revision does not publish.
+
+The pre-smoke re-audit (PS-8) recorded the consequence: without a DeepSeek projection its
+promotion cannot be authorized; without that record the panel funding record cannot be written;
+and without panel funding **even the Qwen smoke correctly refuses**. It also ruled out the
+obvious shortcut — DeepSeek must NOT be recorded as a capability exclusion, because its
+endpoint walk passed on its primary endpoint and doing so would misstate the evidence.
+
+### What is adopted
+
+DeepSeek's own published encoder, pinned by content:
+
+| | |
+|---|---|
+| file | `encoding/encoding_dsv4.py` |
+| source | `deepseek-ai/DeepSeek-V4-Pro` @ `b5968e9190ef611bbf34a7229255be88a0e937c1` |
+| bytes | 27,908 |
+| sha256 | `bdbd57c132a1b3725042323d02b98b9d1df28e5f388f134399555d041f5055e0` |
+| local pin | `out/q2_stage2_tokenizers/deepseek/encoding_dsv4.py` |
+| imports | stdlib only (`typing`, `copy`, `json`, `re`) — no third-party code executes |
+| entry point | `encode_messages` |
+
+**Frozen rendering flags:** `thinking_mode="chat"`, `add_default_bos_token=True`,
+`drop_thinking=True`, `reasoning_effort=None`.
+
+**Verified serialization** (obtained by executing the pinned encoder, not transcribed):
+
+```
+<｜begin▁of▁sentence｜>{system}<｜User｜>{user}<｜Assistant｜></think>
+```
+
+### Why the vendor encoder rather than a transcribed template
+
+A hand-written Jinja equivalent would have to reproduce the BOS token, the `<｜User｜>` /
+`<｜Assistant｜>` special tokens, the passthrough system/user templates, and the trailing
+`</think>` that chat mode appends. Every one of those is a transcription that could silently
+drift from the served format — precisely the class of error C2's "exact serialized input"
+requirement exists to prevent. Executing the model author's own encoder removes that risk, and
+the file is hash-pinned so a substituted encoder fails loudly. Its stdlib-only imports mean
+pinning it introduces no dependency and no third-party execution.
+
+### What this does NOT claim
+
+It does not claim the serving provider (`deepseek` first-party endpoint on OpenRouter) applies
+byte-identical serialization. That is unobservable from outside, exactly as it is for Qwen's
+published template. The claim is narrower and is the same one C2 makes for every model: the
+projection uses the **model author's published serialization** at the pinned revision. The 10%
+margin and the returned `prompt_tokens` from the smoke remain the empirical checks on drift.
+
+### Consequences
+
+1. The endpoint snapshot gains the pinned serializer and a `serialization` block; its SHA-256
+   therefore CHANGES, and must be re-bound by any promotion, projection and funding record.
+   Records bound to the old digest are correctly invalidated.
+
+   | | |
+   |---|---|
+   | superseded digest | `4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f` |
+   | **digest under AMD-V72-01** | **`d9a5d0e061bf222ee7d12bd056c0f7ccaeadfab16db47da1fcf581d52dd3a72b`** |
+
+   Only the DeepSeek tokenizer entry changed: `encoding_dsv4.py` added to `files`, plus the
+   `serialization` block. No candidate, price, endpoint or raw-file hash moved, and Qwen's
+   entry is untouched. The superseded digest is retained in code as
+   `envelope.SNAPSHOT_SHA256_PRE_AMD_V72_01` so the provenance is readable without git
+   archaeology. The existing `out/q2_stage2_v7_study/` manifests bind the OLD digest and are
+   therefore correctly invalidated — which is consistent with the re-audit's requirement to
+   rerun `walk`/`project` in a fresh run directory anyway.
+
+   **Verified counts under the pinned encoder** (real assets, not stubs): the representative
+   system+user pair serializes to 8 tokens; the first real study coordinate
+   (`baseline::no_guard` / `pol_ai_due_process` / order 0) is **143 exact** vs 139 bare content
+   and 171 under the retired heuristic. Qwen's twin coordinate is unchanged at 161/147/179.
+
+   The two exact backends are labelled DISTINCTLY in the projection artifact
+   (`pinned_chat_template` vs `pinned_vendor_encoder`) so a reviewer can tell from the artifact
+   which pinned bytes priced the grid; `serialization_is_frozen_c2` is membership in that pair.
+2. `require_frozen_c2_serialization` passes for DeepSeek only via this pinned, hash-verified
+   route. The fixed-overhead heuristic stays refused for both models.
+3. Expected-count tests pin the serialized string and its token count against the real assets.
+
+### Votes (AMD-V72-01)
+
+A: [AGREE, 2026-07-28] F: [AGREE, as drafter] S: [ ]
+
+Alex approved option 1 (pin an explicit DeepSeek serialization) over a conservative
+length-calibration or a panel narrowing, and signed the amendment as drafted.
+
+Sol's review should cover: whether the vendor encoder is an acceptable substitute for a
+published template under C2; the frozen flag set; the snapshot re-pin and its ripple through
+bound records; and the explicit non-claim about provider-side serialization. No smoke or study
+call before this amendment is signed and the re-review passes against a clean commit.

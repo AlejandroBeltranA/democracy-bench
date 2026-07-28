@@ -797,8 +797,11 @@ def test_artifact_regenerates_every_reported_number(complete_result):
     assert set(body["audit"]["parse"]["per_cell"]) == set(CELLS)
     # promoted endpoint + snapshot hash + manifest hash + reconciled spend
     assert body["endpoint"]["promoted_endpoint"] == PROVIDER
+    # AMD-V72-01 (PS-8) re-digested manifest.json when the pinned DeepSeek vendor serializer
+    # was added; the extractor defaults to `envelope.SNAPSHOT_SHA256`, so this literal moved
+    # with it. Pre-amendment value: 4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff...
     assert body["endpoint"]["endpoint_snapshot_sha256"] == \
-        "4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f"
+        "d9a5d0e061bf222ee7d12bd056c0f7ccaeadfab16db47da1fcf581d52dd3a72b"
     assert body["manifest_sha256"] == ID.canonical_sha256(manifest_body())
     assert body["spend"]["run_usd"] == pytest.approx(G.DRAWS_PER_MODEL * 1e-7)
     assert body["spend"]["hard_stop_usd"] == LG.HARD_STOP_USD

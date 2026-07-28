@@ -3,11 +3,138 @@
 Reviewer: Codex  
 Date: 2026-07-28  
 Reviewed branch: `phase4-floor-guards`  
-Current reviewed HEAD: `84a3fa8` — *Promote both models on their primary endpoints; pin tokenizers; project the full grid*
+Current reviewed HEAD: `091b948` — *Close PS-1--PS-6 from the pre-smoke re-audit; frozen C2 serialization is now enforced*
 
 Original review baseline: `4d0c5ac` — *Build hardened Q2 Stage-2 v7.2 runner; synthetic canary passes on Qwen3.5-397B*
 
-Current implementation scope: cumulative Stage-2 code from `80399d7` through `84a3fa8`
+Current implementation scope: cumulative Stage-2 code from `80399d7` through `091b948`
+
+## Finalization re-review — `091b948`
+
+### Verdict
+
+**HOLD. Do not run smoke from this revision yet.**
+
+Claude's PS-1--PS-6 changes are substantive and mostly correct. The re-review confirms
+that the implementation now has:
+
+- model-specific promotion plus panel-level funding authorization records;
+- authorization and projection verification before transport construction;
+- content-addressed, write-once projection evidence;
+- exact pinned Qwen chat serialization;
+- append-only persistence and accounting for every returned retry attempt;
+- full-envelope canary-derived binding;
+- exact decimal ledger arithmetic.
+
+The focused suites exercised in this pass are green:
+
+```text
+tests/test_q2_v7_canary.py
+tests/test_q2_v7_gate.py
+tests/test_q2_v7_ledger.py
+tests/test_q2_v7_study_run.py
+
+260 passed in 265.93s
+```
+
+```text
+tests/test_q2_v7_envelope.py
+tests/test_q2_v7_identity.py
+tests/test_q2_v7_conformance.py
+tests/test_q2_v7_interlock.py
+tests/test_q2_v7_study_render.py
+tests/test_q2_v7_study_conformance.py
+
+604 passed, 1 skipped in 13.20s
+```
+
+No network or paid call was made by this re-review.
+
+Two issues remain. The first is a reproducible implementation defect. The second is the
+explicit pre-outcome decision that Claude's own fix correctly surfaced rather than hiding.
+
+### PS-7 — retries bypass the hard-stop check
+
+**Priority: P1 — paid-execution blocker**
+
+`execute_plan` checks `ledger.must_halt_before_next_call(...)` once before starting a
+logical draw (`src/alignment/q2_v7/study_run.py:1973-1991`). `_send_draw` can then invoke
+the wire sender up to five times through `execute_with_retries`, but its nested `send`
+function does not repeat the ledger check (`study_run.py:1876-1898`).
+
+This is not hypothetical. A no-network reproduction used:
+
+- hard stop: `$0.0000006`;
+- first attempt: paid HTTP 429 costing `$0.0000004`;
+- retry: HTTP 200 costing `$0.0000004`;
+- per-call worst case: `$0.0000004`.
+
+Observed result:
+
+```text
+transport_calls=2
+spent=0.0000008
+hard_stop=0.0000006
+overspent=True
+halted=False
+```
+
+The first call is allowed. After it is booked, the second call must be refused because its
+worst case would breach the stop. The current code sends it.
+
+Required fix:
+
+1. Pass the per-call worst-case amount into `_send_draw`.
+2. Immediately before **every** `_post_once`, including retries, call the exact-money ledger
+   pre-call gate.
+3. If the retry would breach the stop, terminate the retry ladder without sending it and
+   return/record a halted incomplete run with no headline.
+4. Add the reproduction above as a no-network regression test.
+
+Do not solve this by reserving five calls at the outer draw check: unused retries would
+unnecessarily halt otherwise valid draws. The invariant is simply “check immediately
+before every actual wire call.”
+
+### PS-8 — DeepSeek cannot currently reach panel funding authorization
+
+**Priority: P0 — explicit pre-smoke decision required**
+
+The new C2 guard correctly rejects DeepSeek because its pinned repository revision contains
+no chat template. `_stage_project` refuses any projection that did not use frozen exact
+serialization (`src/alignment/q2_v7/study_run.py:2290-2307`).
+
+At the same time, panel funding requires a promotion/exclusion authorization record for
+every frozen panel model (`study_run.py:1517-1541`). The existing DeepSeek walk promoted
+the primary endpoint, so it is not a capability exclusion. Without a valid DeepSeek
+projection, its promotion cannot be authorized; without that record, the panel funding
+record cannot be written; without panel funding, even Qwen smoke correctly refuses.
+
+This is not a code nuance. The frozen method requires an input that the pinned DeepSeek
+revision does not publish. Choose one pre-outcome resolution:
+
+1. **Recommended:** adopt and pin an explicit DeepSeek chat template as a narrow signed
+   amendment, with its source, exact bytes, SHA-256, rendering flags, and expected-count
+   tests; or
+2. approve a different sealed conservative DeepSeek length-calibration method as a signed
+   amendment, with evidence that it upper-bounds the full 528-request grid.
+
+Do not mark DeepSeek as a capability exclusion merely to get past the funding gate: its
+endpoint walk passed, so that would misstate the evidence.
+
+### Minimal path to smoke
+
+There is no need for another broad rewrite:
+
+- [ ] fix PS-7 and add its one regression test;
+- [ ] record the narrow PS-8 pre-outcome amendment and implement its deterministic input;
+- [ ] rerun `walk`/`project` in a fresh run directory as required by `091b948`;
+- [ ] record both model promotion decisions and the panel funding decision;
+- [ ] rerun the focused pre-smoke gate;
+- [ ] review the exact clean commit and fresh artifacts.
+
+After those checks pass, Qwen smoke can be authorized immediately. The extractor/CLI
+integration noted later in this document remains a pre-**full-run** item, not a reason to
+delay a valid outcome-blinded smoke.
 
 ## Pre-smoke re-audit — 2026-07-28
 

@@ -43,7 +43,14 @@ SUBMODULES = ("envelope", "ledger", "identity", "gate")
 PKG_DIR = REPO / "src" / "alignment" / "q2_v7"
 
 SNAPSHOT_DIR = REPO / "out" / "q2_stage2_endpoint_snapshot"
-SNAPSHOT_MANIFEST_SHA256 = "4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f"
+# v7.2 closure froze this at 4b4b11a4...80b295f. Signed pre-outcome amendment AMD-V72-01
+# (PS-8) added the pinned DeepSeek vendor serializer — `encoding_dsv4.py`, its SHA-256 and its
+# frozen rendering flags — to the DeepSeek tokenizer entry, which re-digests the manifest to
+# the value below. No candidate, price, endpoint or raw-file hash changed; the raw-file pins
+# and the nine-candidate assertions below are unchanged and still verify the freeze.
+SNAPSHOT_MANIFEST_SHA256 = "d9a5d0e061bf222ee7d12bd056c0f7ccaeadfab16db47da1fcf581d52dd3a72b"
+SNAPSHOT_MANIFEST_SHA256_PRE_AMD_V72_01 = (
+    "4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f")
 SNAPSHOT_RAW_SHA256 = {
     "qwen_qwen3.5-397b-a17b_endpoints.json":
         "75f6ac9dea5c6890bf42fada0e884b81b5d21b8e48ad45f0b546e6c4ae73a3d2",

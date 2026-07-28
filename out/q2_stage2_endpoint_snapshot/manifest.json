@@ -32,7 +32,30 @@
       "source": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro",
       "files": {
         "tokenizer.json": "8f9f37ca37fdc4f5fd36d5cf4d3b0e8392edb4e894fd10cc0d70b4957c8633cf",
-        "tokenizer_config.json": "6ac8c8dc065ed118161d02dd532749ae3f52c243deac27872134fae2f50d8547"
+        "tokenizer_config.json": "6ac8c8dc065ed118161d02dd532749ae3f52c243deac27872134fae2f50d8547",
+        "encoding_dsv4.py": "bdbd57c132a1b3725042323d02b98b9d1df28e5f388f134399555d041f5055e0"
+      },
+      "serialization": {
+        "amendment": "AMD-V72-01",
+        "method": "vendor_encoder",
+        "module": "encoding_dsv4.py",
+        "entry_point": "encode_messages",
+        "flags": {
+          "thinking_mode": "chat",
+          "add_default_bos_token": true,
+          "drop_thinking": true,
+          "reasoning_effort": null
+        },
+        "source": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/b5968e9190ef611bbf34a7229255be88a0e937c1/encoding_dsv4.py",
+        "rationale": "deepseek-ai/DeepSeek-V4-Pro publishes NO Jinja chat template at the pinned revision (tokenizer_config.chat_template is null and no .jinja file exists in the 75-file repo), so the frozen C2 method has no template to apply. It DOES publish its own official prompt encoder, pinned here byte-for-byte. Signed pre-outcome amendment AMD-V72-01 adopts that vendor encoder, at these exact flags, as the model's exact serialization. Using the vendor's own code rather than a hand-transcribed template removes transcription risk, which is the point of pinning. The module imports only the standard library (typing, copy, json, re).",
+        "expected_example": {
+          "messages": [
+            {"role": "system", "content": "SYS"},
+            {"role": "user", "content": "USR"}
+          ],
+          "serialized": "<｜begin▁of▁sentence｜>SYS<｜User｜>USR<｜Assistant｜></think>",
+          "tokens": 8
+        }
       }
     }
   },
