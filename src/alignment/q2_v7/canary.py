@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Optional, Sequence
 
 from alignment.q2_v7 import envelope as E
+from alignment.q2_v7 import identity as I
 from alignment.q2_v7 import ledger as L
 from alignment.q2_v7.gate import (
     BACKOFF_BASE_S,
@@ -84,6 +85,9 @@ PRIOR_DIAGNOSTIC_COMPONENTS: tuple[L.NonReconciledComponent, ...] = (
 CANARY_SYSTEM = ("Answer with exactly one character: a single digit from 1 to 4. "
                  "Output nothing else — no words, no punctuation, no explanation.")
 CANARY_USER = "Reply with the digit 2."
+#: The prompt asks for exactly this option, so the canary can assert the ANSWER, not just
+#: the wire format (R-C6).
+EXPECTED_OPTION = 2
 
 STAGE = "canary"
 BUCKET = "canary"
@@ -190,13 +194,18 @@ class CanaryResult:
     audit_failures: tuple[str, ...]
     reasoning_ok: bool
     reasoning_failures: tuple[str, ...]
+    parse_ok: bool
+    parse_reason: str
     reused: bool
     error: Optional[str]
 
     @property
     def passed(self) -> bool:
+        # R-C6: the wire-format claim is only meaningful if the ANSWER parses under the
+        # frozen anchored rule. Without this the live canary is weaker than the promotion
+        # gate it feeds, and empty/prose/out-of-range content would pass.
         return (self.http_status == 200 and self.audit_ok and self.reasoning_ok
-                and self.cost_usd is not None and self.error is None)
+                and self.parse_ok and self.cost_usd is not None and self.error is None)
 
 
 def canary_messages() -> list[dict]:
@@ -207,18 +216,26 @@ def canary_messages() -> list[dict]:
 def run_one(*, model: str, tag: str, key: str, snapshot: E.Snapshot,
             store: L.EnvelopeStore, ledger: L.V7Ledger,
             transport: LiveTransport) -> CanaryResult:
-    """One synthetic canary call, persisted and booked before any validation."""
-    body = E.build_sampling_request(model, tag, canary_messages())
-    sha = E.canonical_request_sha256(body)
-    draw = L.DrawIdentity(request_sha256=sha, draw_index=0)
+    """One synthetic canary call, persisted and accounted before any validation."""
+    body, draw = planned_draw(model, tag)
 
-    # restart: an already-persisted draw is never repaid
-    if store.has(draw.draw_id):
-        return CanaryResult(model, tag, 200, None, None, None, None,
-                            True, (), True, (), True, None)
+    # R-C1: a persisted draw is REPLAYED FROM ITS RECORD, never assumed successful. The
+    # prior DeepSeek 404 envelope must stay a failure on restart; the existence of a file
+    # is not evidence of success.
+    existing = store.get(draw.draw_id)
+    if existing is not None:
+        if existing.request_sha256 != draw.request_sha256:
+            raise CanaryError(
+                f"persisted envelope {draw.draw_id} has request hash "
+                f"{existing.request_sha256} != recomputed {draw.request_sha256}")
+        return _evaluate(model, tag, status=existing.http_status,
+                         response=existing.response_body or {},
+                         resp_headers=existing.response_headers or {},
+                         cost=existing.cost_usd, snapshot=snapshot,
+                         err=None if existing.cost_usd is not None else "cost_unreconciled",
+                         reused=True)
 
     headers = E.request_headers(key)
-    # pre-call hard-stop check (worst case is far below any cap, but the gate is frozen)
     ledger.check_before_call(0.01, label=f"{STAGE}:{model}@{tag}")
 
     status, resp_headers, raw = transport.post(body, headers)
@@ -227,46 +244,99 @@ def run_one(*, model: str, tag: str, key: str, snapshot: E.Snapshot,
     except json.JSONDecodeError:
         response = {"_unparseable_body": raw}
 
-    # R-E1: persist BEFORE anything that can fail
-    env = L.build_envelope(draw=draw, request_body=body, request_headers=headers,
-                           response_body=response, response_headers=resp_headers,
-                           http_status=status, bucket=BUCKET, model=model,
-                           provider=tag, stage=STAGE)
-    store.put(env)
-
-    if status != 200:
-        return CanaryResult(model, tag, status, None, None, None, None,
-                            False, ("http_error",), False, ("http_error",), False,
-                            (raw or "")[:300])
-
-    # S-F2: a response-cache HIT is a replay, not an independent draw — fail closed.
-    # R-E2: book the returned cost (fails closed if absent).
-    cost = None
-    err = None
+    # R-C3: EVERY returned response goes through record_response — persist first, then book
+    # any finite returned cost, regardless of HTTP status, audit, parse or cache outcome.
+    # Some provider/error responses still incur prompt cost; validity is a separate question
+    # from accounting.
+    cost: Optional[float] = None
+    err: Optional[str] = None
     try:
-        L.reject_cache_hit(response, resp_headers)
-        cost = L.returned_cost(response)
-        ledger.book_envelope(env)
+        recorded = L.record_response(
+            store=store, ledger=ledger, draw=draw, request_body=body,
+            request_headers=headers, response_body=response,
+            response_headers=resp_headers, http_status=status, bucket=BUCKET,
+            model=model, provider=tag, stage=STAGE)
+        cost = recorded.booked_cost_usd
+    except L.CostAccountingError as e:
+        err = f"CostAccountingError: {e}"      # envelope is durable; needs reconciliation
     except L.LedgerError as e:
         err = f"{type(e).__name__}: {e}"
 
+    # S-F2 exclusion is a VALIDITY finding, recorded separately from accounting.
+    try:
+        L.reject_cache_hit(response, resp_headers)
+    except L.CacheHitRejected as e:
+        err = f"CacheHitRejected: {e}"
+
+    result = _evaluate(model, tag, status=status, response=response,
+                       resp_headers=resp_headers, cost=cost, snapshot=snapshot,
+                       err=err, reused=False)
+    _write_derived(store, draw, result, status, err, cost)
+    return result
+
+
+def _write_derived(store: L.EnvelopeStore, draw: L.DrawIdentity, result: "CanaryResult",
+                   status: int, err: Optional[str], cost: Optional[float]) -> None:
+    """Linked derived validation record (R-E1/R-C3): why a paid call was excluded."""
+    env = store.get(draw.draw_id)
+    if env is None:
+        return
+    failures = tuple(f for f in (
+        *(("http_error",) if status != 200 else ()),
+        *(f"audit:{x}" for x in result.audit_failures),
+        *(f"reasoning:{x}" for x in result.reasoning_failures),
+        *((f"parse:{result.parse_reason}",) if not result.parse_ok else ()),
+        *((f"error:{err}",) if err else ()),
+    ))
+    store.put_derived(L.DerivedRecord(
+        draw_id=draw.draw_id,
+        raw_sha256=L.canonical_sha256(env.response_body or {}),
+        valid=result.passed, failures=failures,
+        excluded_from_estimands=not result.passed,
+        booked_cost_usd=cost if cost is not None else 0.0,
+        timestamp=env.timestamp))
+
+
+def planned_draw(model: str, tag: str) -> tuple[dict, L.DrawIdentity]:
+    """The single authorized canary draw for one model/endpoint (pure)."""
+    body = E.build_sampling_request(model, tag, canary_messages())
+    sha = E.canonical_request_sha256(body)
+    return body, L.DrawIdentity(request_sha256=sha, draw_index=0)
+
+
+def _evaluate(model: str, tag: str, *, status: int, response: Mapping[str, Any],
+              resp_headers: Mapping[str, Any], cost: Optional[float],
+              snapshot: E.Snapshot, err: Optional[str], reused: bool) -> CanaryResult:
+    """Derive the capability verdict from a response (pure; no I/O, no fabrication)."""
+    if status != 200:
+        return CanaryResult(model, tag, status, cost, None, None, None,
+                            False, ("http_error",), False, ("http_error",),
+                            False, "http_error", reused, err)
+
     audit = E.verify_provider_audit(response, model, tag, snapshot)
     reasoning = E.verify_reasoning_off(response)
-
     choice = (response.get("choices") or [{}])[0]
     msg = choice.get("message") or {}
     usage = response.get("usage") or {}
     rt = ((usage.get("completion_tokens_details") or {}).get("reasoning_tokens"))
+    content = msg.get("content")
+
+    # R-C6: the frozen anchored parser, plus the exact digit this prompt requests.
+    pr = I.parse_option(content)
+    parse_ok = bool(pr.ok and pr.option == EXPECTED_OPTION)
+    parse_reason = ("ok" if parse_ok else
+                    (pr.reason if not pr.ok else f"unexpected_option_{pr.option}"))
 
     return CanaryResult(
         model=model, tag=tag, http_status=status, cost_usd=cost,
-        content=msg.get("content"), finish_reason=choice.get("finish_reason"),
+        content=content, finish_reason=choice.get("finish_reason"),
         reasoning_tokens=rt,
+        parse_ok=parse_ok, parse_reason=parse_reason,
         audit_ok=bool(getattr(audit, "ok", False)),
         audit_failures=tuple(getattr(audit, "failures", ()) or ()),
         reasoning_ok=bool(getattr(reasoning, "ok", False)),
         reasoning_failures=tuple(getattr(reasoning, "failures", ()) or ()),
-        reused=False, error=err)
+        reused=reused, error=err)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -295,12 +365,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     rec = L.reconcile_prior_spend([d for d in PRIOR_RECORD_DIRS if d.exists()],
                                   non_reconciled=list(PRIOR_DIAGNOSTIC_COMPONENTS))
-    ledger = L.V7Ledger(reconciliation=rec)
-    print(f"prior reconciled spend: ${rec.total_usd:.6f} (exact={rec.is_exact})")
-    print(f"hard stop ${ledger.hard_stop_usd:.2f}; remaining ${ledger.remaining_usd:.4f}\n")
 
     models = ([m.strip() for m in args.models.split(",")] if args.models
               else list(PANEL_ORDER))
+
+    # R-C2: bind the authorized canary draws and RECONSTRUCT current-run spend from the
+    # store BEFORE the first budget check. Opening a fresh zeroed ledger silently dropped
+    # every already-persisted v7 cost on restart.
+    planned = {m: planned_draw(m, FALLBACK_SEQUENCES[m][0]) for m in models}
+    draw_ids = frozenset(d.draw_id for _, d in planned.values())
+    run_manifest = L.RunManifest(
+        manifest_sha256=L.canonical_sha256(sorted(draw_ids)),
+        draw_ids=draw_ids, model=",".join(models), endpoint="primary")
+    ledger = L.reconstruct_ledger(store, manifest=run_manifest, reconciliation=rec)
+
+    print(f"prior reconciled spend: ${rec.total_usd:.6f} (exact={rec.is_exact})")
+    print(f"current-run spend already on disk: ${ledger.run_usd:.6f}")
+    print(f"hard stop ${ledger.hard_stop_usd:.2f}; remaining ${ledger.remaining_usd:.4f}\n")
+
     transport = LiveTransport(ca_file=args.ca_file)
 
     results: list[CanaryResult] = []
@@ -317,6 +399,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"    provider-audit FAIL: {r.audit_failures}")
         if not r.reasoning_ok:
             print(f"    reasoning-off FAIL: {r.reasoning_failures}")
+        if not r.parse_ok:
+            print(f"    anchored-parse FAIL: {r.parse_reason}")
         if r.error:
             print(f"    error: {r.error}")
         print()
@@ -325,7 +409,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"=== canary run spend ${spent:.6f}; cumulative ${ledger.total_spent_usd:.6f} "
           f"of ${ledger.hard_stop_usd:.2f} (exact={ledger.is_exact}) ===")
     print(f"artifacts: {run_dir}")
-    return 0 if all(r.passed or r.reused for r in results) else 1
+    # R-C1: `reused` no longer implies success — a replayed record carries its REAL verdict,
+    # so a persisted 404 stays a failure.
+    return 0 if all(r.passed for r in results) else 1
 
 
 if __name__ == "__main__":

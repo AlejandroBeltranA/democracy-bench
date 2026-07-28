@@ -217,6 +217,33 @@ def is_cache_hit(response: Mapping[str, Any],
     return bool(usage.get("cache_hit") is True or usage.get("is_cache_hit") is True)
 
 
+def is_unbilled_rejection(response: Mapping[str, Any], http_status: int,
+                          response_headers: Optional[Mapping[str, Any]] = None) -> bool:
+    """True when a 4xx response provably never reached a provider, so nothing was billed.
+
+    This is deliberately NARROW. A missing cost is normally an accounting failure that must
+    fail closed (R-E2), and provider-level failures CAN incur prompt cost — OpenRouter says
+    so explicitly. But a ROUTER-level rejection (`provider.only` matched no endpoint, a data
+    policy filtered every candidate, unsupported parameters filtered the endpoint) is decided
+    before any generation exists: there is no generation id, no usage, and no completion to
+    bill. Booking 0.0 for that case is a statement of fact, not a silent write-off, and the
+    envelope records `cost_status='unbilled_rejection'` so the reason stays auditable.
+
+    Requires ALL of: a 4xx status; an OpenRouter-shaped error body; no generation id
+    anywhere; and no usage block. Anything else (any 2xx, any 5xx, or a 4xx that carries a
+    generation id or usage) still fails closed.
+    """
+    if not (400 <= int(http_status) < 500):
+        return False
+    if not isinstance(response, Mapping) or not isinstance(response.get("error"), Mapping):
+        return False
+    if _extract_generation_id(response, response_headers) is not None:
+        return False
+    if response.get("usage"):
+        return False
+    return True
+
+
 class CacheHitRejected(LedgerError):
     """A response-cache HIT was returned despite `X-OpenRouter-Cache: false` (S-F2).
 
@@ -376,7 +403,10 @@ def build_envelope(*, draw: DrawIdentity, request_body: Mapping[str, Any],
         cost: Optional[float] = returned_cost(response_body)
         status = "cache_hit_zero" if (cost == 0.0 and is_cache_hit(response_body)) else "returned"
     except CostAccountingError:
-        cost, status = None, "missing"
+        if is_unbilled_rejection(response_body, http_status, response_headers):
+            cost, status = 0.0, "unbilled_rejection"
+        else:
+            cost, status = None, "missing"
 
     return RawEnvelope(
         draw_id=draw.draw_id,
@@ -813,6 +843,14 @@ class V7Ledger:
                 f"draw {envelope.draw_id} is not bound by manifest "
                 f"{self.manifest.manifest_sha256[:12]} — refusing to book")
         if envelope.cost_usd is None:
+            # Re-derive from the PERSISTED evidence: a record written before
+            # `unbilled_rejection` existed may still provably qualify (4xx, no generation id,
+            # no usage). This is deterministic re-reading, not a write-off — anything that
+            # does not qualify still fails closed.
+            if is_unbilled_rejection(envelope.response_body or {}, envelope.http_status,
+                                     envelope.response_headers):
+                self._booked[envelope.draw_id] = 0.0
+                return 0.0
             raise CostAccountingError(
                 f"draw {envelope.draw_id} was persisted without a returned cost "
                 f"(generation id {envelope.generation_id!r}); refusing to book 0.0 (R-E2)")

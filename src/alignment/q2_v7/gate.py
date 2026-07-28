@@ -180,6 +180,9 @@ class RenderedRequest:
     order_idx: int
     request_sha256: str
     payload_text: str
+    #: R-C4: tokens the chat template adds beyond `payload_text` (roles, delimiters, special
+    #: tokens, generation prompt). Zero when the tokenizer itself applies the pinned template.
+    template_overhead_tokens: int = 0
 
     @property
     def coordinate(self) -> tuple[str, str, int]:
@@ -193,14 +196,46 @@ def canonical_request_sha256(body: Mapping) -> str:
     return hashlib.sha256(canon.encode()).hexdigest()
 
 
-def render_request(cell_id: str, probe_id: str, order_idx: int, body: Mapping) -> RenderedRequest:
-    """Build a `RenderedRequest` from an exact request body: hash the canonical body and
-    concatenate the message contents in wire order as the tokenizer input."""
+#: R-C4: chat-template overhead the served model bills but a bare content concatenation
+#: omits — role markers, turn delimiters, special tokens and the generation prompt. These
+#: are NOT covered by the 10% drift margin (for short prompts template overhead alone can
+#: exceed 10%), so they are counted explicitly and conservatively.
+#:
+#: Empirical basis: the frozen-envelope canary on `qwen/qwen3.5-397b-a17b @ alibaba`
+#: (out/q2_stage2_v7_canary/) billed prompt_tokens=53 for a two-message request whose raw
+#: content tokenizes to ~35, i.e. ~18 tokens of template overhead across 2 messages plus the
+#: generation prompt. The constants below round that UP; a projection that overstates cost
+#: can only refuse an affordable run, never authorize an unaffordable one.
+#:
+#: The exact pinned chat template remains the preferred method: pass `template_overhead=0`
+#: and a tokenizer that applies the pinned template itself, and these constants drop out.
+CHAT_TEMPLATE_TOKENS_PER_MESSAGE = 12
+CHAT_TEMPLATE_GENERATION_PROMPT_TOKENS = 8
+
+
+def chat_template_overhead(n_messages: int,
+                           per_message: int = CHAT_TEMPLATE_TOKENS_PER_MESSAGE,
+                           generation_prompt: int = CHAT_TEMPLATE_GENERATION_PROMPT_TOKENS
+                           ) -> int:
+    """Conservative token overhead the chat template adds on top of raw message content."""
+    return int(n_messages) * int(per_message) + int(generation_prompt)
+
+
+def render_request(cell_id: str, probe_id: str, order_idx: int, body: Mapping,
+                   *, template_overhead: Optional[int] = None) -> RenderedRequest:
+    """Build a `RenderedRequest` from an exact request body.
+
+    The tokenizer input is the message contents in wire order PLUS an explicit chat-template
+    overhead (R-C4). A bare concatenation omits roles, delimiters, special tokens and the
+    generation prompt, and therefore understates what the provider actually bills.
+    """
     messages = body.get("messages") or []
     payload_text = "\n".join(str(m.get("content", "")) for m in messages)
+    overhead = (chat_template_overhead(len(messages)) if template_overhead is None
+                else int(template_overhead))
     return RenderedRequest(cell_id=cell_id, probe_id=probe_id, order_idx=int(order_idx),
                            request_sha256=canonical_request_sha256(body),
-                           payload_text=payload_text)
+                           payload_text=payload_text, template_overhead_tokens=overhead)
 
 
 def completion_allowance(observed_billed_completion_tokens: int | Iterable[int] = ()) -> int:
@@ -372,7 +407,9 @@ def project_full_grid(
             raise SpecViolation(f"duplicate coordinate in the grid: {req.coordinate}")
         seen_hashes.add(req.request_sha256)
         seen_coords.add(req.coordinate)
-        raw = int(tokenizer(req.payload_text))
+        # R-C4: bill the chat-template overhead too, then apply the 10% drift margin. The
+        # margin covers tokenizer-vs-provider drift; it does not cover omitted serialization.
+        raw = int(tokenizer(req.payload_text)) + int(req.template_overhead_tokens)
         projected = projected_input_tokens(raw)
         rows.append(ProjectionRow(
             request_sha256=req.request_sha256,

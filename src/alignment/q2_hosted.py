@@ -948,6 +948,18 @@ def main(argv=None):
                     help="required acknowledgement that this makes PAID OpenRouter calls")
     args = ap.parse_args(argv)
 
+    # R-C5: this v5 entry point is SUPERSEDED by the v7.2 design and must not make paid
+    # calls. It targets the retired four-model logprob panel and does not use the frozen
+    # reasoning-off envelope, the committed endpoint snapshot, the response-cache
+    # prohibition, the v7 manifest, or the unified $8.50 ledger. The live Stage-2 entry
+    # point is `python -m alignment.q2_v7.canary`. Kept importable so the historical gate-run
+    # artifacts remain reproducible offline.
+    ap.error(
+        "SUPERSEDED: the v5 hosted runner is retired by the v7.2 amendment and can no "
+        "longer make paid calls (R-C5). Use `python -m alignment.q2_v7.canary` for the "
+        "authorized Stage-2 canary. This module remains importable for offline analysis "
+        "of the committed v5 gate-run artifacts.")
+
     out = Path(args.out_dir)
     if not str(out).replace("\\", "/").startswith("out/"):
         ap.error("--out-dir must be under out/")
