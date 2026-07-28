@@ -69,6 +69,8 @@ FALLBACK_EVIDENCE_KEYS: tuple[str, ...] = (
     "fallback", "fallback_used", "fell_back", "fallbacks_used", "did_fallback",
 )
 ALLOWED_ROLES: frozenset[str] = frozenset({"system", "user", "assistant"})
+#: Separator in a catalog `endpoint_name`: "<display name> | <dated upstream model id>".
+ENDPOINT_NAME_SEP = " | "
 
 _SUMMARY_AVAILABLE = re.compile(r"available=(\d+)")
 _SUMMARY_SELECTED = re.compile(r"selected=([^,]+)")
@@ -417,6 +419,38 @@ def _metadata(response_json: Mapping[str, Any]) -> Optional[Mapping[str, Any]]:
     return meta if isinstance(meta, Mapping) else None
 
 
+def resolved_model_evidence(evidence: Any,
+                            expected_display_name: Optional[str] = None) -> Optional[str]:
+    """Normalise one piece of returned model/version evidence to the DATED upstream id.
+
+    R-V7-4 requires the runner to assert "resolved model/version evidence". The only field
+    that carries a VERSION is the datable upstream id (`qwen/qwen3.5-397b-a17b-20260216`);
+    the bare catalog slug (`qwen/qwen3.5-397b-a17b`) is version-free and therefore is not
+    evidence at all — a provider serving a different dated checkpoint can return it.
+
+    Two equivalent surface forms carry the dated id and are accepted:
+
+    * the bare upstream id, as `openrouter_metadata.endpoints.available[].model` returns it;
+    * the catalog `endpoint_name` form `"<display name> | <dated upstream id>"`, which is the
+      same evidence with the display-name prefix attached. When `expected_display_name` is
+      supplied, the prefix must agree with it — evidence attributing the checkpoint to a
+      different provider is not evidence for this candidate.
+
+    Anything else (missing, empty, non-string) normalises to `None`, so the caller's exact
+    comparison against `SnapshotCandidate.upstream_model` fails closed. This is the SINGLE
+    dated-upstream-model rule; `alignment.q2_v7.gate.audit_envelope` reaches the same verdict
+    by delegating to `verify_provider_audit` rather than restating it.
+    """
+    if not isinstance(evidence, str):
+        return None
+    if ENDPOINT_NAME_SEP in evidence:
+        display, upstream = evidence.split(ENDPOINT_NAME_SEP, 1)
+        if expected_display_name is not None and display.strip() != expected_display_name:
+            return None
+        return upstream.strip() or None
+    return evidence.strip() or None
+
+
 def verify_provider_audit(response_json: Mapping[str, Any],
                           expected_model: str,
                           expected_tag: str,
@@ -508,7 +542,11 @@ def verify_provider_audit(response_json: Mapping[str, Any],
             returned_upstream = target.get("model")
             if selected_provider != expected_display:
                 failures.append(f"display_name_mismatch:{selected_provider!r}")
-            if returned_upstream != candidate.upstream_model:
+            # R-V7-4 "resolved model/version evidence": the DATED upstream id, never the
+            # version-free catalog slug. `resolved_model_evidence` is the single rule the
+            # gate delegates to, so both paths reject a different dated checkpoint alike.
+            if resolved_model_evidence(returned_upstream,
+                                       expected_display) != candidate.upstream_model:
                 failures.append(f"returned_model_mismatch:{returned_upstream!r}")
 
     # Top-level display name, when the API supplies one, must agree with the same mapping.

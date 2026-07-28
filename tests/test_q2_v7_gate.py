@@ -56,7 +56,9 @@ def ok_probe_result(tag: str, cand: G.EndpointCandidate) -> G.EndpointProbeResul
     return G.EndpointProbeResult(
         tag=tag, http_status=200, requested_provider_only=(tag,), n_candidates_available=1,
         selected_provider_name=cand.provider_name, requested_model=cand.model,
-        returned_model_evidence=cand.model, strategy="direct", attempt=1,
+        # R-V7-4: the evidence a passing response returns is the DATED upstream checkpoint
+        # id, not the version-free catalog slug `cand.model`.
+        returned_model_evidence=cand.upstream_model, strategy="direct", attempt=1,
         fallback_occurred=False, is_byok=False, reasoning_tokens=0,
         has_reasoning_payload=False, usage_fields_present=True, parsed_leading_digit=3,
         billed_completion_tokens=1)

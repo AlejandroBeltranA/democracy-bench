@@ -40,14 +40,32 @@ import hashlib
 import json
 import os
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
-from typing import Callable, Iterable, Mapping, NoReturn, Optional, Sequence
+from typing import Any, Callable, Iterable, Mapping, NoReturn, Optional, Sequence
 
 import numpy as np
 
 from alignment import drift
 from alignment.q1_channel import WILLIAMS_ORDERS_4
 from alignment.q2_hosted import HOSTED_CELLS, cid_for
+from alignment.q2_v7 import envelope
+# The frozen outcome-blinding interlock lives in `alignment.q2_v7.interlock`; it is
+# re-exported here because the promotion decision this module produces is decision (a) of
+# that interlock, and because `gate_view` is the blinded report of a GATE run.
+from alignment.q2_v7.interlock import (  # noqa: F401
+    FundingRecord,
+    HeadlineBlocked,
+    InterlockState,
+    PromotionRecord,
+    assert_outcome_blinded,
+    blinding_interlock,
+    gate_view,
+    interlock_state,
+    record_funding,
+    record_promotion,
+    require_headline_permitted,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 ENDPOINT_SNAPSHOT = ROOT / "out" / "q2_stage2_endpoint_snapshot" / "manifest.json"
@@ -166,6 +184,16 @@ class EndpointCandidate:
     def __post_init__(self) -> None:
         if self.price_prompt_per_token < 0 or self.price_completion_per_token < 0:
             raise SpecViolation(f"negative price on candidate {self.tag!r}")
+
+    @property
+    def upstream_model(self) -> str:
+        """The DATED upstream checkpoint id carried in `endpoint_name` (R-V7-4).
+
+        This — not the version-free catalog slug `model` — is the "resolved model/version
+        evidence" a response must return. Empty when the snapshot row carries none, which
+        fails the audit closed.
+        """
+        return envelope.resolved_model_evidence(self.endpoint_name, self.provider_name) or ""
 
 
 @dataclass(frozen=True)
@@ -647,36 +675,102 @@ class EndpointProbeResult:
     retry: Optional[RetryResult] = None
 
 
+#: `envelope.verify_provider_audit` failure code -> this module's historical field label, so
+#: delegating does not change the vocabulary operators and tests already read.
+_AUDIT_CODE_LABEL: Mapping[str, str] = {
+    "missing_openrouter_metadata": "returned_model_evidence",
+    "requested_model_mismatch": "requested_model",
+    "response_model_mismatch": "requested_model",
+    "returned_model_mismatch": "returned_model_evidence",
+    "display_name_mismatch": "selected_provider_name",
+    "missing_available_candidates": "n_candidates_available",
+    "available_candidates_not_one": "n_candidates_available",
+    "sole_candidate_not_selected": "n_candidates_available",
+    "selected_candidate_count": "n_candidates_available",
+    "strategy_not_direct": "strategy",
+    "attempt_not_one": "attempt",
+    "is_byok_not_false": "is_byok",
+    "fallback_occurred": "fallback occurred under allow_fallbacks:false",
+}
+
+
+def _snapshot_binding(candidate: EndpointCandidate) -> envelope.Snapshot:
+    """Re-express one gate candidate as the single-row `Snapshot` the C1 proof reads.
+
+    The proof is defined over the committed snapshot's `(model, tag)` -> display-name and
+    dated-upstream-model mapping; this adapter supplies exactly that mapping for the one
+    candidate under audit and nothing else.
+    """
+    row = envelope.SnapshotCandidate(
+        model=candidate.model,
+        tag=candidate.tag,
+        provider_name=candidate.provider_name,
+        endpoint_name=candidate.endpoint_name,
+        upstream_model=candidate.upstream_model,
+        quantization=candidate.quantization,
+        params_all_declared=True,
+        supported_parameters={},
+        price_prompt_per_token=Decimal(str(candidate.price_prompt_per_token)),
+        price_completion_per_token=Decimal(str(candidate.price_completion_per_token)),
+    )
+    return envelope.Snapshot(
+        path=str(ENDPOINT_SNAPSHOT), sha256=envelope.SNAPSHOT_SHA256,
+        artifact="gate probe binding", fetched_utc="", sources=(),
+        raw_file_sha256={}, tokenizers={}, candidates={(row.model, row.tag): row},
+    )
+
+
+def _probe_as_response(result: EndpointProbeResult) -> dict[str, Any]:
+    """Re-express an injected probe result in the wire shape the C1 proof judges.
+
+    The probe harness hands this module a flattened summary; `verify_provider_audit` reads
+    `openrouter_metadata`. Rebuilding that shape (rather than restating the rules) is what
+    makes the gate and the envelope audit ONE rule with one verdict.
+    """
+    available: list[dict[str, Any]] = []
+    n_available = int(result.n_candidates_available or 0)
+    for i in range(max(n_available, 0)):
+        available.append({
+            "provider": result.selected_provider_name if i == 0 else f"other-{i}",
+            "model": result.returned_model_evidence if i == 0 else None,
+            "selected": i == 0,
+        })
+    return {
+        "openrouter_metadata": {
+            "requested": result.requested_model,
+            "strategy": result.strategy,
+            "attempt": result.attempt,
+            "is_byok": result.is_byok,
+            "fallback": bool(result.fallback_occurred),
+            "endpoints": {"available": available},
+        },
+    }
+
+
 def audit_envelope(result: EndpointProbeResult, candidate: EndpointCandidate) -> tuple[str, ...]:
     """Criterion (a): HTTP 200 to the exact frozen envelope with `require_parameters:true`,
-    resolving to exactly the declared slug with no fallback, under the C1 proof."""
+    resolving to exactly the declared slug with no fallback, under the C1 proof.
+
+    The C1 proof itself is NOT restated here: it is delegated to
+    `envelope.verify_provider_audit`, the single implementation of the frozen rule. Only the
+    two facts that proof cannot see — the HTTP status and the `provider.only` field of the
+    REQUEST — are judged locally. In particular the returned model/version evidence is
+    accepted only when it resolves to the candidate's DATED upstream checkpoint id (R-V7-4);
+    the version-free catalog slug is no longer accepted, because a provider serving a
+    different dated checkpoint could return it.
+    """
     failures: list[str] = []
     if result.http_status != 200:
         failures.append(f"http_status={result.http_status} (not 200)")
     if tuple(result.requested_provider_only) != (candidate.tag,):
         failures.append(
             f"provider.only={list(result.requested_provider_only)} != [{candidate.tag!r}]")
-    if result.n_candidates_available != 1:
-        failures.append(f"n_candidates_available={result.n_candidates_available} != 1")
-    if result.selected_provider_name != candidate.provider_name:
-        failures.append(
-            f"selected_provider_name={result.selected_provider_name!r} != "
-            f"{candidate.provider_name!r}")
-    if result.requested_model != candidate.model:
-        failures.append(f"requested_model={result.requested_model!r} != {candidate.model!r}")
-    if not result.returned_model_evidence or (
-            result.returned_model_evidence not in (candidate.model, candidate.endpoint_name)):
-        failures.append(
-            f"returned_model_evidence={result.returned_model_evidence!r} inconsistent with "
-            f"the snapshot")
-    if result.strategy != "direct":
-        failures.append(f"strategy={result.strategy!r} != 'direct'")
-    if result.attempt != 1:
-        failures.append(f"attempt={result.attempt!r} != 1")
-    if result.fallback_occurred:
-        failures.append("fallback occurred under allow_fallbacks:false")
-    if result.is_byok is not False:
-        failures.append("is_byok is not false — BYOK spend would escape the cost ledger")
+    audit = envelope.verify_provider_audit(
+        _probe_as_response(result), candidate.model, candidate.tag,
+        _snapshot_binding(candidate))
+    for code in audit.failures:
+        label = _AUDIT_CODE_LABEL.get(code.split(":", 1)[0], code)
+        failures.append(code if label == code else f"{label}: {code}")
     return tuple(failures)
 
 
