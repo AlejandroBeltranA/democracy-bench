@@ -870,7 +870,16 @@ def open_ledger(run_dir: Path | str, *, model: str, endpoint: str = "",
     """
     if reconciliation is None:
         reconciliation = L.ReconciliationResult(reconciled_usd=0.0, record_count=0)
-    authorised = set(walk_draw_ids(model, max_attempts)) | set(study_draw_ids)
+    # The walk store is deliberately SHARED across the frozen panel so that every model's
+    # spend counts against the one $8.50 stop. The manifest must therefore authorise the walk
+    # draws of EVERY panel model, not just the current one: otherwise reconstructing the
+    # ledger for the second model hits the first model's persisted walk envelope and raises
+    # ManifestBindingError. The panel is frozen, so these ids are deterministic and
+    # pre-computable — this widens the binding, it does not weaken it (a draw outside the
+    # panel's authorised set is still refused).
+    authorised = set(study_draw_ids)
+    for panel_model in G.PANEL_ORDER:
+        authorised |= set(walk_draw_ids(panel_model, max_attempts))
     manifest = L.RunManifest.from_draw_ids(authorised, model=model, endpoint=endpoint)
     ledger = L.reconstruct_ledger(study_store(run_dir), manifest=manifest,
                                   reconciliation=reconciliation)

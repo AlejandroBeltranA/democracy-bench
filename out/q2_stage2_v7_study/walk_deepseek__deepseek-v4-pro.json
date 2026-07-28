@@ -1,0 +1,45 @@
+{
+ "artifact": "Q2 Stage-2 v7.2 endpoint promotion walk",
+ "attempts": [
+  {
+   "failures": [],
+   "passed": true,
+   "position": 1,
+   "projected_total": 1.91226042,
+   "tag": "deepseek"
+  }
+ ],
+ "excluded": false,
+ "exclusion_reason": null,
+ "model": "deepseek/deepseek-v4-pro",
+ "probes": [
+  {
+   "attempts_made": 1,
+   "billed_completion_tokens": 1,
+   "booked_cost_usd": 1.827e-05,
+   "draw_ids": [
+    "bf531ef12e0cfadd45b315fd66057c47a8356affdcd62ff79a29187cb0c93920#draw0"
+   ],
+   "envelope_audit_failures": [],
+   "http_status": 200,
+   "parsed_option": 2,
+   "reasoning_failures": [],
+   "reasoning_tokens": 0,
+   "tag": "deepseek",
+   "terminal_reason": "success"
+  }
+ ],
+ "promoted_projection_total": 1.91226042,
+ "promoted_tag": "deepseek",
+ "reduced_cell_substitute": null,
+ "reduced_designs_retired": true,
+ "reduced_s_substitute": null,
+ "sequence": [
+  "deepseek",
+  "fireworks",
+  "novita/fp8",
+  "parasail/fp8",
+  "streamlake/fp8"
+ ],
+ "substitute": null
+}
