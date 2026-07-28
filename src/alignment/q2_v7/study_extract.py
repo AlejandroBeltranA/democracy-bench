@@ -456,10 +456,22 @@ def extract_draws(store: "LG.EnvelopeStore", *, probe_ids: Sequence[str], model:
     seen: set[str] = set()
     providers: set[str] = set()
 
+    other_models: list[str] = []
+
     for env in store.envelopes():
         if env.draw_id in seen:
             raise ExtractionError(f"draw {env.draw_id} appears more than once in {store.raw_dir}")
         seen.add(env.draw_id)
+
+        # The study store is SHARED across the frozen panel (one $8.50 stop must see every
+        # model's spend), so it legitimately holds the other panel model's draws. Those are
+        # not unbound study draws — they are another model's correctly recorded, correctly
+        # bound evidence — so they are skipped by model BEFORE the manifest check rather than
+        # raising. Without this, extracting either model refuses as soon as the other model
+        # has any draw on disk, i.e. extraction could never run on a real panel directory.
+        if env.model and env.model != model:
+            other_models.append(env.draw_id)
+            continue
 
         sha, draw_index = _parse_identity(env)
         coord = index.coordinate(sha)
