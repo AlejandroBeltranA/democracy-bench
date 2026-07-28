@@ -1,0 +1,44 @@
+{
+ "artifact": "Q2 Stage-2 v7.2 endpoint promotion walk",
+ "attempts": [
+  {
+   "failures": [],
+   "passed": true,
+   "position": 1,
+   "projected_total": 1.7913181500000002,
+   "tag": "alibaba"
+  }
+ ],
+ "excluded": false,
+ "exclusion_reason": null,
+ "model": "qwen/qwen3.5-397b-a17b",
+ "probes": [
+  {
+   "attempts_made": 1,
+   "billed_completion_tokens": 1,
+   "booked_cost_usd": 2.301e-05,
+   "draw_ids": [
+    "4c02943d8bb241049c4248bfff9a4bf64aba8d4fbd4ef49e0a850b0556daee36#draw0"
+   ],
+   "envelope_audit_failures": [],
+   "http_status": 200,
+   "parsed_option": 2,
+   "reasoning_failures": [],
+   "reasoning_tokens": 0,
+   "tag": "alibaba",
+   "terminal_reason": "success"
+  }
+ ],
+ "promoted_projection_total": 1.7913181500000002,
+ "promoted_tag": "alibaba",
+ "reduced_cell_substitute": null,
+ "reduced_designs_retired": true,
+ "reduced_s_substitute": null,
+ "sequence": [
+  "alibaba",
+  "digitalocean",
+  "streamlake",
+  "parasail/fp8"
+ ],
+ "substitute": null
+}
