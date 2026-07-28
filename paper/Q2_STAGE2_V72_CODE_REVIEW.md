@@ -1,13 +1,66 @@
-# Q2 Stage-2 v7.2 code review — full runs not yet authorized
+# Q2 Stage-2 v7.2 code review — both full runs authorized
 
 Reviewer: Codex  
 Date: 2026-07-28  
 Reviewed branch: `phase4-floor-guards`  
-Current reviewed HEAD: `f6e9e6bffb5e2d3f5f22c46cd51c1331df0823d8` — *Both 240-draw outcome-blinded smokes PASS at parse rate 1.0000*
+Current reviewed HEAD: `89027e2efba45d67637822dcce7d7b1b3a7ae0de` — *Close PF-1 and PF-2: extraction consumes the runner's own authorization records*
 
 Original review baseline: `4d0c5ac` — *Build hardened Q2 Stage-2 v7.2 runner; synthetic canary passes on Qwen3.5-397B*
 
-Current implementation scope: cumulative Stage-2 code from `80399d7` through `f6e9e6b`
+Current implementation scope: cumulative Stage-2 code from `80399d7` through `89027e2`
+
+## Final full-run authorization — `89027e2`
+
+### Verdict
+
+**PASS — Claude is authorized to run both frozen 13,200-draw full models now.**
+
+Run the existing Qwen and DeepSeek full stages from
+`out/q2_stage2_v7_run_panel/`, in the frozen panel order, reusing the 240 persisted smoke
+draws per model. This authorization does not require or request another walk, projection,
+authorization, or smoke sequence.
+
+PF-1 and PF-2 are closed:
+
+- extraction consumes the exact model-specific promotion and panel-funding records that
+  authorized the paid runner, rather than a second legacy decision pair;
+- each model's promotion, manifest, projection, endpoint, promotion binding, and funding row
+  are cross-checked, with missing, edited, refused, stale, cross-model, and inconsistent
+  records failing closed;
+- the real Qwen and DeepSeek panel records each pass the extraction interlock against their
+  own recomputed manifest;
+- the new no-network panel regression proves that the second model carries the first model's
+  exact persisted spend while identities outside both frozen grids remain refused.
+
+The unrelated `study_run.py` hardening edit was removed before commit. The reviewed runner is
+byte-identical to the smoke runner, and all three values agree:
+
+```text
+current runner revision:   sha256:400a4ff7948a1e8e
+Qwen smoke manifest:       sha256:400a4ff7948a1e8e
+DeepSeek smoke manifest:   sha256:400a4ff7948a1e8e
+```
+
+Independent focused no-network test record:
+
+```text
+python -m pytest -q \
+  tests/test_q2_v7_ledger.py \
+  tests/test_q2_v7_interlock.py \
+  tests/test_q2_v7_study_run.py \
+  tests/test_q2_v7_study_extract.py
+
+319 passed in 921.52s
+```
+
+Final direct artifact check:
+
+```text
+qwen/qwen3.5-397b-a17b       scheme=ps1 headline_permitted=True failures=[]
+deepseek/deepseek-v4-pro     scheme=ps1 headline_permitted=True failures=[]
+```
+
+No network request or paid call was made by this re-review. No full-run blocker remains.
 
 ## Pre-full-run re-review — `f6e9e6b`
 
