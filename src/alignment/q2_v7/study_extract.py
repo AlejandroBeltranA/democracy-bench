@@ -790,15 +790,50 @@ def extract_headline(draws: Sequence[SamplingDraw], items: Mapping[str, Mapping]
     return nested_bootstrap(rows, items, completeness=report, replicates=replicates, seed=seed)
 
 
+#: Mirrors `interlock.INTERLOCK_DIRNAME` (kept as a literal because the interlock module is
+#: imported lazily below); `tests/test_q2_v7_study_extract.py` pins the two together.
+IL_DIRNAME = "interlock"
+
+#: `study_run` puts the study envelopes in `<run_dir>/study/` (and the retried attempts in
+#: `<run_dir>/study_attempts/`), while the authorization records live in `<run_dir>/interlock/`.
+#: An `EnvelopeStore` therefore reports a run_dir one level BELOW the run. These are the only
+#: sub-directory names from which the interlock lookup steps up.
+_STORE_SUBDIRS: tuple[str, ...] = ("study", "study_attempts", "walk")
+
+
+def interlock_run_dir(run_dir: Path | str) -> Path:
+    """The directory whose `interlock/` holds this run's authorization records.
+
+    Usually `run_dir` itself. When `run_dir` is an `EnvelopeStore` directory of the frozen
+    runner layout (`<run>/study`), the records are one level up, so this steps up — and only
+    then, and only when the parent actually has an `interlock/` directory. Stepping up cannot
+    weaken anything: the records found there are still required to bind this model and this
+    run's recomputed manifest digest before a headline is permitted.
+    """
+    run_dir = Path(run_dir)
+    if ((run_dir / IL_DIRNAME).is_dir()
+            or run_dir.name not in _STORE_SUBDIRS
+            or not (run_dir.parent / IL_DIRNAME).is_dir()):
+        return run_dir
+    return run_dir.parent
+
+
 def require_headline_permitted(run_dir: Path | str,
-                               manifest_sha256: Optional[str] = None) -> Any:
+                               manifest_sha256: Optional[str] = None,
+                               model: Optional[str] = None) -> Any:
     """The frozen outcome-blinding interlock, enforced at the ONE place a substantive outcome
     is first computed.
 
-    Headline aggregation refuses to run until BOTH interlock records exist for this run:
-    (a) the deterministic endpoint-promotion decision and (b) the funding decision, each bound
-    to this run's manifest digest. The records live in — and are validated by —
-    `alignment.q2_v7.interlock`; this module only refuses to aggregate without them.
+    Headline aggregation refuses to run until BOTH authorization decisions exist for this run:
+    (a) the deterministic endpoint-promotion decision for THIS model and (b) the funding
+    decision, each bound to this run's recomputed manifest digest. The records are the very
+    ones `study_run` wrote to authorize the paid draws — no second, weaker operator decision
+    is minted here, so nothing can diverge from what actually paid. They live in, and are
+    validated by, `alignment.q2_v7.interlock`; this module only refuses to aggregate without
+    them.
+
+    `model` selects that model's per-model PS-1 promotion record and its row of the panel
+    funding record. Omitting it is only unambiguous for a single-model run directory.
     """
     try:
         from alignment.q2_v7 import interlock as IL
@@ -806,7 +841,8 @@ def require_headline_permitted(run_dir: Path | str,
         raise HeadlineBlocked(
             f"the promotion/funding interlock module is unavailable ({exc}); refusing to "
             f"aggregate a substantive outcome without it") from exc
-    state = IL.interlock_state(run_dir, manifest_sha256)
+    resolved = interlock_run_dir(run_dir)
+    state = IL.interlock_state(resolved, manifest_sha256, model)
     if not getattr(state, "headline_permitted", False):
         raise HeadlineBlocked(
             f"headline aggregation refuses to run: missing interlock records "
@@ -875,7 +911,7 @@ def extract_model(store: "LG.EnvelopeStore", *, probe_ids: Sequence[str], model:
             estimands=None, protective_mass=None, diagnostics=None)
 
     if require_interlock:
-        require_headline_permitted(store.run_dir, extraction.manifest_sha256)
+        require_headline_permitted(store.run_dir, extraction.manifest_sha256, model)
     bank = _load_items(items, probes)
     boot = nested_bootstrap(list(extraction.draws), bank, completeness=report,
                             replicates=replicates, seed=seed)
@@ -929,10 +965,10 @@ def write_artifact(result: ModelResult, path: Path | str) -> str:
 
 
 __all__ = [
-    "ARTIFACT_SCHEMA", "MANIFEST_FILENAME", "STUDY_STAGES",
+    "ARTIFACT_SCHEMA", "IL_DIRNAME", "MANIFEST_FILENAME", "STUDY_STAGES",
     "CoordinateIndex", "DrawExtraction", "DrawRecord", "ExtractionError", "HeadlineBlocked",
     "ModelResult", "artifact_bytes", "coordinate_index", "crack_diagnostics",
-    "extract_draws", "extract_headline", "extract_model", "load_draws",
+    "extract_draws", "extract_headline", "extract_model", "interlock_run_dir", "load_draws",
     "observed_protective_mass", "parse_reply", "reconcile_spend",
     "require_headline_permitted", "write_artifact",
 ]

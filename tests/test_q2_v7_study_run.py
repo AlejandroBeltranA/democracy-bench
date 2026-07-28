@@ -1596,3 +1596,77 @@ def test_a_retry_cannot_breach_the_hard_stop(tmp_path, monkeypatch):
     assert ledger.total_spent_usd <= ledger.hard_stop_usd, (
         f"spent ${ledger.total_spent_usd:.10f} > stop ${ledger.hard_stop_usd:.10f}")
     assert run.halted, "a stop reached mid-ladder must halt the run"
+
+
+# =======================================================================================
+# PF-2 — panel reconstruction: a SECOND model in the SAME run directory
+# =======================================================================================
+
+def test_a_second_panel_model_reconstructs_the_shared_stop(tmp_path, monkeypatch):
+    """The regression the 3ccf830 panel-binding fix shipped without.
+
+    The study and attempt stores are shared across the panel so one $8.50 stop sees every
+    model's spend, but `open_ledger` authorised only the CURRENT model's sampling and attempt
+    identities. The second model therefore always met the first model's records under a
+    manifest that did not bind them:
+
+        ManifestBindingError: persisted record <sha>#draw1000 is not bound by manifest ...
+
+    `#draw1000` is ATTEMPT_DRAW_INDEX_BASE — a PS-4 attempt record from the first model. Every
+    existing runner fixture uses ONE model per run directory, which is exactly why this
+    survived three review rounds and only surfaced on a live paid run.
+    """
+    _install_study_fakes(monkeypatch)
+    run_dir = tmp_path / "panel"
+
+    first, second = MODEL, DEEPSEEK
+    first_tag = G.FALLBACK_SEQUENCES[first][0]
+    second_tag = G.FALLBACK_SEQUENCES[second][0]
+
+    # a promoted walk record for BOTH models — this is what makes the other model's grid
+    # derivable, so the binding can be widened deterministically rather than guessed
+    run_dir.mkdir(parents=True, exist_ok=True)
+    for model, tag in ((first, first_tag), (second, second_tag)):
+        S.walk_record_path(run_dir, model).write_text(
+            json.dumps({"model": model, "promoted_tag": tag, "excluded": False}))
+
+    req = fake_study_grid(first, first_tag)[0]
+    store = S.study_store(run_dir)
+    attempts = S.attempt_store(run_dir)
+
+    # persist one paid sampling draw of the FIRST model, plus its attempt record
+    cost = 0.000123
+    draw = S.StudyDraw(request_sha256=req.request_sha256, draw_index=0)
+    attempt = S.StudyDraw(request_sha256=req.request_sha256,
+                          draw_index=S.attempt_draw_index(0, 0, G.MAX_ATTEMPTS))
+    for target, identity in ((attempts, attempt), (store, draw)):
+        target.put(L.build_envelope(
+            draw=identity, request_body=req.body, request_headers={},
+            response_body=ok_body(cost=cost), response_headers={}, http_status=200,
+            bucket="study", model=first, provider=first_tag, stage="study"))
+
+    ids_second = [I.draw_id(r.request_sha256, i)
+                  for r in fake_study_grid(second, second_tag)
+                  for i in range(I.DRAWS_PER_COORDINATE)]
+
+    ledger = S.open_ledger(run_dir, model=second, endpoint=second_tag,
+                           study_draw_ids=ids_second,
+                           reconciliation=L.ReconciliationResult(reconciled_usd=0.0,
+                                                                 record_count=0))
+
+    assert ledger.run_usd == pytest.approx(cost), (
+        "the second model's ledger must carry the FIRST model's spend against the shared "
+        f"$8.50 stop; got ${ledger.run_usd:.8f} instead of ${cost:.8f}")
+
+    # ...and an identity outside BOTH frozen model grids is still refused
+    outsider = L.build_envelope(
+        draw=S.StudyDraw(request_sha256="f" * 64, draw_index=0),
+        request_body={}, request_headers={}, response_body=ok_body(cost=0.001),
+        response_headers={}, http_status=200, bucket="study", model=second,
+        provider=second_tag, stage="study")
+    attempts.put(outsider)
+    with pytest.raises(L.ManifestBindingError):
+        S.open_ledger(run_dir, model=second, endpoint=second_tag,
+                      study_draw_ids=ids_second,
+                      reconciliation=L.ReconciliationResult(reconciled_usd=0.0,
+                                                            record_count=0))

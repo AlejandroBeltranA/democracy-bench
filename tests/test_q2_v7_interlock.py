@@ -206,6 +206,263 @@ def test_a_tampered_record_leaves_the_headline_blocked(tmp_path):
 
 
 # =======================================================================================
+# 2b. PF-1 — the PS-1 staged-authorization records that actually paid for the run
+# =======================================================================================
+#
+# `study_run` writes `interlock/promotion_record_<model>.json` per panel model plus one
+# `interlock/funding_record_panel.json`. Headline extraction must CONSUME AND VALIDATE those
+# records — not ask an operator to re-record a second, weaker pair of decisions that could
+# diverge from the ones that authorized the paid draws. Every fixture below is either the
+# real committed panel run directory (read-only) or a copy of it under tmp_path.
+
+PANEL_RUN = REPO / "out" / "q2_stage2_v7_run_panel"
+DEEPSEEK = "deepseek/deepseek-v4-pro"
+PANEL_MODELS = (QWEN, DEEPSEEK)
+
+
+def _panel_manifest_sha(run_dir: Path, model: str) -> str:
+    """The recomputed extraction manifest digest for one panel model."""
+    from alignment.q2_v7 import identity as ID
+    body = json.loads((run_dir / f"manifest_{model.replace('/', '__')}.json").read_text())
+    return ID.canonical_sha256(body)
+
+
+def _sign(doc: dict) -> dict:
+    """Re-sign a record the way BOTH writers do, recomputed here from first principles:
+    sha256 over the canonical payload with `binding_sha256` removed. A tamper case that is
+    re-signed is cryptographically VALID — it must still be refused on its content."""
+    import hashlib
+    payload = {k: v for k, v in doc.items() if k != "binding_sha256"}
+    out = dict(payload)
+    out["binding_sha256"] = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return out
+
+
+@pytest.fixture
+def panel(tmp_path):
+    """A WRITABLE copy of the immutable paid panel run's authorization evidence.
+
+    `out/q2_stage2_v7_run_panel/` is paid evidence and is never mutated by a test; only the
+    files a tamper case needs are copied, and the copies are made writable."""
+    import shutil
+    run = tmp_path / "run"
+    (run / I.INTERLOCK_DIRNAME).mkdir(parents=True)
+    for src in sorted((PANEL_RUN / I.INTERLOCK_DIRNAME).glob("*.json")):
+        dst = run / I.INTERLOCK_DIRNAME / src.name
+        shutil.copyfile(src, dst)
+        dst.chmod(0o644)
+    for model in PANEL_MODELS:
+        name = f"manifest_{model.replace('/', '__')}.json"
+        shutil.copyfile(PANEL_RUN / name, run / name)
+    return run
+
+
+@pytest.mark.parametrize("model", PANEL_MODELS)
+def test_the_real_paid_panel_run_unblocks_the_headline_for_each_model(model):
+    """PF-1 regression, against the untouched committed run directory.
+
+    Before the fix this reported `promotion_recorded: false, funding_recorded: false,
+    missing: [promotion, funding]` — a complete, fully paid 13,200-draw run refused at
+    headline extraction because only the legacy singular filenames were looked for."""
+    st = I.require_headline_permitted(
+        PANEL_RUN, _panel_manifest_sha(PANEL_RUN, model), model)
+    assert st.scheme == I.SCHEME_PS1 and st.model == model
+    assert st.promotion_recorded and st.funding_recorded
+    assert st.missing == () and st.binding_failures == ()
+    assert st.ps1_promotion["model"] == model and st.ps1_funding["authorized"] is True
+    # and it does so WITHOUT any legacy singular record present
+    assert not I.promotion_record_path(PANEL_RUN).exists()
+    assert not I.funding_record_path(PANEL_RUN).exists()
+
+
+def test_the_ps1_names_and_schemas_track_the_runner_that_writes_them():
+    """The one place the two modules could silently drift apart is pinned here."""
+    from alignment.q2_v7 import study_run as S
+    assert I.PS1_PROMOTION_SCHEMA == S.AUTHORIZATION_PROMOTION_SCHEMA
+    assert I.PS1_FUNDING_SCHEMA == S.AUTHORIZATION_FUNDING_SCHEMA
+    assert I.PS1_FUNDING_RECORD_FILENAME == S.FUNDING_AUTHORIZATION_FILENAME
+    for model in PANEL_MODELS:
+        assert I.ps1_promotion_record_path(PANEL_RUN, model) == \
+            S.promotion_authorization_path(PANEL_RUN, model)
+    assert I.ps1_funding_record_path(PANEL_RUN) == S.funding_authorization_path(PANEL_RUN)
+
+
+@pytest.mark.parametrize("model", PANEL_MODELS)
+def test_a_missing_promotion_record_for_this_model_blocks(panel, model):
+    I.ps1_promotion_record_path(panel, model).unlink()
+    st = I.interlock_state(panel, _panel_manifest_sha(panel, model), model)
+    assert st.promotion_recorded is False and st.headline_permitted is False
+    assert "promotion" in " ".join(st.binding_failures)
+    with pytest.raises(I.HeadlineBlocked):
+        I.require_headline_permitted(panel, _panel_manifest_sha(panel, model), model)
+
+
+def test_a_missing_panel_funding_record_blocks(panel):
+    I.ps1_funding_record_path(panel).unlink()
+    st = I.interlock_state(panel, _panel_manifest_sha(panel, QWEN), QWEN)
+    assert st.funding_recorded is False and st.headline_permitted is False
+    with pytest.raises(I.HeadlineBlocked):
+        I.require_headline_permitted(panel, _panel_manifest_sha(panel, QWEN), QWEN)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("promoted_tag", "digitalocean"),
+    ("manifest_sha256", "f" * 64),
+    ("projection_artifact_sha256", "f" * 64),
+    ("excluded", True),
+    ("model", DEEPSEEK),
+])
+def test_an_edited_promotion_record_blocks(panel, field, value):
+    """Editing WITHOUT re-signing breaks `binding_sha256`, so the record fails to load."""
+    path = I.ps1_promotion_record_path(panel, QWEN)
+    doc = json.loads(path.read_text())
+    doc[field] = value
+    path.write_text(json.dumps(doc))
+    st = I.interlock_state(panel, _panel_manifest_sha(panel, QWEN), QWEN)
+    assert st.headline_permitted is False
+    assert "binding_sha256" in " ".join(st.binding_failures)
+
+
+def test_an_edited_funding_record_blocks(panel):
+    path = I.ps1_funding_record_path(panel)
+    doc = json.loads(path.read_text())
+    doc["authorized"] = True
+    doc["hard_stop_usd"] = 9999.0
+    path.write_text(json.dumps(doc))
+    st = I.interlock_state(panel, _panel_manifest_sha(panel, QWEN), QWEN)
+    assert st.headline_permitted is False
+    assert "binding_sha256" in " ".join(st.binding_failures)
+
+
+def test_a_cross_model_promotion_record_blocks(panel):
+    """DeepSeek's decision moved onto Qwen's filename. The move keeps `binding_sha256`
+    valid — the record is intact — so only the model check can catch it."""
+    import shutil
+    shutil.copyfile(I.ps1_promotion_record_path(panel, DEEPSEEK),
+                    I.ps1_promotion_record_path(panel, QWEN))
+    st = I.interlock_state(panel, _panel_manifest_sha(panel, QWEN), QWEN)
+    assert st.headline_permitted is False
+    assert any("not 'qwen/qwen3.5-397b-a17b'" in f for f in st.binding_failures)
+
+
+def test_another_models_manifest_does_not_unblock_this_model(panel):
+    """Qwen's promotion record does not authorize a headline over DeepSeek's manifest."""
+    st = I.interlock_state(panel, _panel_manifest_sha(panel, DEEPSEEK), QWEN)
+    assert st.headline_permitted is False
+    assert any("recomputed extraction manifest" in f for f in st.binding_failures)
+
+
+def test_a_stale_manifest_blocks(panel):
+    st = I.interlock_state(panel, "a" * 64, QWEN)
+    assert st.headline_permitted is False
+    assert any("not the recomputed extraction manifest" in f for f in st.binding_failures)
+
+
+def test_a_staged_authorization_is_never_accepted_unbound(panel):
+    """Without a recomputed manifest digest to check against, there is nothing binding the
+    record to THIS extraction — so it is refused rather than waved through."""
+    st = I.interlock_state(panel, None, QWEN)
+    assert st.headline_permitted is False
+    assert any("without the recomputed run manifest digest" in f
+               for f in st.binding_failures)
+
+
+def test_a_panel_run_refuses_to_guess_which_model_is_being_extracted(panel):
+    st = I.interlock_state(panel, _panel_manifest_sha(panel, QWEN))
+    assert st.headline_permitted is False
+    assert any("refusing to guess" in f for f in st.binding_failures)
+
+
+def test_a_refused_funding_decision_blocks(panel):
+    """`authorized=False` is a validly recorded REFUSAL, correctly signed. It must not
+    unblock anything — the legacy `interlock_state` never checked this field at all."""
+    path = I.ps1_funding_record_path(panel)
+    doc = _sign({**json.loads(path.read_text()), "authorized": False,
+                 "decision": "refused: out of budget"})
+    path.write_text(json.dumps(doc))
+    assert I.load_ps1_funding_record(panel)["authorized"] is False    # signature is valid
+    st = I.interlock_state(panel, _panel_manifest_sha(panel, QWEN), QWEN)
+    assert st.headline_permitted is False
+    assert any("REFUSES this run" in f for f in st.binding_failures)
+
+
+@pytest.mark.parametrize("field", [
+    "manifest_sha256", "projection_artifact_sha256", "promotion_binding_sha256",
+    "endpoint_tag",
+])
+def test_an_internally_inconsistent_funding_record_blocks(panel, field):
+    """A correctly signed funding record whose Qwen row disagrees with the Qwen promotion
+    record it claims to fund. The signature proves only that nobody edited it afterwards —
+    it says nothing about whether the two decisions agree."""
+    path = I.ps1_funding_record_path(panel)
+    doc = json.loads(path.read_text())
+    for row in doc["models"]:
+        if row["model"] == QWEN:
+            row[field] = "digitalocean" if field == "endpoint_tag" else "e" * 64
+    path.write_text(json.dumps(_sign(doc)))
+    assert I.load_ps1_funding_record(panel) is not None               # signature is valid
+    st = I.interlock_state(panel, _panel_manifest_sha(panel, QWEN), QWEN)
+    assert st.headline_permitted is False and st.binding_failures
+    # the OTHER panel model is untouched and still authorized
+    assert I.interlock_state(panel, _panel_manifest_sha(panel, DEEPSEEK),
+                             DEEPSEEK).headline_permitted is True
+
+
+def test_a_funding_record_that_does_not_cover_this_model_blocks(panel):
+    path = I.ps1_funding_record_path(panel)
+    doc = json.loads(path.read_text())
+    doc["models"] = [r for r in doc["models"] if r["model"] != QWEN]
+    path.write_text(json.dumps(_sign(doc)))
+    st = I.interlock_state(panel, _panel_manifest_sha(panel, QWEN), QWEN)
+    assert st.headline_permitted is False
+    assert any("does not cover" in f for f in st.binding_failures)
+
+
+def test_an_excluded_model_has_no_headline(panel):
+    path = I.ps1_promotion_record_path(panel, QWEN)
+    doc = _sign({**json.loads(path.read_text()), "excluded": True,
+                 "exclusion_reason": "budget"})
+    path.write_text(json.dumps(doc))
+    st = I.interlock_state(panel, _panel_manifest_sha(panel, QWEN), QWEN)
+    assert st.headline_permitted is False
+    assert any("EXCLUDES" in f for f in st.binding_failures)
+
+
+def test_valid_ps1_records_need_no_legacy_records_but_legacy_cannot_rescue_them(panel):
+    """Backward compatibility runs one way only. The legacy singular records are not
+    required when PS-1 records are present (that was PF-1), and — because presence, not
+    validity, selects the scheme — they cannot be used to launder a broken PS-1 record."""
+    sha = _panel_manifest_sha(panel, QWEN)
+    assert I.interlock_state(panel, sha, QWEN).headline_permitted is True
+
+    I.record_promotion(panel, model=QWEN, manifest_sha256=sha, promoted_tag=TAG)
+    I.record_funding(panel, manifest_sha256=sha, authorized=True)
+    assert I.interlock_state(panel, sha, QWEN).scheme == I.SCHEME_PS1
+
+    I.ps1_promotion_record_path(panel, QWEN).unlink()
+    st = I.interlock_state(panel, sha, QWEN)
+    assert st.scheme == I.SCHEME_PS1 and st.headline_permitted is False
+
+
+def test_the_legacy_scheme_is_untouched_when_no_ps1_record_exists(tmp_path):
+    I.record_promotion(tmp_path, model=QWEN, manifest_sha256=MANIFEST, promoted_tag=TAG)
+    I.record_funding(tmp_path, manifest_sha256=MANIFEST, authorized=True)
+    st = I.interlock_state(tmp_path, MANIFEST, QWEN)
+    assert st.scheme == I.SCHEME_LEGACY and st.headline_permitted is True
+    # a legacy record for another model is still refused when the model is named
+    blocked = I.interlock_state(tmp_path, MANIFEST, DEEPSEEK)
+    assert blocked.headline_permitted is False
+
+
+def test_the_pure_predicate_reads_a_ps1_record_pair():
+    promotion = I.load_ps1_promotion_record(PANEL_RUN, QWEN)
+    funding = I.load_ps1_funding_record(PANEL_RUN)
+    assert I.blinding_interlock(promotion, funding) is True
+    assert I.blinding_interlock(promotion, {**funding, "authorized": False}) is False
+
+
+# =======================================================================================
 # 3. The pure `blinding_interlock` predicate
 # =======================================================================================
 

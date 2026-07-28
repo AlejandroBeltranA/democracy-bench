@@ -865,6 +865,272 @@ def test_interlock_records_bound_to_another_manifest_do_not_unblock(tmp_path):
                          manifest=manifest_body(), replicates=50)
 
 
+# ---------------------------------------------------------------------------------------
+# PF-1 integration regression: the records `study_run` actually writes must unblock
+# `study_extract`, and every tamper case must stay blocked.
+#
+# `study_run` writes per-model `interlock/promotion_record_<model>.json` plus one panel
+# `interlock/funding_record_panel.json` BEFORE any paid draw. Extraction consumes exactly
+# those records; it never mints a second, weaker operator decision alongside them. A
+# complete, fully paid run that was refused at headline extraction is what this section
+# exists to prevent recurring.
+# ---------------------------------------------------------------------------------------
+
+REPO = Path(__file__).resolve().parents[1]
+PANEL_RUN = REPO / "out" / "q2_stage2_v7_run_panel"
+DEEPSEEK = "deepseek/deepseek-v4-pro"
+PANEL_MODELS = (MODEL, DEEPSEEK)
+
+
+def sign_record(doc: dict) -> dict:
+    """Sign a record the way both writers do — sha256 over the canonical payload with
+    `binding_sha256` removed — recomputed here independently of either module."""
+    payload = {k: v for k, v in doc.items() if k != "binding_sha256"}
+    out = dict(payload)
+    out["binding_sha256"] = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return out
+
+
+def write_runner_records(run_dir, *, manifest_sha, model=MODEL, tag=PROVIDER,
+                         authorized=True, projection_sha="a" * 64):
+    """The PS-1 record pair in exactly the shape `study_run` emits it, for a synthetic run.
+
+    Byte-shape and cross-record binding are pinned against the real committed records by
+    `test_the_synthetic_runner_records_match_the_real_ones`."""
+    run_dir = Path(run_dir)
+    promotion = sign_record({
+        "schema": "q2_v7.study_run.model_promotion_authorization.v1",
+        "model": model,
+        "endpoint_snapshot_sha256": "d" * 64,
+        "walk_record_sha256": "w" * 64,
+        "excluded": False,
+        "exclusion_reason": None,
+        "promoted_tag": tag,
+        "promoted_endpoint_name": "qwen/qwen3.5-397b-a17b-20260216",
+        "promoted_upstream_model": "qwen/qwen3.5-397b-a17b-20260216",
+        "manifest_sha256": manifest_sha,
+        "projection_artifact_filename": "projection.json",
+        "projection_artifact_sha256": projection_sha,
+        "projection_total_usd": 1.79,
+        "projection_stop_usd": LG.HARD_STOP_USD,
+        "recorded_utc": TS,
+        "recorded_by": "test",
+    })
+    funding = sign_record({
+        "schema": "q2_v7.study_run.panel_funding_authorization.v1",
+        "authorized": authorized,
+        "decision": "authorized" if authorized else "refused",
+        "hard_stop_usd": LG.HARD_STOP_USD,
+        "reconciled_prior_usd": 0.03,
+        "reconciliation_is_exact": True,
+        "available_headroom_usd": LG.HARD_STOP_USD - 0.03,
+        "max_projected_total_usd": 1.79,
+        "models": [{
+            "model": model,
+            "excluded": False,
+            "endpoint_tag": tag,
+            "manifest_sha256": manifest_sha,
+            "projection_artifact_sha256": projection_sha,
+            "projection_total_usd": 1.79,
+            "promotion_binding_sha256": promotion["binding_sha256"],
+        }],
+        "recorded_utc": TS,
+        "recorded_by": "test",
+    })
+    IL.ps1_promotion_record_path(run_dir, model).parent.mkdir(parents=True, exist_ok=True)
+    IL.ps1_promotion_record_path(run_dir, model).write_text(json.dumps(promotion))
+    IL.ps1_funding_record_path(run_dir).write_text(json.dumps(funding))
+    return promotion, funding
+
+
+@pytest.fixture
+def panel_evidence(tmp_path):
+    """A writable copy of the paid panel run's authorization records and manifests.
+
+    `out/q2_stage2_v7_run_panel/` is immutable paid evidence; nothing here mutates it."""
+    import shutil
+    run = tmp_path / "panel"
+    (run / IL.INTERLOCK_DIRNAME).mkdir(parents=True)
+    for src in sorted((PANEL_RUN / IL.INTERLOCK_DIRNAME).glob("*.json")):
+        dst = run / IL.INTERLOCK_DIRNAME / src.name
+        shutil.copyfile(src, dst)
+        dst.chmod(0o644)
+    for model in PANEL_MODELS:
+        name = f"manifest_{model.replace('/', '__')}.json"
+        shutil.copyfile(PANEL_RUN / name, run / name)
+    return run
+
+
+def panel_manifest_sha(run_dir, model):
+    body = json.loads(
+        (Path(run_dir) / f"manifest_{model.replace('/', '__')}.json").read_text())
+    return ID.canonical_sha256(body)
+
+
+@pytest.mark.parametrize("model", PANEL_MODELS)
+def test_records_written_by_study_run_unblock_extraction(model):
+    """The PF-1 reproduction, inverted: the real paid run's own records, loaded by
+    `study_run`'s own reader, now permit `study_extract`'s headline for each model."""
+    from alignment.q2_v7 import study_run as SR
+    promotion = SR.load_promotion_authorization(PANEL_RUN, model)
+    funding = SR.load_funding_authorization(PANEL_RUN)
+    assert promotion["model"] == model and funding["authorized"] is True
+
+    sha = panel_manifest_sha(PANEL_RUN, model)
+    state = SX.require_headline_permitted(PANEL_RUN, sha, model)
+    assert state.headline_permitted is True and state.scheme == IL.SCHEME_PS1
+    # the same records reached through the study EnvelopeStore directory one level down
+    assert SX.require_headline_permitted(
+        PANEL_RUN / "study", sha, model).headline_permitted is True
+
+
+def test_a_funding_record_freshly_emitted_by_study_run_unblocks_extraction(panel_evidence):
+    """Not just the checked-in bytes: the record `study_run`'s writer produces right now,
+    from the promotion records on disk, is the one extraction accepts."""
+    from alignment.q2_v7 import study_run as SR
+    IL.ps1_funding_record_path(panel_evidence).unlink()
+    for model in PANEL_MODELS:
+        with pytest.raises(SX.HeadlineBlocked):
+            SX.require_headline_permitted(
+                panel_evidence, panel_manifest_sha(panel_evidence, model), model)
+
+    SR.record_funding_authorization(
+        panel_evidence, decision="authorized for the regression", authorized=True,
+        reconciliation=LG.ReconciliationResult(reconciled_usd=0.03183914, record_count=3),
+        recorded_by="test")
+    for model in PANEL_MODELS:
+        assert SX.require_headline_permitted(
+            panel_evidence, panel_manifest_sha(panel_evidence, model),
+            model).headline_permitted is True
+
+
+def test_a_funding_refusal_emitted_by_study_run_keeps_the_headline_blocked(panel_evidence):
+    from alignment.q2_v7 import study_run as SR
+    IL.ps1_funding_record_path(panel_evidence).unlink()
+    SR.record_funding_authorization(
+        panel_evidence, decision="refused: no budget", authorized=False,
+        reconciliation=LG.ReconciliationResult(reconciled_usd=0.03183914, record_count=3),
+        recorded_by="test")
+    with pytest.raises(SX.HeadlineBlocked, match="REFUSES"):
+        SX.require_headline_permitted(
+            panel_evidence, panel_manifest_sha(panel_evidence, MODEL), MODEL)
+
+
+def test_the_synthetic_runner_records_match_the_real_ones():
+    """`write_runner_records` must not drift from what the runner writes: same schemas,
+    same signature scheme, same cross-record binding field."""
+    from alignment.q2_v7 import study_run as SR
+    real_promotion = json.loads(
+        IL.ps1_promotion_record_path(PANEL_RUN, MODEL).read_text())
+    real_funding = json.loads(IL.ps1_funding_record_path(PANEL_RUN).read_text())
+    assert sign_record(real_promotion) == real_promotion
+    assert sign_record(real_funding) == real_funding
+    assert real_promotion["schema"] == SR.AUTHORIZATION_PROMOTION_SCHEMA
+    assert real_funding["schema"] == SR.AUTHORIZATION_FUNDING_SCHEMA
+    row = [m for m in real_funding["models"] if m["model"] == MODEL][0]
+    assert row["promotion_binding_sha256"] == real_promotion["binding_sha256"]
+    assert IL.INTERLOCK_DIRNAME == SX.IL_DIRNAME
+
+
+@pytest.mark.parametrize("tamper", [
+    "missing_promotion", "missing_funding", "edited_promotion", "edited_funding",
+    "cross_model", "stale_manifest", "refused", "inconsistent_binding", "not_covered",
+])
+def test_every_tamper_case_keeps_the_headline_blocked(panel_evidence, tamper):
+    import shutil
+    sha = panel_manifest_sha(panel_evidence, MODEL)
+    promotion_path = IL.ps1_promotion_record_path(panel_evidence, MODEL)
+    funding_path = IL.ps1_funding_record_path(panel_evidence)
+
+    if tamper == "missing_promotion":
+        promotion_path.unlink()
+    elif tamper == "missing_funding":
+        funding_path.unlink()
+    elif tamper == "edited_promotion":
+        doc = json.loads(promotion_path.read_text())
+        doc["projection_total_usd"] = 0.01
+        promotion_path.write_text(json.dumps(doc))          # not re-signed
+    elif tamper == "edited_funding":
+        doc = json.loads(funding_path.read_text())
+        doc["available_headroom_usd"] = 9999.0
+        funding_path.write_text(json.dumps(doc))            # not re-signed
+    elif tamper == "cross_model":
+        shutil.copyfile(IL.ps1_promotion_record_path(panel_evidence, DEEPSEEK),
+                        promotion_path)
+    elif tamper == "stale_manifest":
+        sha = "a" * 64
+    elif tamper == "refused":
+        funding_path.write_text(json.dumps(sign_record(
+            {**json.loads(funding_path.read_text()), "authorized": False})))
+    elif tamper == "inconsistent_binding":
+        doc = json.loads(funding_path.read_text())
+        for row in doc["models"]:
+            if row["model"] == MODEL:
+                row["promotion_binding_sha256"] = "e" * 64
+        funding_path.write_text(json.dumps(sign_record(doc)))
+    elif tamper == "not_covered":
+        doc = json.loads(funding_path.read_text())
+        doc["models"] = [r for r in doc["models"] if r["model"] != MODEL]
+        funding_path.write_text(json.dumps(sign_record(doc)))
+
+    with pytest.raises(SX.HeadlineBlocked):
+        SX.require_headline_permitted(panel_evidence, sha, MODEL)
+
+
+def test_extract_model_aggregates_under_the_runner_records_and_nothing_else(tmp_path):
+    """End to end: a complete synthetic model whose ONLY authorization is the PS-1 record
+    pair `study_run` writes. No legacy singular record exists anywhere in the run."""
+    run = tmp_path / "run"
+    store = build_store(store=MemoryEnvelopeStore(run / "study"))
+    man = manifest_body()
+    kwargs = dict(probe_ids=PROBES, model=MODEL, items=items(), manifest=man, replicates=50)
+
+    with pytest.raises(SX.HeadlineBlocked):
+        SX.extract_model(store, **kwargs)
+
+    write_runner_records(run, manifest_sha=ID.canonical_sha256(man))
+    assert not IL.promotion_record_path(run).exists()
+    assert not IL.funding_record_path(run).exists()
+
+    res = SX.extract_model(store, **kwargs)
+    assert res.complete is True and res.estimands is not None
+
+
+def test_extract_model_refuses_a_runner_record_for_a_different_model(tmp_path):
+    run = tmp_path / "run"
+    store = build_store(store=MemoryEnvelopeStore(run / "study"))
+    man = manifest_body()
+    write_runner_records(run, manifest_sha=ID.canonical_sha256(man), model=DEEPSEEK)
+    with pytest.raises(SX.HeadlineBlocked, match="promotion"):
+        SX.extract_model(store, probe_ids=PROBES, model=MODEL, items=items(),
+                         manifest=man, replicates=50)
+
+
+def test_extract_model_refuses_a_runner_record_bound_to_another_manifest(tmp_path):
+    run = tmp_path / "run"
+    store = build_store(store=MemoryEnvelopeStore(run / "study"))
+    write_runner_records(run, manifest_sha="f" * 64)
+    with pytest.raises(SX.HeadlineBlocked):
+        SX.extract_model(store, probe_ids=PROBES, model=MODEL, items=items(),
+                         manifest=manifest_body(), replicates=50)
+
+
+def test_the_interlock_lookup_only_steps_up_from_a_runner_store_directory(tmp_path):
+    """The step-up from `<run>/study` to `<run>` is what lets a real run be extracted at
+    all. It must not turn into a general search of ancestor directories."""
+    run = tmp_path / "run"
+    (run / IL.INTERLOCK_DIRNAME).mkdir(parents=True)
+    assert SX.interlock_run_dir(run / "study") == run
+    assert SX.interlock_run_dir(run / "study_attempts") == run
+    assert SX.interlock_run_dir(run / "anything_else") == run / "anything_else"
+    assert SX.interlock_run_dir(run) == run
+    assert SX.interlock_run_dir(run / "study" / "raw") == run / "study" / "raw"
+    # a directory with its own interlock/ is never resolved past
+    (run / "study" / IL.INTERLOCK_DIRNAME).mkdir(parents=True)
+    assert SX.interlock_run_dir(run / "study") == run / "study"
+
+
 def test_an_incomplete_model_never_reaches_the_interlock(tmp_path):
     """Nothing substantive is computed for an incomplete model, so there is nothing to
     blind — the gate refuses first, with no interlock record anywhere."""

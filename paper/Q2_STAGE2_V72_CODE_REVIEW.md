@@ -1,13 +1,113 @@
-# Q2 Stage-2 v7.2 code review — Qwen smoke authorized
+# Q2 Stage-2 v7.2 code review — full runs not yet authorized
 
 Reviewer: Codex  
 Date: 2026-07-28  
 Reviewed branch: `phase4-floor-guards`  
-Current reviewed HEAD: `45a78fb3316736b120a84082b88bf91b493f947b` — *Close PS-7 and PS-8; pin the DeepSeek serializer under signed amendment AMD-V72-01*
+Current reviewed HEAD: `f6e9e6bffb5e2d3f5f22c46cd51c1331df0823d8` — *Both 240-draw outcome-blinded smokes PASS at parse rate 1.0000*
 
 Original review baseline: `4d0c5ac` — *Build hardened Q2 Stage-2 v7.2 runner; synthetic canary passes on Qwen3.5-397B*
 
-Current implementation scope: cumulative Stage-2 code from `80399d7` through `45a78fb`
+Current implementation scope: cumulative Stage-2 code from `80399d7` through `f6e9e6b`
+
+## Pre-full-run re-review — `f6e9e6b`
+
+### Verdict
+
+**HOLD — do not start either 13,200-draw full run yet.**
+
+Both real 240-draw smokes passed their outcome-blinded measurement gates, and the live
+DeepSeek smoke confirms that `3ccf830` fixed reconstruction of Qwen's prior spend under the
+shared panel stop. The remaining hold is not about either instrument or endpoint. It is one
+reproduced extraction-plumbing blocker plus one missing regression for the code change made
+after the last reviewed revision.
+
+### PF-1 — runner authorization records do not unblock extraction
+
+`study_run` writes the authoritative PS-1 records:
+
+```text
+interlock/promotion_record_qwen__qwen3.5-397b-a17b.json
+interlock/promotion_record_deepseek__deepseek-v4-pro.json
+interlock/funding_record_panel.json
+```
+
+`study_extract.require_headline_permitted`, however, calls
+`interlock.interlock_state`, which looks only for the legacy singular files:
+
+```text
+interlock/promotion_record.json
+interlock/funding_record.json
+```
+
+Reproduced against the successful panel smoke run:
+
+```text
+run_dir: out/q2_stage2_v7_run_panel
+promotion_recorded: false
+funding_recorded: false
+headline_permitted: false
+missing: [promotion, funding]
+```
+
+The three valid PS-1 records are present in that directory. Therefore a complete paid full
+run would still be refused at headline extraction.
+
+Required fix:
+
+1. Make the extraction interlock consume and validate the existing PS-1 model-promotion and
+   panel-funding records. Do not create a second, weaker pair of operator-authored decisions
+   that can diverge from the records which authorized the paid run.
+2. Select the promotion record for the model being extracted and require its manifest digest
+   to equal that model's recomputed extraction manifest.
+3. Require the panel funding record to be authorized, cryptographically valid, and to contain
+   the same model, manifest digest, projection digest, and promotion binding.
+4. Preserve fail-closed behavior for missing, edited, cross-model, stale-manifest, refused,
+   or internally inconsistent records.
+5. Add an integration regression proving that records emitted by `study_run` unblock
+   `study_extract` for each valid model and that each tamper case above remains blocked.
+
+### PF-2 — `3ccf830` needs a no-network panel reconstruction regression
+
+The ledger change is narrowly reasonable and has live evidence: DeepSeek reconstructed the
+shared store after Qwen and carried Qwen's spend. But it added 37 source lines and no test.
+The existing runner fixtures use one model per run directory, which is exactly why the defect
+escaped earlier review.
+
+Add a no-network regression that persists first-model sampling/attempt records, reconstructs
+the second model's ledger in the same run directory, verifies the first model's exact spend is
+carried into the shared stop, and still rejects an identity outside both frozen model grids.
+
+### PF-3 — the proposed fix invalidates both paid smoke manifests
+
+The current working-tree fix also edits `src/alignment/q2_v7/study_run.py` by narrowing two
+exception handlers in `_other_panel_study_draw_ids`. That hardening is unrelated to PF-1 and
+changes the manifest-bound runner revision:
+
+```text
+paid Qwen and DeepSeek smoke manifests: sha256:400a4ff7948a1e8e
+current working tree:                 sha256:700311d191ef5ed0
+```
+
+`full` recomputes the manifest and `write_study_manifest` resumes only when it is
+byte-identical. Therefore the current working tree will refuse before constructing a
+transport and cannot reuse the 480 paid smoke draws.
+
+Required fix: revert only the unrelated `study_run.py` exception-handler change. The PF-2
+test can remain; tests do not enter `runner_revision`. With `study_run.py` restored
+byte-for-byte to `f6e9e6b`, the runner revision returns to `sha256:400a4ff7948a1e8e` and the
+paid smoke evidence remains reusable. Otherwise both smoke sequences must be rerun under the
+new revision, which is unnecessary.
+
+### Minimal route to full-run authorization
+
+- fix PF-1 without duplicating authorization decisions;
+- add the PF-2 regression;
+- preserve the exact `f6e9e6b` `study_run.py` bytes so the paid smoke manifests remain valid;
+- run the focused runner, ledger, interlock, and extraction suites;
+- commit a stable revision for immediate re-review.
+
+No additional endpoint walk or paid smoke is requested by this hold. If those checks pass,
+the two full runs can be authorized immediately.
 
 ## Final smoke-gate review — `45a78fb`
 

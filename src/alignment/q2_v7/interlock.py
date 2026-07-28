@@ -28,10 +28,23 @@ specified and tested; this module deliberately does not pretend to be one.
 
 Artifacts
 ---------
-`PromotionRecord` and `FundingRecord` are immutable, persisted JSON artifacts under
-`<run_dir>/interlock/`. Each carries a UTC timestamp, the decision content, the run
+There is exactly ONE set of authorization records, and it is the set that authorized the
+paid run. Two on-disk spellings exist:
+
+* **PS-1 staged authorization (authoritative)** — written by `study_run` before any paid
+  stage: one `interlock/promotion_record_<model>.json` per panel model plus a single panel
+  `interlock/funding_record_panel.json`. These are what a real run produces, and they are
+  what this module consumes at headline time. `study_extract` never invents a second,
+  weaker pair of operator-authored decisions that could diverge from them.
+* **Legacy singular records** — `PromotionRecord` / `FundingRecord` in
+  `interlock/promotion_record.json` and `interlock/funding_record.json`. They predate the
+  panel design (whose single-manifest schema cannot express a two-model binding) and are
+  retained only so older single-model run directories and fixtures keep working. Their
+  ABSENCE never blocks a run that carries valid PS-1 records.
+
+Every record — either spelling — carries a UTC timestamp, the decision content, the run
 manifest digest, and a `binding_sha256` computed over its own canonical payload INCLUDING
-that manifest digest — so a record cannot be silently moved onto a different run, and a
+that manifest digest, so a record cannot be silently moved onto a different run, and a
 record edited after the fact fails to load.
 
 Writing refuses to replace an existing record: an interlock decision is evidence, and the
@@ -69,6 +82,20 @@ FUNDING_RECORD_FILENAME = "funding_record.json"
 PROMOTION_SCHEMA = "q2_v7.promotion_record.v1"
 FUNDING_SCHEMA = "q2_v7.funding_record.v1"
 GATE_VIEW_SCHEMA = "q2_v7.gate_view.v1"
+
+#: The PS-1 staged-authorization records `study_run` actually writes before a paid stage.
+#: These names and schemas are read-only mirrors of `study_run`'s; this module deliberately
+#: does NOT import `study_run` (which imports this module) — the digest scheme is identical
+#: (`sha256` over the canonical payload minus `binding_sha256`), and
+#: `tests/test_q2_v7_interlock.py` pins the two spellings against each other.
+PS1_PROMOTION_SCHEMA = "q2_v7.study_run.model_promotion_authorization.v1"
+PS1_FUNDING_SCHEMA = "q2_v7.study_run.panel_funding_authorization.v1"
+PS1_PROMOTION_FILENAME_PREFIX = "promotion_record_"
+PS1_FUNDING_RECORD_FILENAME = "funding_record_panel.json"
+
+#: Which on-disk authorization spelling `interlock_state` consumed.
+SCHEME_PS1 = "ps1"
+SCHEME_LEGACY = "legacy"
 
 #: The two records the frozen interlock requires, in the order the staged authorization
 #: (v7 "Staged authorization", requirement 1) records them.
@@ -343,25 +370,110 @@ def load_funding_record(run_dir: Path | str) -> Optional[FundingRecord]:
 
 
 # =======================================================================================
+# 1b. The PS-1 staged-authorization records — the ones that authorized the paid run
+# =======================================================================================
+#
+# `study_run` writes these before a transport is ever constructed, so they are the records
+# that actually paid for the draws. Headline extraction consumes THEM rather than asking an
+# operator to re-record a second, weaker decision that could disagree with what was funded.
+
+def _safe_model(model: str) -> str:
+    """`study_run._safe_model`: the exact filename spelling the runner writes."""
+    return str(model).replace("/", "__")
+
+
+def ps1_promotion_record_path(run_dir: Path | str, model: str) -> Path:
+    return (interlock_dir(run_dir)
+            / f"{PS1_PROMOTION_FILENAME_PREFIX}{_safe_model(model)}.json")
+
+
+def ps1_funding_record_path(run_dir: Path | str) -> Path:
+    return interlock_dir(run_dir) / PS1_FUNDING_RECORD_FILENAME
+
+
+def ps1_promotion_record_paths(run_dir: Path | str) -> list[Path]:
+    """Every per-model PS-1 promotion record in `run_dir`, sorted. Never the legacy file."""
+    directory = interlock_dir(run_dir)
+    if not directory.is_dir():
+        return []
+    return sorted(p for p in directory.glob(f"{PS1_PROMOTION_FILENAME_PREFIX}*.json")
+                  if p.name != PROMOTION_RECORD_FILENAME)
+
+
+def ps1_records_present(run_dir: Path | str) -> bool:
+    """True when this run directory carries the PS-1 staged-authorization scheme at all.
+
+    Presence — not validity — selects the scheme. A run that emitted PS-1 records is judged
+    by them: a tampered or refused PS-1 record blocks the headline and CANNOT be rescued by
+    a legacy singular record sitting alongside it.
+    """
+    return bool(ps1_promotion_record_paths(run_dir)) or ps1_funding_record_path(
+        run_dir).exists()
+
+
+def _read_ps1_record(path: Path, schema: str) -> Optional[dict[str, Any]]:
+    """Load and cryptographically verify one PS-1 record, or None when it is absent."""
+    if not path.exists():
+        return None
+    try:
+        obj = json.loads(path.read_text())
+    except (OSError, ValueError) as exc:
+        raise RecordBindingError(
+            f"{path}: unreadable authorization record ({exc})") from None
+    if not isinstance(obj, Mapping):
+        raise RecordBindingError(f"{path}: authorization record is not a JSON object")
+    if obj.get("schema") != schema:
+        raise RecordBindingError(
+            f"{path}: wrong schema {obj.get('schema')!r}, expected {schema!r}")
+    stored = obj.get("binding_sha256")
+    payload = {k: v for k, v in obj.items() if k != "binding_sha256"}
+    if not isinstance(stored, str) or not stored or stored != _binding_digest(payload):
+        raise RecordBindingError(
+            f"{path}: binding_sha256 does not match the record payload — the record was "
+            f"edited after it was written, or moved onto another run")
+    return dict(obj)
+
+
+def load_ps1_promotion_record(run_dir: Path | str, model: str) -> Optional[dict[str, Any]]:
+    """One model's PS-1 promotion authorization, verified. None when absent."""
+    return _read_ps1_record(ps1_promotion_record_path(run_dir, model), PS1_PROMOTION_SCHEMA)
+
+
+def load_ps1_funding_record(run_dir: Path | str) -> Optional[dict[str, Any]]:
+    """The panel PS-1 funding authorization, verified. None when absent."""
+    return _read_ps1_record(ps1_funding_record_path(run_dir), PS1_FUNDING_SCHEMA)
+
+
+# =======================================================================================
 # 2. Interlock state and the refusal that guards every aggregation
 # =======================================================================================
 
 @dataclass(frozen=True)
 class InterlockState:
-    """Which interlock records exist for one run directory, and therefore what is permitted."""
+    """Which interlock records exist for one run directory, and therefore what is permitted.
+
+    `promotion`/`funding` hold the LEGACY singular dataclasses; `ps1_promotion`/`ps1_funding`
+    hold the authoritative PS-1 staged-authorization payloads `study_run` wrote. Exactly one
+    family is ever populated — `scheme` names which — because a run directory is judged by
+    the records that authorized it, never by a mixture.
+    """
     run_dir: str
     promotion: Optional[PromotionRecord] = None
     funding: Optional[FundingRecord] = None
     expected_manifest_sha256: Optional[str] = None
     binding_failures: tuple[str, ...] = ()
+    model: Optional[str] = None
+    ps1_promotion: Optional[Mapping[str, Any]] = None
+    ps1_funding: Optional[Mapping[str, Any]] = None
+    scheme: str = SCHEME_LEGACY
 
     @property
     def promotion_recorded(self) -> bool:
-        return self.promotion is not None
+        return self.promotion is not None or self.ps1_promotion is not None
 
     @property
     def funding_recorded(self) -> bool:
-        return self.funding is not None
+        return self.funding is not None or self.ps1_funding is not None
 
     @property
     def missing(self) -> tuple[str, ...]:
@@ -382,6 +494,8 @@ class InterlockState:
     def as_dict(self) -> dict[str, Any]:
         return {
             "run_dir": self.run_dir,
+            "scheme": self.scheme,
+            "model": self.model,
             "promotion_recorded": self.promotion_recorded,
             "funding_recorded": self.funding_recorded,
             "missing": list(self.missing),
@@ -391,14 +505,23 @@ class InterlockState:
 
 
 def interlock_state(run_dir: Path | str,
-                    expected_manifest_sha256: Optional[str] = None) -> InterlockState:
-    """Report which interlock records exist for `run_dir`.
+                    expected_manifest_sha256: Optional[str] = None,
+                    model: Optional[str] = None) -> InterlockState:
+    """Report which interlock records exist for `run_dir`, and therefore what is permitted.
 
-    A record that is present but unreadable, unbound, or bound to a manifest other than
-    `expected_manifest_sha256` is NOT counted as recorded: absence of a valid record and
-    presence of an invalid one both leave the headline blocked.
+    When the run directory carries the PS-1 staged-authorization records `study_run` writes,
+    THOSE are consumed and validated (`_ps1_interlock_state`); `model` then names which of
+    the panel's per-model promotion decisions applies. Otherwise the legacy singular records
+    are used, unchanged.
+
+    Under either scheme, a record that is present but unreadable, unbound, or bound to a
+    manifest other than `expected_manifest_sha256` is NOT counted as recorded: absence of a
+    valid record and presence of an invalid one both leave the headline blocked.
     """
     run_dir = Path(run_dir)
+    if ps1_records_present(run_dir):
+        return _ps1_interlock_state(run_dir, expected_manifest_sha256, model)
+
     failures: list[str] = []
     promotion: Optional[PromotionRecord] = None
     funding: Optional[FundingRecord] = None
@@ -418,12 +541,152 @@ def interlock_state(run_dir: Path | str,
                 failures.append(
                     f"{name}: bound to manifest {rec.manifest_sha256!r}, not "
                     f"{expected_manifest_sha256!r}")
+    if promotion is not None and model is not None and promotion.model != model:
+        failures.append(
+            f"promotion: records the decision for {promotion.model!r}, not {model!r}")
     return InterlockState(
         run_dir=str(run_dir),
         promotion=promotion,
         funding=funding,
         expected_manifest_sha256=expected_manifest_sha256,
         binding_failures=tuple(failures),
+        model=model,
+        scheme=SCHEME_LEGACY,
+    )
+
+
+def _ps1_interlock_state(run_dir: Path,
+                         expected_manifest_sha256: Optional[str],
+                         model: Optional[str]) -> InterlockState:
+    """Validate the PS-1 records that authorized this run against the model being extracted.
+
+    Fail-closed on every one of: a missing promotion record for this model; a missing panel
+    funding record; a record edited after it was written (its `binding_sha256` no longer
+    verifies); a promotion record for a DIFFERENT model; a promotion record bound to a
+    manifest other than the recomputed extraction manifest; a funding record that REFUSES
+    the run (`authorized` false); and a funding record whose per-model entry disagrees with
+    the promotion record it claims to fund (endpoint tag, manifest digest, projection
+    artifact digest, or promotion binding).
+    """
+    failures: list[str] = []
+    promotion: Optional[dict[str, Any]] = None
+    funding: Optional[dict[str, Any]] = None
+
+    # --- (a) the model-promotion decision, selected FOR THE MODEL BEING EXTRACTED ------
+    paths = ps1_promotion_record_paths(run_dir)
+    path: Optional[Path] = None
+    if model is not None:
+        candidate = ps1_promotion_record_path(run_dir, model)
+        if candidate.exists():
+            path = candidate
+        else:
+            failures.append(
+                f"promotion: this run records no endpoint-promotion decision for {model!r} "
+                f"(expected {candidate})")
+    elif len(paths) == 1:
+        path = paths[0]
+    elif paths:
+        failures.append(
+            "promotion: this run records per-model promotion decisions "
+            f"{[p.name for p in paths]}; name the model being extracted so the right one is "
+            "selected — refusing to guess which decision authorizes this headline")
+    else:
+        failures.append(
+            f"promotion: this run records no endpoint-promotion decision under "
+            f"{interlock_dir(run_dir)}")
+
+    if path is not None:
+        try:
+            promotion = _read_ps1_record(path, PS1_PROMOTION_SCHEMA)
+        except InterlockError as exc:
+            failures.append(f"promotion: {exc}")
+
+    bound_model = promotion.get("model") if promotion is not None else None
+    target_model = model if model is not None else bound_model
+
+    if promotion is not None:
+        if not isinstance(bound_model, str) or not bound_model:
+            failures.append("promotion: the record names no model")
+        elif model is not None and bound_model != model:
+            failures.append(
+                f"promotion: {path.name if path else '<record>'} records the decision for "
+                f"{bound_model!r}, not {model!r}")
+        if promotion.get("excluded"):
+            failures.append(
+                f"promotion: the recorded decision EXCLUDES {bound_model!r} "
+                f"({promotion.get('exclusion_reason')!r}); an excluded model has no draws "
+                f"and no headline")
+        recorded_manifest = promotion.get("manifest_sha256")
+        if expected_manifest_sha256 is None:
+            failures.append(
+                "promotion: refusing to accept a staged authorization without the "
+                "recomputed run manifest digest to check it against — the manifest binding "
+                "is the whole of what makes the record apply to THIS extraction")
+        elif recorded_manifest != expected_manifest_sha256:
+            failures.append(
+                f"promotion: bound to manifest {recorded_manifest!r}, not the recomputed "
+                f"extraction manifest {expected_manifest_sha256!r}")
+
+    # --- (b) the panel funding decision -----------------------------------------------
+    funding_path = ps1_funding_record_path(run_dir)
+    try:
+        funding = load_ps1_funding_record(run_dir)
+    except InterlockError as exc:
+        failures.append(f"funding: {exc}")
+    else:
+        if funding is None:
+            failures.append(f"funding: no panel funding record at {funding_path}")
+
+    if funding is not None:
+        if not funding.get("authorized"):
+            failures.append(
+                f"funding: the recorded panel funding decision REFUSES this run "
+                f"({funding.get('decision')!r})")
+        rows = funding.get("models")
+        if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)):
+            rows = []
+        entries = [m for m in rows
+                   if isinstance(m, Mapping) and m.get("model") == target_model]
+        if target_model is None:
+            pass                       # already reported as a promotion-selection failure
+        elif not entries:
+            failures.append(
+                f"funding: the panel funding record does not cover {target_model!r}")
+        else:
+            entry = entries[0]
+            if entry.get("excluded"):
+                failures.append(
+                    f"funding: the panel funding record EXCLUDES {target_model!r}")
+            if (expected_manifest_sha256 is not None
+                    and entry.get("manifest_sha256") != expected_manifest_sha256):
+                failures.append(
+                    f"funding: funds manifest {entry.get('manifest_sha256')!r} for "
+                    f"{target_model!r}, not the recomputed extraction manifest "
+                    f"{expected_manifest_sha256!r}")
+            if promotion is not None:
+                for field, label in (("manifest_sha256", "manifest digest"),
+                                     ("projection_artifact_sha256", "projection digest"),
+                                     ("endpoint_tag", "promoted endpoint tag")):
+                    promo_field = "promoted_tag" if field == "endpoint_tag" else field
+                    if entry.get(field) != promotion.get(promo_field):
+                        failures.append(
+                            f"funding: the record funds {label} {entry.get(field)!r} for "
+                            f"{target_model!r}, but the promotion decision records "
+                            f"{promotion.get(promo_field)!r}")
+                if entry.get("promotion_binding_sha256") != promotion.get("binding_sha256"):
+                    failures.append(
+                        f"funding: recorded against a DIFFERENT promotion decision for "
+                        f"{target_model!r} ({entry.get('promotion_binding_sha256')!r} != "
+                        f"{promotion.get('binding_sha256')!r})")
+
+    return InterlockState(
+        run_dir=str(run_dir),
+        expected_manifest_sha256=expected_manifest_sha256,
+        binding_failures=tuple(failures),
+        model=target_model,
+        ps1_promotion=promotion,
+        ps1_funding=funding,
+        scheme=SCHEME_PS1,
     )
 
 
@@ -472,15 +735,19 @@ def _funding_ok(rec: Any) -> bool:
 
 
 def require_headline_permitted(run_dir: Path | str,
-                               expected_manifest_sha256: Optional[str] = None
-                               ) -> InterlockState:
+                               expected_manifest_sha256: Optional[str] = None,
+                               model: Optional[str] = None) -> InterlockState:
     """RAISE unless both interlock records exist. Call this BEFORE emitting anything.
 
     This is the refusal the frozen design names: "Headline aggregation refuses to run until
     both records exist." Every aggregation path — headline extraction, contrast
     reconstruction, effect sizes, crack counts — must pass through here first.
+
+    `model` names the panel model being extracted. It selects that model's PS-1 promotion
+    decision and that model's row of the panel funding decision; a panel run directory with
+    more than one promotion record refuses to guess.
     """
-    state = interlock_state(run_dir, expected_manifest_sha256)
+    state = interlock_state(run_dir, expected_manifest_sha256, model)
     if not state.headline_permitted:
         detail = []
         if state.missing:
@@ -717,9 +984,14 @@ __all__ = [
     "BlindingViolation", "FUNDING_RECORD_FILENAME", "FUNDING_SCHEMA", "FundingRecord",
     "GATE_VIEW_SCHEMA", "GATE_VIEW_SECTIONS", "HeadlineBlocked", "INTERLOCK_DIRNAME",
     "InterlockError", "InterlockState", "PROMOTION_RECORD_FILENAME", "PROMOTION_SCHEMA",
+    "PS1_FUNDING_RECORD_FILENAME", "PS1_FUNDING_SCHEMA",
+    "PS1_PROMOTION_FILENAME_PREFIX", "PS1_PROMOTION_SCHEMA",
     "PromotionRecord", "REQUIRED_RECORDS", "RecordBindingError", "RecordExistsError",
+    "SCHEME_LEGACY", "SCHEME_PS1",
     "assert_outcome_blinded", "blinding_interlock", "funding_record_path", "gate_view",
     "interlock_dir", "interlock_state", "load_funding_record", "load_promotion_record",
-    "promotion_record_path", "record_funding", "record_promotion",
+    "load_ps1_funding_record", "load_ps1_promotion_record", "promotion_record_path",
+    "ps1_funding_record_path", "ps1_promotion_record_path", "ps1_promotion_record_paths",
+    "ps1_records_present", "record_funding", "record_promotion",
     "require_headline_permitted",
 ]
