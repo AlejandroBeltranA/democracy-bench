@@ -1311,6 +1311,33 @@ def default_reconciliation() -> L.ReconciliationResult:
     )
 
 
+def _other_panel_study_draw_ids(run_dir: Path | str, model: str,
+                                max_attempts: int = G.MAX_ATTEMPTS) -> set[str]:
+    """Sampling + attempt identities of every OTHER promoted panel model in this run dir.
+
+    Derived deterministically from each model's own persisted walk record (its promoted
+    endpoint) and the frozen grid; no network, no guessing. A model with no walk record yet
+    contributes nothing, so a fresh run directory behaves exactly as before.
+    """
+    out: set[str] = set()
+    for panel_model in G.PANEL_ORDER:
+        if panel_model == model:
+            continue
+        try:
+            tag = load_promotion(run_dir, panel_model)
+        except Exception:
+            continue                       # not walked yet in this run directory
+        try:
+            requests = render_study_grid(panel_model, tag, probe_ids_for())
+        except Exception:
+            continue
+        ids = [I.draw_id(r.request_sha256, i)
+               for r in requests for i in range(I.DRAWS_PER_COORDINATE)]
+        out |= set(ids)
+        out |= authorised_attempt_draw_ids(ids, max_attempts)
+    return out
+
+
 def open_ledger(run_dir: Path | str, *, model: str, endpoint: str = "",
                 study_draw_ids: Sequence[str] = (),
                 reconciliation: Optional[L.ReconciliationResult] = None,
@@ -1337,6 +1364,16 @@ def open_ledger(run_dir: Path | str, *, model: str, endpoint: str = "",
     authorised |= authorised_attempt_draw_ids(study_draw_ids, max_attempts)
     for panel_model in G.PANEL_ORDER:
         authorised |= set(walk_draw_ids(panel_model, max_attempts))
+    # The STUDY and ATTEMPT stores are shared across the panel for the same reason the walk
+    # store is: one $8.50 stop must see every model's spend. So the binding must also cover
+    # the OTHER panel models' sampling and attempt identities. Without this, running the
+    # second model's smoke in the same run directory reconstructs the ledger, meets the first
+    # model's persisted attempt records, and refuses -- i.e. the runner could only ever handle
+    # one model per run directory, which contradicts a panel-level funding record and a
+    # panel-level stop. The ids are deterministic (frozen panel, frozen grid, frozen ladder)
+    # and are derived from each model's own persisted walk record, so this widens the binding
+    # without weakening it: anything outside the panel's authorised set is still refused.
+    authorised |= _other_panel_study_draw_ids(run_dir, model, max_attempts)
     manifest = L.RunManifest.from_draw_ids(authorised, model=model, endpoint=endpoint)
     # Money is reconstructed from the ATTEMPT store: it holds every returned wire response,
     # including the paid non-terminal retries the old runner discarded.
