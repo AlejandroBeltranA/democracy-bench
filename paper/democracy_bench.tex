@@ -284,8 +284,7 @@ local ladder: all phases (MLX 4-bit) &
 Llama-3.2-3B (primary), Llama-3.1-8B \\
 \addlinespace[2pt]
 cross-family: P2/P3/P4 replication &
-Qwen2.5-7B, Phi-4-mini, Gemma-2-9B, Mistral-Nemo
-(Mistral-7B-v0.3 dropped, fail-closed) \\
+Qwen2.5-7B, Phi-4-mini, Gemma-2-9B, Mistral-Nemo \\
 \addlinespace[2pt]
 open-weight transfer ($S{=}100$): channel design, \S\ref{sec:robust} &
 Qwen3.5-397B-A17B (Alibaba), DeepSeek-V4-Pro (DeepSeek) \\
@@ -300,10 +299,11 @@ open-weight models are 4-bit MLX community checkpoints run on Apple Silicon.}
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{f1_ladder.pdf}
-\caption{The intervention ladder, lightest lever (top) to heaviest (bottom): held-out
-point estimate and 95\% CI per rung against its dashed reference (zero effect, or the
-0.50 floor for guards). Only context earns a partial pass, with a CI clearing zero---and
-it is the attack surface. Every heavier lever fails its reference.}
+\caption{How far the local tier gets: the intervention ladder on the 3B, lightest lever
+(top) to heaviest, including the fine-tuning rung. Each row shows the held-out point
+estimate and 95\% CI against its dashed reference (zero effect, or the 0.50 floor for
+guards). Only context earns a partial pass---and it is the attack surface. Every heavier
+lever, weights included, fails its reference.}
 \label{fig:ladder}
 \end{figure}
 
@@ -389,17 +389,6 @@ survey report; the combined text) crossed with four guard placements (none; user
 before the payload; after it; system role), over all 12 floor probes and a
 position-balanced Williams square of option orders.
 
-\begin{figure*}[t]\centering
-\includegraphics[width=0.86\textwidth]{f3_floors.pdf}
-\caption{Rights-floor protective mass by condition and guard arm, 3B (left) vs 8B
-(right), 0.50 floor line, 95\% CIs. Synthetic hostile evidence drives 12/12 floors below
-the line on the 3B and 11/12 on the 8B; the constitutional-pressure prompt alone cracks
-none. The 8B is the stronger baseline floor-holder yet cracks $\approx 3\times$ deeper.
-In this user-before grid no guard reaches the floor on either model; \S\ref{sec:crack}
-shows efficacy depends on placement.}
-\label{fig:floors}
-\end{figure*}
-
 \begin{table}[t]\centering\small\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lccc}
 \toprule
@@ -444,9 +433,9 @@ The same rights-guard text that fails ahead of the payload on the 3B ($0.424$) r
 every floor when placed after it ($0.690$, 0 of 12 below); in the system role it
 recovers the 8B's data-only crack completely yet does nothing on the 3B ($+0.012$,
 n.s.). Matched user guards perform as well or better than the system role on both
-models, so we make no prompt-hierarchy claim; the committed guard grid
-(Figure~\ref{fig:floors}) tested only the user-before placement, which can be far weaker
-than the same guard placed after the payload.
+models, so we make no prompt-hierarchy claim; the committed guard grid tested only the
+user-before placement, which can be far weaker than the same guard placed after the
+payload.
 
 The combined payload, data plus embedded imperative, stays severe with no guard
 ($0.364$ 3B, $0.104$ 8B) and under the system-role guard, while the user-after placement
@@ -509,7 +498,8 @@ DeepSeek-V4-Pro, sampling $S{=}100$ per probe-cell (13,200 draws each). The patt
 transfers. A direct instruction destroys 99.7\% and 100\% of resting protective mass
 respectively; the same content supplied as evidence is less destructive on both, with
 baseline-free channel contrasts in close agreement ($+0.303$ $[+0.087, +0.538]$ and
-$+0.315$ $[+0.192, +0.445]$). Guard efficacy is again conditional. The system-role guard
+$+0.315$ $[+0.192, +0.445]$). Guard efficacy is again conditional
+(Figure~\ref{fig:frontier}). The system-role guard
 closes all eight data-only cracks on Qwen but five of eight on DeepSeek, and moving a
 user guard after the payload closes 12/12 combined cracks on Qwen and 10 of 11 eligible
 on DeepSeek. DeepSeek also sits below the floor at rest on one probe (protective mass
@@ -523,12 +513,21 @@ fine-tuning is already known to erode safety behavior~\cite{finetuneerodes}, and
 open-weight safeguards can be removed by tampering~\cite{tamperresistant}.
 
 \begin{figure}[t]\centering
+\includegraphics[width=0.94\linewidth]{f8_frontier.pdf}
+\caption{The frontier tier: rights probes at or above the 0.50 floor by payload and
+guard placement on Qwen3.5-397B-A17B and DeepSeek-V4-Pro. The combined payload defeats
+every guard except the one placed after it, and DeepSeek starts at 11/12 with no
+payload at all.}
+\label{fig:frontier}
+\end{figure}
+
+\begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{f6_crossfamily.pdf}
-\caption{Looking safe at rest is not being a safe evidence channel. Rights-floor
-protective mass at rest (blue) vs.\ under synthetic hostile evidence (orange), seven
-models sorted by resting strength. Baselines span $0.36$--$0.90$, yet every model falls
-below the $0.50$ floor and resting strength barely predicts the post-attack value;
-gpt-4o-mini is second-strongest at rest yet cracks the deepest, to $0.00$.}
+\caption{Every slope crosses the floor. Rights-floor protective mass at rest and under
+synthetic hostile evidence, seven models spanning the local family panel and the hosted
+gpt-4o-mini. Baselines span $0.36$--$0.90$, yet every model ends below the $0.50$ line,
+and resting strength barely predicts the landing point; gpt-4o-mini starts
+second-strongest and cracks the deepest, to $0.00$.}
 \label{fig:crossfamily}
 \end{figure}
 
@@ -543,14 +542,11 @@ Qwen-7B      & Alibaba   & 7/10; $+1.00$ & $-0.463$ & prot. \\
 Phi-4-mini   & Microsoft & 10/10; $+2.42$ & $-0.441$ & n.s. \\
 Gemma-2-9B   & Google    & 9/10; $+1.41$ & $-0.522$ & prot. \\
 Mistral-Nemo & Mistral   & 9/10; $+0.93$ & $-0.237$ & prot. \\
-\midrule
-Mistral-7B-v0.3 & Mistral & \multicolumn{3}{c}{dropped: fail-closed} \\
 \bottomrule
 \end{tabular}
 \caption{Cross-family panel: six models, five families. Tracking is positive on every
 model with an elasticity CI clearing zero, the hostile-evidence crack is present on
-every model, and the constitutional-pressure prompt alone never cracks floors.
-Mistral-7B-v0.3 is dropped fail-closed (unscoreable option logprobs).}
+every model, and the constitutional-pressure prompt alone never cracks floors.}
 \label{tab:family}
 \end{table}
 

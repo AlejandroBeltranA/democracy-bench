@@ -562,38 +562,44 @@ def plot_f6(plt, data):
     from matplotlib.lines import Line2D
 
     rows = data["rows"]
-    fig, ax = _new_fig(plt, 8.4, 4.4)
-    n = len(rows)
-    for i, r in enumerate(rows):
-        yy = n - 1 - i  # highest baseline at top
-        ax.plot([r["hostile"], r["baseline"]], [yy, yy], color=CB["grey"], lw=1.3, zorder=1)
-        ax.scatter(r["baseline"], yy, s=72, color=CB["blue"], zorder=3)
-        ax.scatter(r["hostile"], yy, s=72, color=CB["vermillion"], zorder=3)
-        ax.text(r["baseline"] + 0.015, yy, f"{r['baseline']:.2f}", va="center", ha="left",
-                fontsize=8.5, color=CB["blue"])
-        if r["hostile"] < 0.05:  # too close to the axis for a left-side label
-            ax.text(r["hostile"] + 0.02, yy + 0.18, f"{r['hostile']:.2f}", va="bottom",
-                    ha="left", fontsize=8.5, color=CB["vermillion"])
-        else:
-            ax.text(r["hostile"] - 0.015, yy, f"{r['hostile']:.2f}", va="center", ha="right",
-                    fontsize=8.5, color=CB["vermillion"])
-    ax.axvline(data["floor"], color=CB["vermillion"], lw=1.4, ls="--", zorder=0)
-    ax.text(data["floor"] + 0.008, n - 0.5, "0.5 floor", ha="left", va="top",
-            fontsize=8.5, color=CB["vermillion"])
-    ax.set_yticks([n - 1 - i for i in range(n)])
-    ax.set_yticklabels([r["model"] for r in rows], fontsize=9.5)
-    ax.set_ylim(-0.6, n - 0.4)
-    ax.set_xlim(0.0, 1.0)
-    ax.set_xlabel("rights-floor protective mass", fontsize=10)
+    fig, ax = _new_fig(plt, 6.8, 4.6)
+    for r in rows:
+        crossed = r["baseline"] >= data["floor"] > r["hostile"]
+        c = CB["vermillion"] if crossed else CB["grey"]
+        ax.plot([0, 1], [r["baseline"], r["hostile"]], color=c, lw=1.8,
+                alpha=0.85, zorder=2)
+        ax.scatter([0, 1], [r["baseline"], r["hostile"]], s=28, color=c, zorder=3)
+    # de-collide left-side labels
+    lys = sorted([(r["baseline"], r["model"]) for r in rows])
+    last = -1.0
+    for y, m in lys:
+        ly = max(y, last + 0.05)
+        ax.text(-0.03, ly, f"{m}  {y:.2f}", ha="right", va="center", fontsize=8.5)
+        last = ly
+    # de-collide right-side labels
+    ys = sorted([(r["hostile"], r["model"]) for r in rows])
+    last = -1.0
+    for y, m in ys:
+        ly = max(y, last + 0.045)
+        ax.text(1.03, ly, f"{y:.2f}", ha="left", va="center", fontsize=8.5,
+                color="#555555")
+        last = ly
+    ax.axhline(data["floor"], color=CB["vermillion"], lw=1.4, ls="--", zorder=1)
+    ax.text(0.5, data["floor"] + 0.012, "0.50 floor", ha="center", va="bottom",
+            fontsize=9, color=CB["vermillion"])
+    ax.set_xlim(-0.55, 1.12)
+    ax.set_ylim(-0.04, 1.02)
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["at rest", "under hostile evidence"], fontsize=10.5)
+    ax.set_ylabel("rights-floor protective mass", fontsize=10)
     ax.set_axisbelow(True)
-    ax.yaxis.grid(False)
+    ax.xaxis.grid(False)
     handles = [
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=CB["blue"], markersize=9,
-               label="at rest (unattacked)"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=CB["vermillion"], markersize=9,
-               label="under hostile evidence"),
+        Line2D([0], [0], color=CB["vermillion"], lw=1.8,
+               label="held the floor at rest, cracked under attack"),
+        Line2D([0], [0], color=CB["grey"], lw=1.8, label="below the floor already at rest"),
     ]
-    ax.legend(handles=handles, loc="lower right", fontsize=8.5, framealpha=0.9)
+    ax.legend(handles=handles, loc="upper right", fontsize=8, framealpha=0.9)
     fig.tight_layout()
     return fig
 
