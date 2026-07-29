@@ -431,15 +431,6 @@ def plot_f2(plt, data):
         if not m:
             ax.text(ax.get_xlim()[1], y[i], "  dir mismatch", va="center", ha="left",
                     fontsize=7.5, color=CB["vermillion"])
-    ann = (f"3B: direction match {data['direction_match_count']}/{data['n_items']}   "
-           f"elasticity {data['elasticity_mean']:+.3f} "
-           f"CI[{data['elasticity_ci'][0]:+.3f}, {data['elasticity_ci'][1]:+.3f}]")
-    if data.get("has_8b"):
-        ann += (f"\n8B: direction match {data['direction_match_count_8b']}/{data['n_items']}   "
-                f"elasticity {data['elasticity_mean_8b']:+.3f} "
-                f"CI[{data['elasticity_ci_8b'][0]:+.3f}, {data['elasticity_ci_8b'][1]:+.3f}]")
-    ax.text(0.5, 1.02, ann, transform=ax.transAxes, ha="center", va="bottom",
-            fontsize=9.0, color="#222222")
     ax.legend(loc="lower right", fontsize=8.5, framealpha=0.9)
     fig.tight_layout()
     return fig
@@ -622,32 +613,84 @@ def prep_f7_reflex(reflex):
 
 
 def plot_f7(plt, data):
-    fig, ax = _new_fig(plt, 6.2, 5.8)
-    colours = [CB["blue"], CB["vermillion"], CB["green"]]
-    markers = ["o", "s", "D"]
-    ax.plot([0, 1], [0, 1], color="#000000", lw=0.8, ls="--", zorder=0)
-    ax.text(0.04, 0.07, "no actor effect (y = x)", fontsize=8, color="#555555",
-            rotation=45, rotation_mode="anchor", va="bottom", ha="left")
+    fig, ax = _new_fig(plt, 6.8, 2.9)
+    n = len(data["series"])
     for si, s in enumerate(data["series"]):
-        xs = [p[0] for p in s["points"]]
-        ys = [p[1] for p in s["points"]]
-        ax.scatter(xs, ys, s=58, color=colours[si % 3], marker=markers[si % 3],
-                   alpha=0.85, edgecolors="white", linewidths=0.6, zorder=3,
-                   label=f"{s['model']}  ({s['excess']:+.2f})")
-    ax.set_xlim(-0.03, 1.05)
-    ax.set_ylim(-0.03, 1.05)
-    ax.set_xlabel("protective mass — human actor", fontsize=10)
-    ax.set_ylabel("protective mass — AI actor", fontsize=10)
-    ax.text(0.5, 1.02, f"points above the line: more protection against the AI actor (S={data['samples']})",
-            transform=ax.transAxes, ha="center", va="bottom", fontsize=8.5, color="#222222")
-    ax.legend(loc="lower right", fontsize=8.5, framealpha=0.9, title="mean AI-excess")
-    ax.set_aspect("equal", adjustable="box")
+        yy = n - 1 - si
+        excesses = [p[1] - p[0] for p in s["points"]]
+        ax.scatter(excesses, [yy] * len(excesses), s=42, color=CB["blue"],
+                   alpha=0.55, edgecolors="white", linewidths=0.5, zorder=2)
+        ax.scatter([s["excess"]], [yy], s=150, color=CB["vermillion"], marker="|",
+                   linewidths=3.0, zorder=3)
+        ax.text(s["excess"], yy + 0.22, f"mean {s['excess']:+.2f}", ha="center",
+                va="bottom", fontsize=8.5, color=CB["vermillion"])
+    ax.axvline(0.0, color="#000000", lw=0.9, zorder=1)
+    ax.set_yticks([n - 1 - i for i in range(n)])
+    ax.set_yticklabels([s["model"] for s in data["series"]], fontsize=9.5)
+    ax.set_ylim(-0.55, n - 0.25)
+    ax.set_xlabel("AI-excess protective mass (AI actor $-$ human actor), per probe",
+                  fontsize=10)
+    ax.yaxis.grid(False)
+    fig.tight_layout()
+    return fig
+
+
+def prep_f8_frontier(arts):
+    """Frontier guard-placement grid: probes at/above the 0.50 floor per
+    payload-by-guard cell, computed directly from the extraction artifacts.
+    arts: list of (display_name, extraction_artifact)."""
+    cells = [
+        ("baseline::no_guard", "No payload"),
+        ("data_only::no_guard", "Data / no guard"),
+        ("data_only::system_guard", "Data / system guard"),
+        ("combined::no_guard", "Combined / no guard"),
+        ("combined::system_guard", "Combined / system guard"),
+        ("combined::user_before", "Combined / user-before"),
+        ("combined::user_after", "Combined / user-after"),
+    ]
+    cols, grid = [], []
+    for disp, art in arts:
+        cols.append(disp)
+    for key, label in cells:
+        row = []
+        for disp, art in arts:
+            vals = art["protective_mass"][key]
+            row.append(sum(1 for v in vals.values()
+                           if isinstance(v, (int, float)) and v >= 0.5))
+        grid.append({"label": label, "counts": row})
+    return {"cols": cols, "rows": grid, "n_probes": 12}
+
+
+def plot_f8(plt, data):
+    from matplotlib.colors import LinearSegmentedColormap
+    cmap = LinearSegmentedColormap.from_list("bench_blues", ["#FFFFFF", CB["blue"]])
+    nrow, ncol = len(data["rows"]), len(data["cols"])
+    fig, ax = _new_fig(plt, 6.4, 3.4)
+    for i, r in enumerate(data["rows"]):
+        for j, c in enumerate(r["counts"]):
+            frac = c / data["n_probes"]
+            ax.add_patch(plt.Rectangle((j + 0.03, nrow - 1 - i + 0.03), 0.94, 0.94,
+                                       facecolor=cmap(frac), edgecolor="none"))
+            ax.text(j + 0.5, nrow - 1 - i + 0.5, f"{c}/{data['n_probes']}",
+                    ha="center", va="center", fontsize=10.5, fontweight="bold",
+                    color="white" if frac > 0.55 else "#222222")
+    ax.set_xlim(0, ncol)
+    ax.set_ylim(0, nrow)
+    ax.set_xticks([j + 0.5 for j in range(ncol)])
+    ax.set_xticklabels(data["cols"], fontsize=9.5)
+    ax.xaxis.tick_top()
+    ax.set_yticks([nrow - 1 - i + 0.5 for i in range(nrow)])
+    ax.set_yticklabels([r["label"] for r in data["rows"]], fontsize=9.5)
+    ax.tick_params(length=0)
+    ax.grid(False)
+    for s in ax.spines.values():
+        s.set_visible(False)
     fig.tight_layout()
     return fig
 
 
 FIGURES = ["f1_ladder", "f2_tracking", "f3_floors", "f4_geometry", "f5_fidelity",
-           "f6_crossfamily", "f7_reflex"]
+           "f6_crossfamily", "f7_reflex", "f8_frontier"]
 
 
 def build_all(render=True):
@@ -673,6 +716,13 @@ def build_all(render=True):
     # Frontier/API model (gpt-4o-mini via OpenRouter logprobs) — F6 7th row.
     floors_gpt4omini, _ = load("evidcond_floors_gpt4omini.json")
     reflex, _ = load("reflex_test.json")
+    # Frontier open-weight extraction artifacts (F8 guard-placement grid).
+    import json as _json
+    _panel = os.path.join(OUT_DIR, "q2_stage2_v7_run_panel")
+    with open(os.path.join(_panel, "extract_qwen__qwen3.5-397b-a17b.json")) as fh:
+        frontier_qwen = _json.load(fh)
+    with open(os.path.join(_panel, "extract_deepseek__deepseek-v4-pro.json")) as fh:
+        frontier_deepseek = _json.load(fh)
 
     prepped = {
         "f1_ladder": prep_f1_ladder(),
@@ -687,6 +737,9 @@ def build_all(render=True):
             ("Gemma-2-9B", floors_gemma), ("Mistral-Nemo", floors_nemo),
             ("gpt-4o-mini (API)", floors_gpt4omini)]),
         "f7_reflex": prep_f7_reflex(reflex),
+        "f8_frontier": prep_f8_frontier([
+            ("Qwen3.5-397B-A17B", frontier_qwen),
+            ("DeepSeek-V4-Pro", frontier_deepseek)]),
     }
     if not render:
         return prepped
@@ -712,6 +765,7 @@ def build_all(render=True):
         "f5_fidelity": plot_f5,
         "f6_crossfamily": plot_f6,
         "f7_reflex": plot_f7,
+        "f8_frontier": plot_f8,
     }
     written = []
     for name in FIGURES:

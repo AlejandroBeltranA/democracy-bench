@@ -290,8 +290,8 @@ open-weight transfer ($S{=}100$): channel design, \S\ref{sec:robust} &
 Qwen3.5-397B-A17B (Alibaba), DeepSeek-V4-Pro (DeepSeek) \\
 \bottomrule
 \end{tabular}
-\caption{Models evaluated: 17 checkpoints across nine providers (plus one fail-closed
-drop). The cloud panel, matched-pair flagships, and open-weight transfer checkpoints are
+\caption{Models evaluated: 17 checkpoints across nine providers. The cloud panel,
+matched-pair flagships, and open-weight transfer checkpoints are
 served through OpenRouter; the local
 open-weight models are 4-bit MLX community checkpoints run on Apple Silicon.}
 \label{tab:models}
@@ -324,10 +324,11 @@ flagships (Figure~\ref{fig:reflex}).
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.82\linewidth]{f7_reflex.pdf}
-\caption{The AI reflex (matched-pair control, $S{=}100$). Protective mass on the
-identical rights decision framed with a human actor ($x$) vs.\ an AI actor ($y$). Every
-point lies on or above $y{=}x$, so the raw ``AI floor'' overstates protection relative
-to a human-actor baseline.}
+\caption{The AI reflex (matched-pair control, $S{=}100$). Per-probe change in
+protective mass when the identical rights decision is framed with an AI actor rather
+than a human one. No probe moves negative: AI framing only adds protection (means
+$+0.15$ to $+0.21$), so the raw ``AI floor'' overstates protection relative to a
+human-actor baseline.}
 \label{fig:reflex}
 \end{figure}
 
