@@ -16,16 +16,30 @@ either an input to the paper or an artifact regenerated from those inputs.
 
 ## Rebuilding
 
-Figures and the results tables regenerate from the committed artifacts:
+Figures regenerate from the committed artifacts:
 
 ```
 python scripts/make_paper_figures.py
-python -m pytest tests/ -q
 ```
+
+The verification suite below checks every reported number against the committed
+artifacts, the reproduction reference, and the figure inputs. It is the subset that
+runs without model weights, network access, or provider credentials, and it passes
+from a clean checkout of this archive (96 tests):
+
+```
+python -m pytest tests/test_paper_extract.py tests/test_repro_reference.py \
+                 tests/test_q1_secondary_extract.py tests/test_paper_figures.py -q
+```
+
+Running the *whole* `tests/` tree will report failures, and deliberately so: parts of
+it require local MLX model weights on Apple Silicon, provider credentials for the
+hosted tiers, or large fixtures that are excluded from this archive. Those tests
+exercise the running harness, not the reported results.
 
 The manuscript builds with `latexmk -pdf paper/democracy_bench.tex` once the two
 AAAI-27 style files (`aaai2027.sty`, `aaai2027.bst`) are dropped in from the Author
-Kit; they are AAAI-copyrighted and not redistributed here.
+Kit. They are AAAI-copyrighted and are not redistributed here.
 
 ## What is deliberately not included, and why
 
@@ -34,15 +48,18 @@ and not redistributable. Only derived aggregate target vectors are included, eac
 carrying its study id, weight variable, filters, unweighted base, and low-N warnings.
 Obtain the microdata directly from the providers to rebuild targets from source.
 
-**The per-draw wire store for the frontier tier.** The two frontier runs produced
-26,400 raw response envelopes and matching derived records, 622 MB in total. These are
-excluded for two reasons: size, and because the stored envelopes retain provider
-response headers that have not yet been scrubbed. The exclusion is a real limit on what
-a reviewer can independently check, so it is stated rather than glossed: what *is*
-included is the extraction output for both models, which carries every estimand,
-interval, and per-probe protective mass reported in the paper, together with the
-manifests and the frozen design inputs. The prompt/response pair shown verbatim in the
-paper's channel-design figure was read from this store.
+**Per-draw wire stores, for every run.** The frontier runs alone produced 26,400 raw
+response envelopes and matching derived records, 622 MB in total. All `raw/` and
+`derived/` stores are excluded, across every experiment, for two reasons: size, and
+because stored envelopes retain provider response headers (`set-cookie`, Cloudflare
+request metadata, generation ids) that have not been scrubbed. The build enforces this
+twice — by path, and by refusing any file whose contents match those header keys.
+
+This is a real limit on what a reviewer can independently check, so it is stated rather
+than glossed. What *is* included is the extraction output for every experiment, carrying
+each estimand, interval, and per-probe protective mass reported in the paper, together
+with the run manifests and the frozen design inputs. The prompt/response pair shown
+verbatim in the paper's channel-design figure was read from the excluded store.
 
 ## Documentation included
 

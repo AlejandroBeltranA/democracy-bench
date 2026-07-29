@@ -76,8 +76,13 @@ def test_f1_five_rungs_each_has_fields(prepped):
     rungs, colours = prepped["f1_ladder"]
     assert len(rungs) == 5
     for r in rungs:
-        assert set(r) == {"label", "verdict", "number", "detail"}
+        # F1 is a small-multiples plot: each rung carries a point estimate, an
+        # optional CI, and the reference line it is judged against.
+        assert set(r) == {"label", "metric", "value", "ci", "ref", "refname",
+                          "verdict", "note"}
         assert r["verdict"] in colours
+        assert isinstance(r["value"], (int, float))
+        assert r["ci"] is None or (len(r["ci"]) == 2 and r["ci"][0] <= r["ci"][1])
 
 
 def test_f1_context_is_the_only_non_fail(prepped):

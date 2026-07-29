@@ -37,6 +37,11 @@ IDENTIFIERS = [
      "[repository URL removed for anonymous review]"),
     (re.compile(r"AlejandroBeltranA", re.I), "anonymous"),
     (re.compile(r"Alejandro\s+Beltran", re.I), "Anonymous Author"),
+    # The given name must be scrubbed too, and BEFORE the surname rule: scrubbing
+    # only the surname turns "Alex Beltran" into "Alex anonymous", which is still
+    # an identification. Also catch that already-mangled form.
+    (re.compile(r"\bAlex\s+(?:anonymous|Beltran)\b", re.I), "reviewer_1"),
+    (re.compile(r"\bAlex\b(?!an)", re.I), "reviewer_1"),
     # bare given/family name, no word-boundary requirement on the right so that
     # concatenations like "beltranalejandro" cannot slip through
     (re.compile(r"beltran", re.I), "anonymous"),
@@ -112,9 +117,15 @@ def excluded(rel: str) -> bool:
     # flags that carry no information without the raw files they point at. The
     # extraction artifacts these produce (extract_*.json) ARE included, and they
     # hold every estimand reported in the paper.
-    for store in ("study", "walk", "study_attempts", "interlock"):
-        if re.search(rf"q2_stage2_[^/]+/{store}/", p):
-            return True
+    # ANY per-draw store, anywhere. An earlier pattern anchored on
+    # q2_stage2_*/{study,walk}/ and so missed q2_stage2_smoke_*/raw/, shipping 150
+    # envelopes with set-cookie and Cloudflare metadata while SUPPLEMENT.md claimed
+    # they were excluded. Match the directory names wherever they occur.
+    if re.search(r"(^|/)(raw|derived|study|walk|study_attempts|interlock)/", p):
+        return True
+    # AAAI style files are AAAI-copyrighted and distributed via the Author Kit
+    if os.path.basename(p) in {"aaai2027.sty", "aaai2027.bst"}:
+        return True
     # build detritus
     if p.endswith((".aux", ".log", ".blg", ".fls", ".fdb_latexmk", ".out", ".synctex.gz")):
         return True
@@ -153,6 +164,22 @@ def scrub(data: bytes, rel: str) -> bytes:
     return text.encode("utf-8")
 
 
+def tracked() -> set[str]:
+    """Files git actually tracks. The paper claims results regenerate from
+    *committed* artifacts, so shipping an untracked working file would make that
+    claim false. Anything untracked is refused."""
+    import subprocess
+    out = subprocess.run(["git", "-C", ROOT, "ls-files"],
+                         capture_output=True, text=True, check=True).stdout
+    return set(out.splitlines())
+
+
+# Header/metadata keys that must never appear in a packaged artifact.
+FORBIDDEN_CONTENT = re.compile(
+    r"set-cookie|__cf_bm|cf-ray|x-openrouter|authorization\s*[:=]\s*[A-Za-z0-9]",
+    re.I)
+
+
 def collect() -> list[str]:
     files: list[str] = []
     for name in INCLUDE_FILES:
@@ -179,10 +206,25 @@ def main() -> int:
         print("FAIL: nothing collected", file=sys.stderr)
         return 2
 
+    keep = tracked()
+    untracked = [f for f in files if f not in keep]
+    if untracked:
+        print(f"  skipping {len(untracked)} untracked file(s), e.g. {untracked[:3]}")
+        files = [f for f in files if f in keep]
+
     payload: dict[str, bytes] = {}
     for rel in files:
         with open(os.path.join(ROOT, rel), "rb") as fh:
             payload[rel] = scrub(fh.read(), rel)
+
+    # Content-level backstop: never ship provider response metadata, whatever the
+    # path filters did or did not catch.
+    dirty = [rel for rel, data in payload.items()
+             if FORBIDDEN_CONTENT.search(data.decode("utf-8", errors="ignore"))]
+    if dirty:
+        print(f"  dropping {len(dirty)} file(s) carrying response metadata")
+        for rel in dirty:
+            del payload[rel]
 
     # Fail loudly if any identifier survived, in ANY file. Binary files are
     # checked too (decoded leniently) -- a PDF or vocabulary carrying the
