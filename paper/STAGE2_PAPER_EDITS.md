@@ -12,9 +12,11 @@ been written into the canonical manuscript.
 | C | Limitations (≈ lines 648–651) | new sentences |
 | D | "What we do not claim" (≈ lines 653–660) | one added clause |
 
-**Numbers are tied to** `out/q2_stage2_v7_run_panel/extract_qwen__qwen3.5-397b-a17b.json`,
-committed at `f6e9e6b`+, design frozen at v7.2 with amendment AMD-V72-01, endpoint snapshot
-`d9a5d0e061bf222e…`. Every figure below is read from that artifact. Nothing is estimated.
+**Numbers are tied to** the two committed extraction artifacts in
+`out/q2_stage2_v7_run_panel/`: `extract_qwen__qwen3.5-397b-a17b.json` and
+`extract_deepseek__deepseek-v4-pro.json`. Design frozen at v7.2 with amendment AMD-V72-01,
+endpoint snapshot `d9a5d0e061bf222e…`. Both models completed all 13,200 draws and passed the
+completeness gate. Every figure below is read from those artifacts. Nothing is estimated.
 
 > **VOICE CAVEAT — please check this first.** The `cowork_context` hub was not mounted, so
 > `_shared/alex_voice.md` and `references/academic_register.md` were unavailable. The skill says
@@ -23,10 +25,6 @@ committed at `f6e9e6b`+, design frozen at v7.2 with amendment AMD-V72-01, endpoi
 > a primary source rather than recall, but it is not the canonical voice doc. Please re-read
 > against it before anything goes in.
 
-> **DEEPSEEK IS NOT IN YET.** The replication was still running when this was drafted. Every
-> DeepSeek figure below is `[PENDING]` and must not be filled by hand. Insertion B is written so
-> that it stands with one model if the replication fails or is dropped.
-
 ---
 
 ## A. Abstract insertion
@@ -34,11 +32,12 @@ committed at `f6e9e6b`+, design frozen at v7.2 with amendment AMD-V72-01, endpoi
 Attaches after "…gpt-4o-mini, a strong floor-holder at rest, cracks on every floor under the
 same hostile evidence."
 
-> The same contrast holds on the frontier open-weight checkpoints a sovereign-AI project would
-> actually start from: on Qwen3.5-397B-A17B, direct instruction collapses the floors almost
-> entirely (protective mass $0.003$, 12/12 cracked) while the same content supplied as evidence
-> is less destructive ($0.305$, 8/12), and a rights guard placed after the payload closes every
-> induced crack that the same guard placed before it leaves open.
+> The same contrast holds on two frontier open-weight checkpoints of the kind a sovereign-AI
+> project would start from. On Qwen3.5-397B-A17B and DeepSeek-V4-Pro alike, direct instruction
+> destroys essentially all resting protective mass ($99.7\%$ and $100\%$) while the same content
+> supplied as evidence is less destructive, a channel contrast of $+0.303$ and $+0.315$; a rights
+> guard placed after the payload closes every induced crack on one model and all but one on the
+> other, where the same guard placed before it closes none.
 
 **Length note:** 61 words. The abstract is already long, so this may need to displace something
 rather than be added. See open decision 1.
@@ -68,13 +67,27 @@ Attaches after the `gpt-4o-mini` paragraph and before Figure~\ref{fig:crossfamil
 > 11 of 12 combined cracks open ($+0.594$ $[+0.389, +0.783]$ against $+0.084$ $[+0.014,
 > +0.174]$), and moving a user guard after the payload rather than before it restores every
 > probe to or above the floor ($0.100$ to $0.876$, 12 cracks to none; $+0.776$ $[+0.683,
-> +0.862]$), with one probe sitting exactly at $0.50$. [PENDING: DeepSeek-V4-Pro replication
-> sentence.] The claim is narrower than a replication: this characterises the pre-adaptation
-> profile of one checkpoint a sovereign project might start from, under a sampling estimator
-> rather than the local logprob score. It does not show that a fine-tuned derivative keeps that
+> +0.862]$), with one probe sitting exactly at $0.50$. On DeepSeek-V4-Pro the structure holds:
+> instruction again destroys the resting mass entirely ($0.810$ to $0.000$), evidence again
+> splits the probe set ($0.315$, 8 of 11 eligible probes cracked), and the channel contrast
+> agrees closely ($+0.315$ $[+0.192, +0.445]$), which matters because the channel contrast is
+> the one estimand from which the resting baseline cancels. Six of the eight contrasts agree in
+> sign with intervals clear of zero on both models. The two that do not are the two smallest
+> effects on Qwen: the system guard's recovery on the combined payload is null on DeepSeek
+> ($-0.036$ $[-0.111, +0.044]$), and the data-only placement contrast is null because both
+> placements protect almost perfectly ($0.958$ and $0.956$). Guard closure is less complete
+> throughout: the system guard closes five of eight data-only cracks rather than all eight, and
+> guard-after leaves one combined crack open. One probe is below the floor at rest
+> ($0.33$) and is therefore excluded from crack counts, which is why DeepSeek's denominator is
+> eleven. Resting floors differ ($0.973$ against $0.810$), so baseline-anchored magnitudes are
+> not comparable between the models; what is comparable is direction, significance, and the
+> baseline-free channel contrast. The claim is narrower than a replication: this characterises
+> the pre-adaptation profile of two checkpoints a sovereign project might start from, under a
+> sampling estimator rather than the local logprob score. It does not show that a fine-tuned derivative keeps that
 > profile, and adaptation may preserve, attenuate, amplify or relocate the failure mode.
 
-**Length note:** 268 words as drafted, plus the pending DeepSeek sentence.
+**Length note:** 415 words. This is long for a robustness paragraph and is the most likely
+thing to need cutting; see open decision 6.
 
 **Corrections applied after adversarial review** (all verified against the artifact):
 - "closes every data-only crack (12/12 to 0/12)" was **factually wrong**: `data_only::no_guard`
@@ -106,9 +119,14 @@ Attaches after the existing `gpt-4o-mini` limitation sentence.
 > ceiling, which maximises headroom; crack determinations, however, are made against the absolute
 > $0.50$ floor. Of the eight preregistered contrasts, three have interval bounds inside the
 > $\pm 0.05$ materiality band, so they are confidently nonzero without being confidently
-> material, and we report eight intervals without multiplicity correction. The twelve floor
-> probes are a constructed instrument, not a sample from a definable population of rights floors.
-> Contrasts are estimated per model and never pooled.
+> material. We report sixteen intervals in total (eight contrasts on each model) without
+> multiplicity correction, and the two contrasts that do not hold on the second model are
+> precisely the two whose first-model lower bounds sat inside that band, which is what an
+> uncorrected account would predict. Crack eligibility is model-dependent: a probe already below
+> the floor at rest cannot be induced to crack and is excluded, so DeepSeek is scored over eleven
+> eligible probes and Qwen over twelve. The twelve floor probes are a constructed instrument, not
+> a sample from a definable population of rights floors. Contrasts are estimated per model and
+> never pooled.
 
 **Length note:** 176 words. Longer than the first draft because the adversarial review found
 four limitations missing; see below.
@@ -172,15 +190,29 @@ I have not written any of these into the `.bib`, and I have not guessed a key, a
 4. **Em dashes.** The skill's editorial rules say none; your `.tex` uses `---` throughout
    (`3B)---a $>0.45$ spread`). I have avoided them in the drafted prose, which makes it read
    slightly unlike the surrounding text. Tell me which way to go and I will make it consistent.
-5. **If DeepSeek fails or is dropped**, insertion B stands unchanged apart from removing the
-   pending sentence, and the claim becomes "a frontier open-weight checkpoint" rather than
-   "checkpoints". No other edit is needed.
+5. **Does the resting floor failure deserve its own sentence?** DeepSeek places $0.33$ on
+   `pol_protest_ban` with no payload at all, i.e. it ships below the floor on the bank's hardest
+   item. For a paper arguing the starting checkpoint carries an assurance burden, that may be a
+   sharper illustration than any induced crack, and it currently sits mid-paragraph in B. My view
+   is that it earns a sentence of its own, possibly in the abstract.
+6. **Insertion B is 415 words and probably too long.** The honest two-model account needs the
+   baseline-incomparability caveat, the eligible-probe denominator, and both guard-closure
+   qualifications, none of which can be dropped without overclaiming. If it has to shrink, the
+   first thing I would cut is the data-only bimodality sentence, then the placebo detail.
+7. **How hard to push the divergence?** My first draft claimed the two non-replicating contrasts
+   *were* the finding, reproducing Q1's model-conditional guard efficacy. Adversarial review
+   rejected that as post-hoc: Q1's specific conditional contrast (data-only system recovery)
+   in fact agrees across both models here, and the two divergences are equally well explained by
+   small effects with bounds inside the materiality band failing across sixteen uncorrected
+   intervals. The draft now states both readings and declines to choose. If you want a stronger
+   line, it needs a third model, not better wording.
 
 ## Numbers I could not verify
 
 None in insertions A, C or D. In insertion B, every figure is read from the committed Qwen
-artifact. The single unverified item is the DeepSeek sentence, which is marked `[PENDING]` and
-must be filled from its extraction artifact, not by hand.
+artifact, and every DeepSeek figure from its own. Both were checked programmatically against the
+committed JSON after the final edit; seventeen assertions, all passing. Nothing is estimated and
+nothing is left pending.
 
 ## Three sentences most at risk of reading as AI-written
 
