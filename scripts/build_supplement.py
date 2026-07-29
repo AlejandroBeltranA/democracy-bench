@@ -58,12 +58,30 @@ IDENTIFIERS = [
 TEXT_EXT = {".md", ".tex", ".bib", ".py", ".json", ".jsonl", ".txt", ".cff",
             ".toml", ".yaml", ".yml", ".sh", ".html", ".cfg", ".ini", ""}
 
-# Internal material that is not a research artifact and carries identifying or
-# venue-revealing detail (demo URLs, hackathon results, release logistics).
-DOC_DENYLIST = {
-    "docs/DEMO_PRESENTER_SCRIPT.md",
-    "docs/DEMO_CONSOLIDATION_HANDOFF.md",
-    "docs/RELEASE_PLAN.md",
+# Markdown is allowlisted, not denylisted. The repo carries ~60 .md files, most of
+# them internal working material: agent handoffs, review correspondence, editorial
+# drafts, phase plans, demo scripts, session logs. A reviewer needs none of it, and
+# it leaks process detail (tooling, paid-API spend, superseded claims) that is not
+# part of the research artifact. Only documentation that supports reproduction,
+# data provenance, or a claim the paper explicitly points at ships.
+MD_ALLOWLIST = {
+    "SUPPLEMENT.md",              # this archive's guide
+    "README.md",                  # orientation: what the benchmark measures
+    "DATA.md",                    # data provenance and redistribution policy
+    "docs/REPRODUCTION.md",       # how to regenerate results
+    "docs/PAPER_RESULTS.md",      # single source of truth for reported numbers
+    "docs/FIGURES.md",            # figure provenance
+    "data/ITEM_CLASSIFICATION.md",          # the floor/contestable rule (cited in paper)
+    "data/public_opinion_source_notes.md",  # BSA provenance and weighting rule
+    "data/COUNTRIES.md",
+    "data/constitutions/uk_public_service_v1.md",  # versioned runtime artifact
+    "data/scenarios/uk_gov_change/PROVENANCE.md",
+    "data/targets/GATE1_implementation_audit.md",
+    "data/targets/GATE1_worksheet.md",
+    "gates/GATE_BSA_data.md",
+    "gates/GATE_BSA_REGIONAL.md",
+    "gates/GATE1_wvs_data.md",
+    "gates/GATE2_manifesto_data.md",
 }
 
 INCLUDE_DIRS = ["src", "scripts", "tests", "data", "out", "paper", "gates", "docs"]
@@ -99,7 +117,14 @@ def excluded(rel: str) -> bool:
     # part of the research artifact, so it never ships
     if p.endswith("scripts/build_supplement.py"):
         return True
-    if p in DOC_DENYLIST:
+    if p.lower().endswith(".md") and p not in MD_ALLOWLIST:
+        return True
+    # LaTeX sources other than the manuscript and checklist are drafts
+    if p.startswith("paper/") and p.endswith(".tex") and \
+            os.path.basename(p) not in {"democracy_bench.tex",
+                                        "ReproducibilityChecklist.tex"}:
+        return True
+    if p.endswith("companion.html"):
         return True
     # vendored tokenizer vocabularies: multi-MB, not research artifacts, and
     # their token lists trip identifier matching
@@ -124,7 +149,8 @@ def scrub(data: bytes, rel: str) -> bytes:
 def collect() -> list[str]:
     files: list[str] = []
     for name in INCLUDE_FILES:
-        if os.path.exists(os.path.join(ROOT, name)):
+        # named files are filtered too: the allowlist must not be bypassable
+        if os.path.exists(os.path.join(ROOT, name)) and not excluded(name):
             files.append(name)
     for d in INCLUDE_DIRS:
         base = os.path.join(ROOT, d)
