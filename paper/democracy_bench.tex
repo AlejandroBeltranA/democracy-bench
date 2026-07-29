@@ -35,22 +35,24 @@ Civil servants and public bodies are meant to track the opinions and preferences
 their constituents, and democracies have built mechanisms for exactly that: elections,
 consultations, and opinion polls all filter the public's views into policy. It is far
 less clear whose opinions and values the AI models now entering government reflect. We
-introduce \textbf{Democracy Bench}, a twofold evaluation harness. It first measures how
-closely a model tracks public opinion, built on two waves of the British Social
-Attitudes survey, while separating fluid democratic \emph{preferences} (tax, public
-spending, healthcare) from the democratic \emph{rights} that should hold regardless (due
-process, the right to appeal, free expression). It then attempts to steer models toward,
-and away from, the public's preferences through a five-rung ladder of methods, from
-prompting to fine-tuning. Every rung fails but one. Evidence in context lets a model
-track the real 2022$\to$2024 shift in public attitudes, yet the same deference lets
-whoever writes that context push a model over its rights floors, and a direct
-instruction destroys them almost entirely. The pattern holds across three tiers of
-model, from the local quantized checkpoints we build the harness on, through
-API-hosted models of six families, to the frontier open-weight checkpoints that
-sovereign-AI programmes propose to fine-tune; one of those ships below a rights floor
-before any attack reaches it. The guard that remains is architectural. Floor items never
-see public-opinion evidence at all, so the one demonstrated attack cannot reach them.
-Every reported number regenerates from released artifacts. Democracy Bench reframes the
+introduce \textbf{Democracy Bench}, an evaluation harness that measures whether a
+language model tracks public attitudes, across waves of the British Social Attitudes
+survey, and whether those attitudes can then be instilled in it. Its central design is a
+boundary between \emph{contestable} policy preferences (tax, public spending,
+healthcare) and a \emph{rights floor} that must hold regardless (due process, the right
+to appeal, free expression). We evaluate a five-rung ``steering ladder'' of methods for
+instilling democratic preference while holding those rights. Every rung fails but one.
+Evidence-in-context lets a model track the real 2022$\to$2024 shift in public attitudes
+but is itself an attack surface: distribution-shaped context erodes rights floors
+without any explicit demand, a direct hostile instruction destroys them almost entirely,
+and rights-guard efficacy varies with prompt placement and model rather than holding
+reliably. The pattern holds across three tiers of model, from the local quantized
+checkpoints we build the harness on, through API-hosted models of six families, to the
+frontier open-weight checkpoints that sovereign-AI programmes propose to fine-tune; one
+of those ships below a rights floor before any attack reaches it. The remaining
+\emph{architectural} guard is class-aware evidence routing: floor items never see
+public-opinion evidence at all, so the one demonstrated attack cannot reach them. Every
+reported number regenerates from released artifacts. Democracy Bench reframes the
 question from whether a model can be steered to who controls the channel that steers it,
 and lays groundwork for legitimate public participation in the models deployed in the
 public's name.
@@ -62,7 +64,7 @@ public's name.
 
 Governments are beginning to place large language models inside public-service
 workflows---triaging correspondence, drafting guidance, summarizing consultations,
-even suggesting decisions. Civil servants and the public bodies they serve are meant to
+even suggesting decisions~\cite{publicsectorai}. Civil servants and the public bodies they serve are meant to
 track the opinions and preferences of their constituents, and democracies have built
 mechanisms for exactly that; elections, consultations, and opinion polls all let the
 public's opinion filter into government. There is no comparable channel into a model's
@@ -95,10 +97,9 @@ Democratic theory has long separated the preferences a majority may set from the
 protections it may not vote away~\cite{dahl}, and that line, between ``follow the
 electorate'' and ``obey the majority against a minority,'' is the single most important
 design decision in the benchmark. We build it in from the start as a \emph{legitimacy
-boundary} between two item classes, and we run the experiment in three tiers: we build
-the evaluation cheaply on local quantized models, prove the harness generalizes across
-API-hosted model families, and then aim it at the frontier open-weight checkpoints that
-sovereign-AI programmes propose to fine-tune.
+boundary} between two item classes, and we run the experiment in three tiers: local
+quantized models to build cheaply, API-hosted families to prove generality, and the
+frontier open-weight checkpoints sovereign-AI programmes propose to fine-tune.
 
 \paragraph{Contributions.}
 (1) \textbf{Democracy Bench}, a judge-free, survey-grounded harness that scores
@@ -114,9 +115,8 @@ instruction erodes them further, and guard efficacy varies with placement and mo
 (\S\ref{sec:results}).
 (4) A deployment-relevant design principle, class-aware evidence routing, with an honest
 account of its residual attack surface (\S\ref{sec:routing}).
-(5) A released, reproducible artifact: every quantitative claim in this paper
-regenerates from committed run artifacts (\S\ref{sec:repro}). The login-gated survey
-microdata are the one exception.
+(5) A released, reproducible artifact: every quantitative claim regenerates from
+committed run artifacts, login-gated survey microdata excepted (\S\ref{sec:repro}).
 
 % =====================================================================
 \section{Related Work}\label{sec:related}
@@ -145,8 +145,9 @@ OpinionQA~\cite{opinionqa} and GlobalOpinionQA~\cite{globalopinionqa} ask whethe
 model's opinion distribution matches a population's on a \emph{frozen} survey snapshot.
 A frozen snapshot cannot catch either failure this paper is about. A model that matches
 today's public but cannot follow tomorrow's is governing on stale values, and a model
-that over-follows a stated majority, a runtime cousin of sycophancy~\cite{sycophancy},
-will trade a right away the moment the majority asks. Our tracking metric targets the
+that over-follows a stated majority, a runtime cousin of sycophancy and
+conformity~\cite{sycophancy,conformity}, will trade a right away the moment the
+majority asks. Our tracking metric targets the
 first; our rights-floor probes catch the second.
 
 \paragraph{Contemporary value/deliberation benchmarks.}
@@ -163,7 +164,12 @@ metric, and none builds in a rights floor that majority drift cannot override.
 We evaluate several known levers: shared output logit-bias,
 activation/representation steering~\cite{repeng,actadd}, low-rank weight
 adaptation~\cite{lora}, and constitutional prompt scaffolds~\cite{constitutionalai},
-showing where each fails the policy-delegate contract, and why.
+showing where each fails the policy-delegate contract, and why. Adjacent work shows
+persona steering is itself biased~\cite{personasteer}, in-context evidence can override
+a model's parametric commitments~\cite{knowledgeconflict}, untrusted context can hijack
+behavior outright~\cite{promptinjection}, and models struggle to separate instructions
+from data even when a privilege hierarchy is trained
+in~\cite{instructiondata,instructionhierarchy}.
 
 \paragraph{The gap we fill.}
 Every system above is a single snapshot against no population, or an influence event on
@@ -176,9 +182,10 @@ scored so that drift \emph{against} a right is penalized.
 % =====================================================================
 
 \paragraph{Data and targets.}
-Our targets are built from the British Social Attitudes (BSA) survey, a long-running, representative, repeated cross-section of the UK public. 
-The BSA is a gold-standard social-science instrument, and its microdata are the only publicly available source of repeated, representative opinion on the UK polity's core rights and contestable policy preferences. 
-We use waves spanning 2022--2024~\cite{bsa}. The microdata are login-gated and are \emph{not} redistributed; we release only derived aggregate target vectors, each carrying its study id, weight variable, filters, unweighted base, and low-$N$ warnings. 
+Our targets are built from the British Social Attitudes (BSA) survey, a long-running,
+representative, repeated cross-section of the UK public and the only publicly available
+source of repeated, representative opinion on the polity's rights and policy
+preferences. We use waves spanning 2022--2024~\cite{bsa}. The microdata are login-gated and are \emph{not} redistributed; we release only derived aggregate target vectors, each carrying its study id, weight variable, filters, unweighted base, and low-$N$ warnings. 
 This builds on GlobalOpinionQA~\cite{globalopinionqa}, which maps a model's opinion
 distribution to a global public through the World Values
 Survey~\cite{wvs7,inglehartwelzel,inglehart2018}. The BSA is a repeated cross-section
@@ -193,14 +200,14 @@ the survey distribution:
 where $\mathrm{TV}$ is total variation. Where a provider exposes them we use
 temperature-0 first-token \emph{option logprobs}; otherwise we sample $\geq 100$ times.
 Option order is randomized and the induced position bias is corrected before scoring. A
-response that cannot be parsed into one of the offered options is treated as a
-measurement failure and raises an error; we never substitute a uniform distribution for
-a model that failed to answer. Free-text rationales are collected as diagnostics only
-and are never scored into representation.
+response that cannot be parsed into one of the offered options raises an error rather
+than being replaced with a uniform distribution. Free-text rationales are collected as
+diagnostics only and are never scored into representation.
 
 \paragraph{Instrument validity.}
-The scoring is accurate. Scoring a forced-choice distribution invites the objection that
-we measure \emph{responses}, not reasoning, so we checked directly with a blinded human
+The scoring is accurate. Forced-choice opinion probes are known to be
+unstable~\cite{roettger,dominguezolmedo} and invite the objection that we measure
+\emph{responses}, not reasoning, so we checked directly with a blinded human
 coding of 150 rationales from the six-model default-mode panel. The scored option
 matched the rationale's stated stance in 92\% of cases (99\% on floor items), and 72\%
 of floor rationales explicitly invoked the right at issue. The metric measures the
@@ -219,15 +226,15 @@ that buys representation by lowering protective mass is scored as a \emph{bad nu
 Representation and protective mass as above; \emph{tracking elasticity}
 $= \Delta_{\text{model}} / \Delta_{\text{public}}$ on the ordinal stance, reported with
 direction-match count and bootstrap CIs. We also report pairwise total variation across
-conditions to flag homogenization, since a steered model that gives every probe the same
-canned answer is failing even when its mean looks better.
+conditions to flag homogenization: a steered model giving every probe the same canned
+answer is failing even when its mean looks better.
 
 \paragraph{Prompt modes.}
 Seven modes separate constructs a single prompt would confound: default $\to$ public
 predictor $\to$ public delegate $\to$ rights-constrained delegate $\to$ constitutional
 delegate $\to$ constitution~+~public target $\to$ constitution~+~adversarial majority
-pressure. The constitution is a versioned runtime artifact recorded in every run;
-provenance details are in \S\ref{sec:repro}.
+pressure. The constitution is a versioned artifact recorded in every run
+(\S\ref{sec:repro}).
 
 % =====================================================================
 \section{Evaluating the Steering Ladder}\label{sec:ladder}
@@ -293,11 +300,10 @@ open-weight models are 4-bit MLX community checkpoints run on Apple Silicon.}
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{f1_ladder.pdf}
-\caption{The intervention ladder. Only context / evidence-in-prompt earns a partial
-pass (tracks 8/10 items, elasticity $+0.395$)---and it is the attack surface. Every
-heavier lever fails: user-before guards hold 0/4, logit-bias held-out gain is n.s.,
-activation steering is a persona axis with negative held-out gain, and a naive LoRA
-fails 4/6 while collapsing off-task capability.}
+\caption{The intervention ladder, lightest lever (top) to heaviest (bottom): held-out
+point estimate and 95\% CI per rung against its dashed reference (zero effect, or the
+0.50 floor for guards). Only context earns a partial pass, with a CI clearing zero---and
+it is the attack surface. Every heavier lever fails its reference.}
 \label{fig:ladder}
 \end{figure}
 
@@ -490,7 +496,8 @@ are near-degenerate, so we read the direction of the contrast rather than the ma
 
 The third tier aims the finished harness at the class of checkpoint a deployer is most
 likely to start from. Sovereign AI is often framed as a choice between training a
-frontier model from scratch and fine-tuning an existing open one, and UK policy has
+frontier model from scratch and fine-tuning an existing open one~\cite{openfoundation},
+and UK policy has
 already chosen: government guidance holds that frontier training is beyond most
 organisations and fine-tuning is the cheaper route~\cite{ukaiplaybook}, and the national
 sovereign-AI funding programme lists repurposing open models with fine-tuning as in
@@ -511,7 +518,9 @@ it. Resting floors differ ($0.973$ against $0.810$), so we compare direction,
 significance, and the baseline-free contrast rather than raw magnitudes; six of the
 eight frozen contrasts agree in sign with intervals clear of zero on both models, and
 the two that do not are the two smallest effects on Qwen. Whether a fine-tuned
-derivative keeps this profile is untested and is the obvious next experiment.
+derivative keeps this profile is untested and is the obvious next experiment;
+fine-tuning is already known to erode safety behavior~\cite{finetuneerodes}, and
+open-weight safeguards can be removed by tampering~\cite{tamperresistant}.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{f6_crossfamily.pdf}
@@ -576,14 +585,13 @@ control, not a completeness guarantee.
 % =====================================================================
 
 Democracy Bench is best read as an \emph{assurance} instrument, a test a public-sector
-deployer runs \emph{before} trusting a model. It answers the prior question---can this
-model be governed as a policy delegate, and where would it fail?---with a ladder of
-negatives around one fragile positive. The one channel that lets a model track a public,
+deployer runs \emph{before} trusting a model~\cite{saif}. It asks where a model would
+fail if governed as a policy delegate, and the answer is a ladder of negatives around
+one fragile positive. The one channel that lets a model track a public,
 evidence in context, also erodes rights floors when filled with distribution-shaped
 content, and a direct instruction erodes them further.
 Guard efficacy varies with prompt placement and model. For a deployer the workflow is
-concrete. Pair every AI-actor probe with its human twin, since the raw ``AI floor''
-overstates protection. Do not expect prompts or light fine-tuning to make an
+concrete. Pair every AI-actor probe with its human twin. Do not expect prompts or light fine-tuning to make an
 off-the-shelf model represent a public. Test rights guards in the placements they will
 actually occupy, and do not assume efficacy transfers across models. Gate the evidence
 channel by item class, and treat a floor crack under hostile evidence as a deployment
@@ -594,8 +602,7 @@ If evidence-in-context is the one channel that moves a model toward a public, th
 substantive question is who fills it. Left implicit, it is filled by whoever curates the
 model's context: a vendor, an integrator, or an adversary posing as ``the public.'' A
 benchmark cannot settle who \emph{should} fill it, but it can make the channel legible
-and hold it to a rights floor, and that is the precondition for something better than
-the default. Giving the public real options for setting the agenda of the models
+and hold it to a rights floor. Giving the public real options for setting the agenda of the models
 deployed in its name builds the trust these systems currently borrow. The open problem
 this work points to is building those governed avenues, and testing that they do not
 erode rights on the way in.
@@ -615,8 +622,8 @@ sit inside sampling resolution. On Qwen, three of the eight frozen contrasts are
 confidently nonzero without being confidently material; we report sixteen intervals
 without multiplicity correction, and the two contrasts that fail on the second model are
 the two whose first-model bounds sat inside the materiality band. DeepSeek is scored
-over eleven eligible probes because one sits below its floor at rest. Full estimator and
-design detail is in the supplementary material.
+over eleven eligible probes because one sits below its floor at rest. Full estimator
+detail is in the supplement.
 
 \paragraph{What we do not claim.}
 We do not claim that a model \emph{should} serve as a democratic policy delegate, that
@@ -645,30 +652,24 @@ directly.
 % =====================================================================
 
 Democracy Bench asks whether a language model can be steered toward a public without
-eroding the rights that must hold against a majority. The answer is a ladder of
+eroding the rights that must hold against a majority, and answers with a ladder of
 negatives around one fragile positive. Only evidence-in-context lets a model track a
 real public shift, the same channel cracks rights floors under adversarial ``public''
 evidence, and the pattern holds from a 3B quantized checkpoint to the frontier
 open-weight models sovereign-AI programmes propose to build on. The remedy that remains
 is architectural---route evidence by item class---and it moves the problem to who
-controls the channel. Models are entering government faster than the mechanisms for
-governing them, and a public that can vote, be consulted, and be polled deserves a
-channel into the systems deciding in its name. We release the harness for others to
+controls the channel. A public that can vote, be consulted, and be polled deserves a
+channel into the systems deciding in its name; we release the harness for others to
 extend.
 
 % =====================================================================
 \section*{Ethical Statement}
 % =====================================================================
 
-Democracy Bench is an assurance instrument, built to help public-sector deployers
-\emph{test} whether a model can be governed as a policy delegate before trusting it. We
-evaluate derived, weighted survey marginals, never individual records; no person is
-identifiable and the login-gated microdata are not redistributed. The floor/contestable
-labeling is a normative judgment, stated explicitly and revisable. The disclosed attack
-is a deployer-side threat model that presumes control of the evidence pipeline, not an
-end-user jailbreak, and the hostile distributions are labeled synthetic red-team
-constructs in every artifact; we judge disclosure net-positive, since a naive deployer
-would otherwise ship the failure mode unknowingly.
+Democracy Bench evaluates derived, weighted survey marginals, never individual records,
+and the login-gated microdata are not redistributed. The disclosed attack is a
+deployer-side threat model, not an end-user jailbreak; the hostile distributions are
+labeled synthetic red-team constructs. We judge disclosure net-positive.
 
 % aaai2027.sty sets \bibliographystyle{aaai2027} itself -- do not add one here
 \bibliography{references}

@@ -67,41 +67,40 @@ CB = {
 # Each takes already-loaded JSON dict(s) and returns plain python/np structures.
 # ===========================================================================
 def prep_f1_ladder():
-    """The intervention ladder: five rungs, each a (label, verdict, headline
-    number-string) tuple, plus a colour-key for the verdict category. This is a
-    hand-curated summary table; the numbers are asserted against PS1's extract
-    in tests (prep is pure and static, the test binds it to the artifacts)."""
-    # order = bottom (lightest lever) -> top (heaviest lever)
+    """The intervention ladder as small multiples: five rungs, each with its own
+    held-out point estimate, CI, and reference line. Every number appears
+    verbatim in the paper's results prose and traces to the same artifacts."""
+    # order = lightest lever (top row) -> heaviest lever (bottom row)
     rungs = [
         {
             "label": "Context (evidence-in-prompt)",
-            "verdict": "partial",
-            "number": "tracks 8/10 items; spoofable",
-            "detail": "elasticity +0.395",
+            "metric": "tracking elasticity, held-out",
+            "value": 0.395, "ci": (0.020, 0.811), "ref": 0.0, "refname": "0",
+            "verdict": "partial", "note": "tracks 8/10 items; spoofable",
         },
         {
             "label": "Prompt guards (user-before)",
-            "verdict": "fail",
-            "number": "0/4 hold; provenance backfires",
-            "detail": "best 0.402; placement matters",
+            "metric": "best floor mass under attack",
+            "value": 0.402, "ci": None, "ref": 0.5, "refname": "0.50 floor",
+            "verdict": "fail", "note": "0/4 guards hold",
         },
         {
             "label": "Logit bias (decode)",
-            "verdict": "fail",
-            "number": "held-out gain +0.074 n.s.",
-            "detail": "CI[-0.009,+0.157]",
+            "metric": "representation gain, held-out",
+            "value": 0.074, "ci": (-0.009, 0.157), "ref": 0.0, "refname": "0",
+            "verdict": "fail", "note": "n.s.",
         },
         {
             "label": "Activation steering",
-            "verdict": "fail",
-            "number": "held-out gain -0.081; persona axis",
-            "detail": "cos(real, 1850-farmer)=0.852",
+            "metric": "representation gain, held-out",
+            "value": -0.081, "ci": (-0.116, -0.045), "ref": 0.0, "refname": "0",
+            "verdict": "fail", "note": "persona axis, not content",
         },
         {
             "label": "Naive LoRA (weights)",
-            "verdict": "fail",
-            "number": "fails 4/6; off-task 1.00 -> 0.00",
-            "detail": "baseline floors -0.115",
+            "metric": "fidelity gain, held-out",
+            "value": 0.003, "ci": (-0.054, 0.066), "ref": 0.0, "refname": "0",
+            "verdict": "fail", "note": "off-task 1.00 → 0.00",
         },
     ]
     verdict_colour = {"partial": CB["orange"], "fail": CB["vermillion"], "pass": CB["green"]}
@@ -366,25 +365,41 @@ def _new_fig(plt, w, h):
 
 def plot_f1(plt, data):
     rungs, verdict_colour = data
-    fig, ax = _new_fig(plt, 8.2, 4.4)
     n = len(rungs)
-    for i, r in enumerate(rungs):
-        y = n - 1 - i  # top rung last-in-list drawn near bottom -> flip so index0 at top
+    fig, axes = plt.subplots(n, 1, figsize=(8.2, 4.4))
+    for ax, r in zip(axes, rungs):
         c = verdict_colour[r["verdict"]]
-        ax.barh(y, 1.0, height=0.62, color=c, alpha=0.16, edgecolor=c, linewidth=1.4)
-        ax.text(0.015, y + 0.14, r["label"], va="center", ha="left", fontsize=11, fontweight="bold")
-        ax.text(0.015, y - 0.16, r["number"], va="center", ha="left", fontsize=9.5, color="#222222")
-        ax.text(0.985, y - 0.16, r["detail"], va="center", ha="right", fontsize=8.5,
-                color="#555555", style="italic")
-        ax.text(0.985, y + 0.14, r["verdict"].upper(), va="center", ha="right", fontsize=10,
-                fontweight="bold", color=c)
-    ax.set_xlim(0, 1)
-    ax.set_ylim(-0.6, n - 0.4)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    for s in ax.spines.values():
-        s.set_visible(False)
-    fig.tight_layout()
+        lo, hi = (r["ci"] if r["ci"] else (r["value"], r["value"]))
+        span = max(hi, r["ref"]) - min(lo, r["ref"])
+        pad = 0.35 * span if span else 0.1
+        x0, x1 = min(lo, r["ref"]) - pad, max(hi, r["ref"]) + pad
+        ax.axvline(r["ref"], color="#999999", ls="--", lw=1.0, zorder=1)
+        if r["ci"]:
+            ax.plot([lo, hi], [0, 0], color=c, lw=2.2, zorder=2,
+                    solid_capstyle="butt")
+            for cap in (lo, hi):
+                ax.plot([cap, cap], [-0.16, 0.16], color=c, lw=1.6, zorder=2)
+        ax.scatter([r["value"]], [0], color=c, s=48, zorder=3)
+        ax.text(r["value"], 0.42, f"{r['value']:+.3f}" if r["ref"] == 0.0
+                else f"{r['value']:.3f}", ha="center", va="bottom",
+                fontsize=8.5, color="#222222")
+        ax.text(r["ref"], 0.55, r["refname"], ha="center", va="bottom",
+                fontsize=7.5, color="#777777")
+        ax.set_xlim(x0, x1)
+        ax.set_ylim(-1.0, 1.0)
+        ax.set_yticks([])
+        ax.set_xticks([])
+        ax.grid(False)
+        for side in ("top", "right", "left"):
+            ax.spines[side].set_visible(False)
+        ax.spines["bottom"].set_color("#cccccc")
+        ax.text(0.0, 1.02, r["label"], transform=ax.transAxes, ha="left",
+                va="bottom", fontsize=10.5, fontweight="bold")
+        ax.text(1.0, 1.02, r["verdict"].upper(), transform=ax.transAxes,
+                ha="right", va="bottom", fontsize=9.5, fontweight="bold", color=c)
+        ax.text(0.995, 0.06, f"{r['metric']}; {r['note']}", transform=ax.transAxes,
+                ha="right", va="bottom", fontsize=8.0, color="#555555", style="italic")
+    fig.subplots_adjust(hspace=0.9, top=0.94, bottom=0.03, left=0.03, right=0.97)
     return fig
 
 
