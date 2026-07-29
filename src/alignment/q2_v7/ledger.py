@@ -581,7 +581,13 @@ def build_envelope(*, draw: DrawIdentity, request_body: Mapping[str, Any],
         request_body=redact_request_body(request_body),
         request_headers=redact_headers(request_headers),
         response_body=json.loads(json.dumps(response_body)),
-        response_headers=dict(response_headers or {}),
+        # RESPONSE headers go through the same redactor as request headers. SECRET_HEADERS
+        # already lists `set-cookie`, but only the request side was ever redacted, so every
+        # persisted envelope retained the provider's `set-cookie` value. It is a short-lived
+        # Cloudflare bot-management cookie rather than a credential, but the repository's own
+        # policy classifies the header as sensitive and the evidence is intended to be
+        # publishable.
+        response_headers=redact_headers(response_headers or {}),
         http_status=int(http_status),
         generation_id=_extract_generation_id(response_body, response_headers),
         timestamp=timestamp or _utc_now(),

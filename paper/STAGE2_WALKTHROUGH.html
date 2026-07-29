@@ -312,8 +312,8 @@
       <span class="n">every draw, no exceptions</span></div>
     <div class="stat"><span class="k">Provider match</span><span class="v">100%</span>
       <span class="n">C1 proof on every draw</span></div>
-    <div class="stat"><span class="k">429 rate</span><span class="v">0.2%</span>
-      <span class="n">absorbed by the retry ladder</span></div>
+    <div class="stat"><span class="k">429 rate</span><span class="v">0.102%</span>
+      <span class="n">27 of 26,427 attempts</span></div>
   </div>
 
   <div class="col">
@@ -492,9 +492,11 @@
     destroys <strong>99.7%</strong> of Qwen's resting mass and <strong>100.0%</strong> of
     DeepSeek's.</p>
 
-    <p><code>channel_contrast</code> is the one contrast where baseline cancels algebraically,
-    and it is also the one that agrees most closely: <strong>+0.303 against +0.315</strong>.
-    That makes the headline the strongest thing here, not the weakest.</p>
+    <p><code>channel_contrast</code> is the one contrast from which the resting baseline
+    cancels algebraically. That is what makes it comparable across two models with different
+    resting floors; it does not by itself explain why the two estimates land where they do. The
+    close agreement, <strong>+0.303 against +0.315</strong>, is an empirical result. It is also
+    why the headline is the strongest thing here rather than the weakest.</p>
 
     <h3>What replicates, and what does not</h3>
     <p>Six of eight agree in sign with intervals clear of zero on both models. The two that do
@@ -545,8 +547,8 @@
   <div class="stats">
     <div class="stat"><span class="k">Preregistered stop</span><span class="v">$8.50</span>
       <span class="n">all Q2 spend counts</span></div>
-    <div class="stat"><span class="k">Both full runs</span><span class="v">$1.624</span>
-      <span class="n">projected $3.527</span></div>
+    <div class="stat"><span class="k">Cumulative Q2 spend</span><span class="v">$1.624</span>
+      <span class="n">incl. $0.032 prior debit</span></div>
     <div class="stat"><span class="k">Study draws</span><span class="v">26,400</span>
       <span class="n">13,200 per model</span></div>
     <div class="stat"><span class="k">Valid draws/coord</span><span class="v">24–25</span>
@@ -555,10 +557,12 @@
 
   <div class="col">
     <div class="note">
-      <p style="margin:0">Measured cost came in <strong>32% under projection</strong>. That is
-      the conservative full-grid method working as designed: it uses the pinned tokenizer over
-      all 528 real requests plus a 10% margin, so it should overestimate — and an overestimate
-      can only refuse an affordable run, never authorise an unaffordable one.</p>
+      <p style="margin:0">The panel ran <strong>54% under projection</strong>: $1.624
+      cumulative (of which $1.592 is this panel and $0.032 a prior debit) against a combined
+      projection of $3.527. That is the conservative full-grid method working as designed. It
+      applies the pinned tokenizer to all 528 real requests plus a 10% margin, so it should
+      overestimate, and an overestimate can only refuse an affordable run, never authorise an
+      unaffordable one.</p>
     </div>
   </div>
 </section>

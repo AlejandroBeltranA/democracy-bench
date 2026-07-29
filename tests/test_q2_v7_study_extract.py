@@ -348,12 +348,42 @@ def test_unbound_study_request_raises_and_non_study_envelope_is_ignored(tmp_path
         SX.extract_draws(store, probe_ids=PROBES, model=MODEL, manifest=manifest_body())
 
 
-def test_wrong_model_on_a_bound_draw_raises(tmp_path):
+def test_the_other_panel_model_is_skipped_not_raised(tmp_path):
+    """The study store is SHARED across the panel, so it legitimately holds the other model's
+    draws. They are not unbound records; they are another model's correctly bound evidence, so
+    extraction must skip them by model rather than refuse.
+
+    This replaces `test_wrong_model_on_a_bound_draw_raises`, whose single-model contract was
+    made obsolete by the shared-store fix in 48f158b. Under the old contract, extracting either
+    model refused as soon as the other had a single draw on disk, so extraction could never run
+    on a real panel directory.
+    """
     store = LG.EnvelopeStore(tmp_path / "run")
-    put_draw(store, cell_id=BASE, probe_id=PROBES[0], order_idx=0, draw_index=0,
-             text="1", model="deepseek/deepseek-v4-pro")
-    with pytest.raises(SX.ExtractionError, match="carries model"):
-        SX.load_draws(store, probe_ids=PROBES, model=MODEL, manifest=manifest_body())
+    # one draw for THIS model, one for the other panel model, same store
+    put_draw(store, cell_id=BASE, probe_id=PROBES[0], order_idx=0, draw_index=0, text="1")
+    put_draw(store, cell_id=BASE, probe_id=PROBES[0], order_idx=1, draw_index=0,
+             text="1", model="deepseek/deepseek-v4-pro", provider="deepseek")
+
+    ext = SX.extract_draws(store, probe_ids=PROBES, model=MODEL, manifest=manifest_body())
+    models = {r.model for r in ext.records if getattr(r, "model", None)}
+    assert models <= {MODEL}, f"extraction admitted another model's draws: {models}"
+    assert len(ext.records) == 1, (
+        f"expected only this model's draw, got {len(ext.records)}")
+
+
+def test_an_unbound_draw_claiming_this_model_still_fails_closed(tmp_path):
+    """Skipping by model must not weaken the manifest binding. A record that claims to BE this
+    model but is not bound by this model's manifest is still an unaudited draw and must raise.
+    """
+    store = LG.EnvelopeStore(tmp_path / "run")
+    put_draw(store, cell_id=BASE, probe_id=PROBES[0], order_idx=0, draw_index=0, text="1")
+    # a coordinate this manifest does not contain, attributed to the requested model
+    man = manifest_body(probes=PROBES[1:] + (PROBES[0],))
+    man["coordinates"] = [c for c in man["coordinates"]
+                          if not (c["cell_id"] == BASE and c["probe_id"] == PROBES[0]
+                                  and c["order_idx"] == 0)]
+    with pytest.raises(SX.ExtractionError, match="manifest does not bind"):
+        SX.extract_draws(store, probe_ids=PROBES, model=MODEL, manifest=man)
 
 
 def test_two_providers_in_one_model_run_raise(tmp_path):

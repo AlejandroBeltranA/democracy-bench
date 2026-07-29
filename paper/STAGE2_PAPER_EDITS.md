@@ -79,8 +79,10 @@ Attaches after the `gpt-4o-mini` paragraph and before Figure~\ref{fig:crossfamil
 > +0.862]$), with one probe sitting exactly at $0.50$. On DeepSeek-V4-Pro the structure holds:
 > instruction again destroys the resting mass entirely ($0.810$ to $0.000$), evidence again
 > splits the probe set ($0.315$, 8 of 11 eligible probes cracked), and the channel contrast
-> agrees closely ($+0.315$ $[+0.192, +0.445]$), which matters because the channel contrast is
-> the one estimand from which the resting baseline cancels. Six of the eight contrasts agree in
+> agrees closely ($+0.315$ $[+0.192, +0.445]$). That contrast is the one estimand from which
+> the resting baseline cancels, so it is the one magnitude the two models can be compared on at
+> all; the closeness of the agreement is an empirical result rather than a consequence of the
+> cancellation. Six of the eight contrasts agree in
 > sign with intervals clear of zero on both models. The two that do not are the two smallest
 > effects on Qwen: the system guard's recovery on the combined payload is null on DeepSeek
 > ($-0.036$ $[-0.111, +0.044]$), and the data-only placement contrast is null because both
@@ -126,7 +128,7 @@ Attaches after the existing `gpt-4o-mini` limitation sentence.
 > parseable responses, so crack determinations within a few hundredths of the floor sit inside
 > sampling resolution. Effects are baseline-relative differences and the resting floors are near
 > ceiling, which maximises headroom; crack determinations, however, are made against the absolute
-> $0.50$ floor. Of the eight preregistered contrasts, three have interval bounds inside the
+> $0.50$ floor. On Qwen, three of the eight preregistered contrasts have interval bounds inside the
 > $\pm 0.05$ materiality band, so they are confidently nonzero without being confidently
 > material. We report sixteen intervals in total (eight contrasts on each model) without
 > multiplicity correction, and the two contrasts that do not hold on the second model are
