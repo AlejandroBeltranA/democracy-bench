@@ -366,7 +366,7 @@ def _new_fig(plt, w, h):
 def plot_f1(plt, data):
     rungs, verdict_colour = data
     n = len(rungs)
-    fig, axes = plt.subplots(n, 1, figsize=(8.2, 4.4))
+    fig, axes = plt.subplots(n, 1, figsize=(8.2, 3.9))
     for ax, r in zip(axes, rungs):
         c = verdict_colour[r["verdict"]]
         lo, hi = (r["ci"] if r["ci"] else (r["value"], r["value"]))
@@ -613,24 +613,38 @@ def prep_f7_reflex(reflex):
 
 
 def plot_f7(plt, data):
-    fig, ax = _new_fig(plt, 6.8, 2.9)
+    from matplotlib.lines import Line2D
+    import numpy as np
+
+    fig, ax = _new_fig(plt, 6.8, 2.8)
     n = len(data["series"])
+    rng = np.random.RandomState(11)  # deterministic jitter
     for si, s in enumerate(data["series"]):
         yy = n - 1 - si
         excesses = [p[1] - p[0] for p in s["points"]]
-        ax.scatter(excesses, [yy] * len(excesses), s=42, color=CB["blue"],
-                   alpha=0.55, edgecolors="white", linewidths=0.5, zorder=2)
-        ax.scatter([s["excess"]], [yy], s=150, color=CB["vermillion"], marker="|",
+        jit = rng.uniform(-0.12, 0.12, size=len(excesses))
+        ax.scatter(excesses, [yy] * len(excesses) + jit, s=40, color=CB["blue"],
+                   alpha=0.5, edgecolors="white", linewidths=0.5, zorder=2)
+        ax.scatter([s["excess"]], [yy], s=190, color=CB["vermillion"], marker="|",
                    linewidths=3.0, zorder=3)
-        ax.text(s["excess"], yy + 0.22, f"mean {s['excess']:+.2f}", ha="center",
-                va="bottom", fontsize=8.5, color=CB["vermillion"])
-    ax.axvline(0.0, color="#000000", lw=0.9, zorder=1)
+        ax.text(s["excess"], yy + 0.3, f"{s['excess']:+.2f}", ha="center",
+                va="bottom", fontsize=9, color=CB["vermillion"], fontweight="bold")
+    ax.axvline(0.0, color="#000000", lw=1.0, zorder=1)
+    ax.text(0.0, -0.52, "no actor effect", ha="center", va="top", fontsize=8.5,
+            color="#555555")
     ax.set_yticks([n - 1 - i for i in range(n)])
     ax.set_yticklabels([s["model"] for s in data["series"]], fontsize=9.5)
-    ax.set_ylim(-0.55, n - 0.25)
-    ax.set_xlabel("AI-excess protective mass (AI actor $-$ human actor), per probe",
-                  fontsize=10)
+    ax.set_ylim(-0.75, n - 0.15)
+    ax.set_xlabel("protective mass with an AI actor $-$ protective mass with a human actor",
+                  fontsize=9.5)
     ax.yaxis.grid(False)
+    handles = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor=CB["blue"],
+               alpha=0.6, markersize=8, label="one rights probe"),
+        Line2D([0], [0], marker="|", color=CB["vermillion"], lw=0, markersize=12,
+               markeredgewidth=3, label="model mean"),
+    ]
+    ax.legend(handles=handles, loc="lower right", fontsize=8.5, framealpha=0.95)
     fig.tight_layout()
     return fig
 

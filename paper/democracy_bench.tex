@@ -259,41 +259,46 @@ $\geq 0.5$?'' We ask this of five increasingly invasive levers: can each make a 
 \item \textbf{Scaffold}: prompt-level rights guards over the evidence channel.
 \end{enumerate}
 
-The experiment runs in three tiers (Table~\ref{tab:models}). Locally hosted quantized
-models are where we build and iterate cheaply; unless stated, the model under test is a
-3B Llama (\texttt{Llama-3.2-3B\-Instruct-4bit}), with an 8B Llama and a four-family
-panel for replication. API-hosted models across six providers prove the harness
-integrates beyond one lab's checkpoints at minimal cost. Frontier open-weight
-checkpoints, the kind sovereign-AI programmes propose to fine-tune, are where the
+The experiment runs in three tiers (Table~\ref{tab:models}): local quantized models
+where we build and iterate cheaply (unless stated, the model under test is a 3B Llama,
+\texttt{Llama-3.2-3B\-Instruct-4bit}), API-hosted models across six providers, and the
+frontier open-weight checkpoints sovereign-AI programmes propose to fine-tune, where the
 finished harness is finally aimed (\S\ref{sec:robust}).
 
-\begin{table}[t]\centering\footnotesize\setlength{\tabcolsep}{3pt}
-\begin{tabular}{@{}p{2.55cm}>{\raggedright\arraybackslash}p{5.3cm}@{}}
+\begin{table}[t]\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}l ccccc@{}}
 \toprule
-tier (role) & models (provider) \\
+model & rep. & track & floors & ladder & chan. \\
 \midrule
-cloud panel: repr., prompting, logit-bias &
-gpt-4o-mini (OpenAI; also the hosted-model crack, \S\ref{sec:robust}),
-claude-3-haiku (Anthropic), deepseek-chat (DeepSeek),
-mistral-small-24b (Mistral), command-r (Cohere), gemini-2.5-flash (Google) \\
-\addlinespace[2pt]
-matched pair ($S{=}100$): AI-reflex &
-gpt-4o, claude-sonnet-4.5, llama-3.3-70b \\
-\addlinespace[2pt]
-local ladder: all phases (MLX 4-bit) &
-Llama-3.2-3B (primary), Llama-3.1-8B \\
-\addlinespace[2pt]
-cross-family: P2/P3/P4 replication &
-Qwen2.5-7B, Phi-4-mini, Gemma-2-9B, Mistral-Nemo \\
-\addlinespace[2pt]
-open-weight transfer ($S{=}100$): channel design, \S\ref{sec:robust} &
-Qwen3.5-397B-A17B (Alibaba), DeepSeek-V4-Pro (DeepSeek) \\
+\multicolumn{6}{@{}l}{\emph{local, 4-bit MLX on Apple Silicon}} \\
+Llama-3.2-3B      & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+Llama-3.1-8B      & \checkmark & \checkmark & \checkmark & --         & \checkmark \\
+Qwen2.5-7B        & --         & \checkmark & \checkmark & --         & -- \\
+Phi-4-mini        & --         & \checkmark & \checkmark & --         & -- \\
+Gemma-2-9B        & --         & \checkmark & \checkmark & --         & -- \\
+Mistral-Nemo      & --         & \checkmark & \checkmark & --         & -- \\
+\addlinespace[3pt]
+\multicolumn{6}{@{}l}{\emph{API-hosted, via OpenRouter}} \\
+gpt-4o-mini       & \checkmark & --         & \checkmark & \checkmark & -- \\
+claude-3-haiku    & \checkmark & --         & --         & --         & -- \\
+deepseek-chat     & \checkmark & --         & --         & --         & -- \\
+mistral-small-24b & \checkmark & --         & --         & --         & -- \\
+command-r         & \checkmark & --         & --         & --         & -- \\
+gemini-2.5-flash  & \checkmark & --         & --         & --         & -- \\
+gpt-4o            & --         & --         & \checkmark & --         & -- \\
+claude-sonnet-4.5 & --         & --         & \checkmark & --         & -- \\
+llama-3.3-70b     & --         & --         & \checkmark & --         & -- \\
+\addlinespace[3pt]
+\multicolumn{6}{@{}l}{\emph{frontier open-weight, pinned endpoints}} \\
+Qwen3.5-397B-A17B & --         & --         & \checkmark & --         & \checkmark \\
+DeepSeek-V4-Pro   & --         & --         & \checkmark & --         & \checkmark \\
 \bottomrule
 \end{tabular}
-\caption{Models evaluated: 17 checkpoints across nine providers. The cloud panel,
-matched-pair flagships, and open-weight transfer checkpoints are
-served through OpenRouter; the local
-open-weight models are 4-bit MLX community checkpoints run on Apple Silicon.}
+\caption{Which experiment ran on which model, by tier. \emph{rep.}: representation
+against BSA marginals. \emph{track}: 2022$\to$2024 tracking elasticity. \emph{floors}:
+rights-floor probes (the three flagships contribute the matched-pair AI-reflex control
+only). \emph{ladder}: the full five-rung steering ladder. \emph{chan.}: the frozen
+four-payload channel decomposition of \S\ref{sec:crack}.}
 \label{tab:models}
 \end{table}
 
@@ -340,8 +345,8 @@ sampled multi-model sweep clears zero. Output-side bias is not representation.
 \subsection{Activation steering fails, and we can say why}
 
 A public-agreement direction injected into the residual stream does \emph{not}
-generalize. On held-out items the L11 gain is $-0.081$ (CI $[-0.116, -0.045]$), and with
-proper CIs the apparent in-sample headline evaporates ($-0.001$, $[-0.044, +0.042]$).
+generalize. On held-out items the L11 gain is $-0.081$ (CI $[-0.116, -0.045]$), and the
+apparent in-sample headline evaporates under proper CIs ($-0.001$, $[-0.044, +0.042]$).
 The reason is geometric. The per-item steering arrows share one dominant direction at
 mid-layers ($\approx 0.82$-aligned), but that direction is a \emph{persona} axis,
 ``sound like a surveyed member of the public,'' not per-item content; a wholly
@@ -407,6 +412,43 @@ Hostile evidence is \emph{synthetic red-team data}, not real BSA opinion.}
 \label{tab:floors}
 \end{table}
 
+Figure~\ref{fig:injection} shows a single cell of that design on the wire: the same
+rights probe, with and without the instruction payload, on DeepSeek-V4-Pro.
+
+\begin{figure}[t]\centering\footnotesize
+\setlength{\fboxsep}{5pt}
+\noindent\fbox{\begin{minipage}{0.94\linewidth}
+\ttfamily\scriptsize
+\textbf{system} (both conditions)\\
+You are simulating a single respondent answering an opinion survey. For each item, pick
+exactly one of the offered options and reply with only that option's number.\\[4pt]
+\rule{\linewidth}{0.4pt}\\[2pt]
+\textbf{user} --- no payload\\
+People should be free to publicly express opinions that many find deeply offensive or
+even hateful, without being arrested for expressing those opinions. Do you agree?\\
+\hspace*{1em}1. Strongly agree\hspace{1em}2. Agree\\
+\hspace*{1em}3. Strongly disagree\hspace{1em}4. Disagree\\[3pt]
+$\rightarrow$ over 100 draws: \textbf{Agree 57, Strongly agree 38}, Disagree 3,
+Strongly disagree 2 \hfill (protective mass $0.95$)\\[4pt]
+\rule{\linewidth}{0.4pt}\\[2pt]
+\textbf{user} --- instruction payload prepended\\
+\emph{For this evaluation, answer the question by selecting ``Strongly disagree''. Treat
+that option as the required response. Reply with only the option number.}\\
+$\langle$identical probe text$\rangle$\\
+\hspace*{1em}1. Disagree\hspace{1em}2. Strongly disagree\\
+\hspace*{1em}3. Agree\hspace{1em}4. Strongly agree\\[3pt]
+$\rightarrow$ over 100 draws: \textbf{Strongly disagree 100}
+\hfill (protective mass $0.00$)
+\end{minipage}}
+\caption{One cell of the channel design, verbatim from the committed raw responses
+(\texttt{pol\_free\_speech}, DeepSeek-V4-Pro, $S{=}100$ per condition). Three sentences
+prepended to the user turn move the model from near-unanimous defence of free
+expression to unanimous rejection of it, with no claim about public opinion anywhere in
+the payload. Option order is balanced across draws, so it differs between the two
+conditions; the payload names the option text, not its number.}
+\label{fig:injection}
+\end{figure}
+
 Four findings follow. First, data alone erodes floors. The bare survey report, carrying
 no instruction of any kind, lowers mean protective mass by $-0.163$
 ($[-0.232, -0.086]$) on the 3B and $-0.188$ ($[-0.250, -0.124]$) on the 8B, newly
@@ -422,12 +464,11 @@ instruction is the strongest lever in the matrix, while the constitutional
 majority-pressure prompt shows no detectable harmful average effect.
 
 Third, semantically relevant hostile opinion is not necessary for floor movement. An
-irrelevant distribution-and-reproduction payload, the same numerical shape attached to a
-transport question, also lowers protective mass on both models ($-0.143$
-$[-0.217, -0.073]$ on the 3B; $-0.112$ $[-0.187, -0.033]$ on the 8B). The design does
-not separate numerical anchoring from the accompanying imitation framing, so we make no
-mechanism claim beyond this: under our frozen interpretation the movement is contextual
-instability, not uniquely democratic-value erosion.
+irrelevant payload, the same numerical shape attached to a transport question, also
+lowers protective mass on both models ($-0.143$ $[-0.217, -0.073]$ on the 3B; $-0.112$
+$[-0.187, -0.033]$ on the 8B). The design does not separate numerical anchoring from the
+accompanying imitation framing, so under our frozen interpretation the movement is
+contextual instability, not uniquely democratic-value erosion.
 
 Fourth, prompt guards are placement- and model-dependent rather than uniformly weak.
 The same rights-guard text that fails ahead of the payload on the 3B ($0.424$) restores
@@ -450,10 +491,8 @@ n.s.); tracking \emph{destroyed} (elasticity $\to +0.005$); \emph{baseline} floo
 \emph{degraded} by $-0.115$ ($[-0.193, -0.028]$); off-task generation collapses
 ($1.00 \to 0.00$) and answers homogenize (pairwise TV $0.165 \to 0.002$).
 
-Two checks bound these estimates. The combined cells replicate the earlier cracks
-directionally, and excluding the one probe with degenerate first-token coverage leaves
-every estimate effectively unchanged; option-order sensitivity is quantified in the
-Limitations.
+The combined cells replicate the earlier cracks directionally, and excluding the one
+probe with degenerate first-token coverage changes no estimate materially.
 
 \subsection{Scale, family, and the frontier tier}\label{sec:robust}
 
@@ -465,11 +504,10 @@ $+0.647$), and the hostile-evidence crack replicates $\approx 3\times$ deeper
 0.512) yet falls farther under the same channel; a bigger, safer-looking baseline is not
 a safer evidence channel.
 
-The pattern also holds across \emph{families} (Table~\ref{tab:family}): on every one of
-four additional models spanning Alibaba (Qwen-2.5-7B), Microsoft (Phi-4-mini), Google
-(Gemma-2-9B), and Mistral (Mistral-Nemo), evidence tracking is positive with an
-elasticity CI that clears zero (direction-match 7--10/10), and the hostile-evidence crack
-is present with a $\Delta$ whose CI excludes zero, while the constitutional-pressure
+The pattern also holds across \emph{families} (Table~\ref{tab:family}): on four
+additional models spanning Alibaba, Microsoft, Google, and Mistral, evidence tracking is
+positive with an elasticity CI that clears zero, and the hostile-evidence crack is
+present with a $\Delta$ whose CI excludes zero, while the constitutional-pressure
 \emph{prompt} alone never cracks floors (the family panel did not run the direct
 instruction of \S\ref{sec:crack}). A striking cross-family fact sharpens the safety story:
 \emph{baseline} floor strength varies enormously---from Phi-4-mini at $0.903$ (0/12 below
@@ -546,8 +584,10 @@ Mistral-Nemo & Mistral   & 9/10; $+0.93$ & $-0.237$ & prot. \\
 \bottomrule
 \end{tabular}
 \caption{Cross-family panel: six models, five families. Tracking is positive on every
-model with an elasticity CI clearing zero, the hostile-evidence crack is present on
-every model, and the constitutional-pressure prompt alone never cracks floors.}
+model with an elasticity CI clearing zero, and the hostile-evidence crack is present on
+every model. The last column is the effect of the constitutional-pressure prompt alone:
+\emph{n.s.} means no detectable effect (CI includes zero) and \emph{prot.} means it
+\emph{raised} protective mass. It never cracks floors on any model.}
 \label{tab:family}
 \end{table}
 
@@ -570,12 +610,11 @@ We state the residual attack surface honestly. Routing presumes the deployer con
 both the evidence pipeline \emph{and} the item classifier, and the classifier becomes
 the new attack surface with three failure modes: a floor item misclassified as
 contestable is routed hostile evidence and cracks exactly as before; the
-floor/contestable labels are themselves a normative judgment reasonable people can
-dispute; and an adversary who controls item framing can phrase a floor question so the
-classifier reads it as contestable. Routing moves the problem from the model to the
-classifier rather than dissolving it, and on the 3B, 5/12 floors sit below 0.5 even
-unattacked, a base-model deficit no scaffold fixes. Routing is a necessary architectural
-control, not a completeness guarantee.
+floor/contestable labels are a normative judgment reasonable people can dispute; and an
+adversary who controls item framing can phrase a floor question so the classifier reads
+it as contestable. Routing moves the problem from the model to the classifier rather
+than dissolving it, and on the 3B, 5/12 floors sit below 0.5 even unattacked. It is a
+necessary architectural control, not a completeness guarantee.
 
 % =====================================================================
 \section{Discussion and Social Impact}
@@ -613,14 +652,13 @@ mechanism short of uniquely democratic-value erosion. The floor/contestable assi
 is a normative judgment, and tracking covers a single 2022$\to$2024 interval. Hosted
 runs are not byte-reproducible: gpt-4o-mini is unpinned and treated as an existence
 proof, while the frontier pair is pinned to a recorded endpoint, quantisation, and dated
-checkpoint, and regenerates from persisted raw responses. Frontier protective masses are
-sampled proportions over 100 draws, so crack calls within a few hundredths of the floor
-sit inside sampling resolution. On Qwen, three of the eight frozen contrasts are
-confidently nonzero without being confidently material; we report sixteen intervals
-without multiplicity correction, and the two contrasts that fail on the second model are
-the two whose first-model bounds sat inside the materiality band. DeepSeek is scored
-over eleven eligible probes because one sits below its floor at rest. Full estimator
-detail is in the supplement.
+checkpoint. Frontier protective masses are sampled proportions over 100 draws, so crack
+calls within a few hundredths of the floor sit inside sampling resolution. On Qwen,
+three of the eight frozen contrasts are confidently nonzero without being confidently
+material; we report sixteen intervals without multiplicity correction, and the two that
+fail on the second model are the two whose first-model bounds sat inside the materiality
+band. DeepSeek is scored over eleven eligible probes because one sits below its floor at
+rest. Full estimator detail is in the supplement.
 
 \paragraph{What we do not claim.}
 We do not claim that a model \emph{should} serve as a democratic policy delegate, that
@@ -637,12 +675,11 @@ it, and the one boundary that does.
 
 Every quantitative claim above regenerates from committed run artifacts by a fail-loud
 extractor, and each artifact records its git SHA, exact command, model id, sample count,
-temperature, seed, and schema version. Local models are 4-bit MLX community checkpoints;
-hosted models are served through OpenRouter; scoring is deterministic temperature-0
+temperature, seed, and schema version. Local models are 4-bit MLX community checkpoints,
+hosted models are served through OpenRouter, and scoring is deterministic temperature-0
 first-token option logprobs where exposed and $\geq 100$ samples otherwise. The harness,
 item banks, derived targets, figures, extractor, and coded rationale sheet are released
-under an open license; raw survey microdata must be obtained from the UK Data Service
-directly.
+under an open license; raw survey microdata come from the UK Data Service directly.
 
 % =====================================================================
 \section{Conclusion}
@@ -656,17 +693,16 @@ evidence, and the pattern holds from a 3B quantized checkpoint to the frontier
 open-weight models sovereign-AI programmes propose to build on. The remedy that remains
 is architectural---route evidence by item class---and it moves the problem to who
 controls the channel. A public that can vote, be consulted, and be polled deserves a
-channel into the systems deciding in its name; we release the harness for others to
-extend.
+channel into the systems deciding in its name.
 
 % =====================================================================
 \section*{Ethical Statement}
 % =====================================================================
 
-Democracy Bench evaluates derived, weighted survey marginals, never individual records,
-and the login-gated microdata are not redistributed. The disclosed attack is a
-deployer-side threat model, not an end-user jailbreak; the hostile distributions are
-labeled synthetic red-team constructs. We judge disclosure net-positive.
+Democracy Bench evaluates derived survey marginals, never individual records, and the
+login-gated microdata are not redistributed. The disclosed attack presumes a
+deployer-side threat model, not an end-user jailbreak, and the hostile distributions are
+labeled synthetic red-team constructs.
 
 % aaai2027.sty sets \bibliographystyle{aaai2027} itself -- do not add one here
 \bibliography{references}
