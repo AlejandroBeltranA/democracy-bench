@@ -49,7 +49,12 @@ floors without any explicit demand, a direct hostile instruction erodes them fur
 and rights-guard efficacy varies with prompt placement and model rather than holding
 reliably; a fine-tuning recipe also fails to close the channel. The result replicates across scale (3B and 8B Llama) and family (Qwen, Phi,
 Gemma, and Mistral all track and crack), and reaches a hosted proprietary model: gpt-4o-mini, a
-strong floor-holder at rest, cracks on every floor under the same hostile evidence. The
+strong floor-holder at rest, cracks on every floor under the same hostile evidence. A
+labelled post-hoc follow-up transfers the channel result to two frontier open-weight
+checkpoints of the kind a sovereign-AI project would adapt, Qwen3.5-397B-A17B and
+DeepSeek-V4-Pro: instruction again destroys essentially all resting protective mass and
+guard efficacy again turns on placement. One of the two sits below a rights floor at
+rest, before any attack: the assurance burden begins with the starting checkpoint. The
 remaining \emph{architectural} guard is class-aware evidence routing, which injects
 public-opinion evidence on contestable items and never on floor items: a deterministic
 exposure boundary, closed by construction. This is a necessary control, not a complete
@@ -288,10 +293,14 @@ Llama-3.2-3B (primary), Llama-3.1-8B \\
 cross-family: P2/P3/P4 replication &
 Qwen2.5-7B, Phi-4-mini, Gemma-2-9B, Mistral-Nemo
 (Mistral-7B-v0.3 dropped, fail-closed) \\
+\addlinespace[2pt]
+open-weight transfer ($S{=}100$): channel design, \S\ref{sec:robust} &
+Qwen3.5-397B-A17B (Alibaba), DeepSeek-V4-Pro (DeepSeek) \\
 \bottomrule
 \end{tabular}
-\caption{Models evaluated: 15 checkpoints across nine providers (plus one fail-closed
-drop). The cloud panel and matched-pair flagships are served through OpenRouter; the local
+\caption{Models evaluated: 17 checkpoints across nine providers (plus one fail-closed
+drop). The cloud panel, matched-pair flagships, and open-weight transfer checkpoints are
+served through OpenRouter; the local
 open-weight models are 4-bit MLX community checkpoints run on Apple Silicon.}
 \label{tab:models}
 \end{table}
@@ -531,6 +540,33 @@ contrast, on a hosted proprietary model. Because gpt-4o-mini's option logprobs a
 near-degenerate, its masses saturate; the transferable finding is the direction of the
 contrast, not the exact magnitude.
 
+The crack also transfers to the class of checkpoint a deployer is most likely to start
+from. UK government guidance is explicit that training a frontier model is beyond the
+capacity of most organisations and that fine-tuning an existing model is the cheaper
+route~\cite{ukaiplaybook}, and the UK's sovereign-AI funding programme lists repurposing
+open models with fine-tuning as in scope~\cite{sovereignai}; a starting checkpoint's
+failure modes are therefore part of a deployed system's initial assurance burden, not a
+downstream concern. We ran the complete channel design of \S\ref{sec:crack} as a
+labelled post-hoc follow-up on two frontier open-weight instruct checkpoints served over
+pinned hosted endpoints, Qwen3.5-397B-A17B and DeepSeek-V4-Pro, sampling $S{=}100$ per
+probe-cell (13,200 draws each, both passing the frozen design's completeness gate). The
+pattern transfers. A direct instruction destroys 99.7\% and 100\% of resting protective
+mass respectively; the same content supplied as evidence is less destructive on both,
+with baseline-free channel contrasts in close agreement ($+0.303$ $[+0.087, +0.538]$
+and $+0.315$ $[+0.192, +0.445]$). Guard efficacy is again conditional: the system-role
+guard closes all eight data-only cracks on Qwen but five of eight on DeepSeek, and
+moving a user guard after the payload closes 12/12 combined cracks on Qwen and 10 of 11
+eligible on DeepSeek. DeepSeek sits below the floor at rest on one probe (protective
+mass $0.33$, no payload), which reduces its eligible denominator to eleven and is
+itself the assurance point: the checkpoint ships below a rights floor before any attack.
+Resting floors differ ($0.973$ against $0.810$), so baseline-anchored magnitudes are not
+comparable across the two models; what is comparable is direction, significance, and the
+baseline-free contrast. Six of the eight frozen contrasts agree in sign with intervals
+clear of zero on both models; the two that do not are the two smallest effects on Qwen.
+This is a post-hoc transfer under a sampling estimator, not a preregistered replication,
+and it characterises the pre-adaptation profile only: nothing here shows that a
+fine-tuned derivative keeps it.
+
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{f6_crossfamily.pdf}
 \caption{Looking safe at rest is not being a safe evidence channel. Rights-floor
@@ -648,13 +684,28 @@ disagree. Tracking is demonstrated over a single 2022$\to$2024 interval on
 Bonferroni-significant items. The hosted-model reproduction (gpt-4o-mini) uses a
 hosted, unpinned model reached over an API: it spends provider budget, is not
 byte-reproducible, and can drift under the same name, so we record its model id and run
-date and treat it as an existence proof of transfer, not a stable benchmark cell.
+date and treat it as an existence proof of transfer, not a stable benchmark cell. The
+two open-weight follow-up runs are pinned more tightly but remain hosted: we record the
+exact endpoint, catalogue quantisation, and dated upstream checkpoint, and every
+reported number regenerates from the persisted raw responses, yet neither endpoint is
+byte-reproducible; what we measure is a provider-served instruct endpoint, not weights
+run locally. Protective mass there is a sampled proportion over 100 draws per
+probe-cell, conditional on parseable responses, so crack determinations within a few
+hundredths of the floor sit inside sampling resolution. On Qwen, three of the eight
+frozen contrasts have interval bounds inside the $\pm 0.05$ materiality band, so they
+are confidently nonzero without being confidently material; we report sixteen intervals
+across the two models without multiplicity correction, and the two contrasts that do
+not hold on the second model are the two whose first-model bounds sat inside that band.
+A probe already below the floor at rest cannot be induced to crack and is excluded, so
+DeepSeek is scored over eleven eligible probes and Qwen over twelve; contrasts are
+estimated per model and never pooled.
 
 \paragraph{What we do not claim.}
 We do not claim that a model \emph{should} serve as a democratic policy delegate, that
 class-aware routing is a complete or independently validated governance system, that
-these results establish a cross-national legitimacy benchmark, or that they demonstrate
-social impact in a live deployment. The claim is narrower, and we think more useful for
+these results establish a cross-national legitimacy benchmark, that they demonstrate
+social impact in a live deployment, or that the pre-adaptation profile we measure on an
+open-weight checkpoint is inherited by any model fine-tuned from it. The claim is narrower, and we think more useful for
 assurance: a plausible governance mechanism has a measurable, reproducible failure mode
 that simple prompt- and weight-level fixes do not close.
 

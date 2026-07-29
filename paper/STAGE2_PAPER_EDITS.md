@@ -1,7 +1,16 @@
 # Stage-2 additions to `democracy_bench.tex` — section draft for co-editing
 
-**Status:** DRAFT for Alex to review, not applied to `democracy_bench.tex`. Nothing here has
-been written into the canonical manuscript.
+**Status:** APPLIED 2026-07-29 (compressed). Alex settled the open decisions: abstract gets a
+compressed insertion plus a sentence promoting the DeepSeek resting-floor failure; insertion B
+applied at ~300 words (bimodality, placebo detail, and per-probe listings cut, every
+Codex-required claim retained); sovereign-AI framing kept with verified entries
+`ukaiplaybook` (GDS, Feb 2025) and `sovereignai` (Innovate UK applicant briefing, 15 Aug
+2025) added to `references.bib`; the shallow-alignment cite left out; em dashes used
+sparingly, none added to the insertions. The sovereign-AI citation is worded as "lists
+repurposing open models with fine-tuning as in scope" because the briefing's line is a scope
+example reading "Repurpose of open models with tooling, RL, fine tuning for non-language
+applications". Table 1 gained an open-weight transfer row (15 → 17 checkpoints). The sections
+below are the co-editing draft as it stood before application.
 
 **What this covers:** four insertions, listed with the exact lines they attach to.
 
