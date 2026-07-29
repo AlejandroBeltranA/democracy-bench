@@ -44,6 +44,17 @@ interval, and per-probe protective mass reported in the paper, together with the
 manifests and the frozen design inputs. The prompt/response pair shown verbatim in the
 paper's channel-design figure was read from this store.
 
+## Documentation included
+
+This archive carries the documentation needed to reproduce and audit the results:
+reproduction instructions, data provenance and gate sign-offs, the BSA source notes and
+weighting rule, the floor/contestable classification rule, and the versioned constitution
+artifact. Internal project material — planning documents, phase handoffs, review
+correspondence, editorial drafts and session notes — is not included, since none of it is
+needed to replicate the paper. A few retained documents cross-reference those internal
+files; those references will not resolve here, and nothing in the reported results depends
+on them.
+
 ## Anonymity
 
 This archive is built by a script that scrubs author and repository identifiers and

@@ -50,6 +50,13 @@ IDENTIFIERS = [
      "[event name removed for anonymous review]"),
     (re.compile(r"AI in Government Hackathon\s*\d{0,4}", re.I),
      "[event name removed for anonymous review]"),
+    # Tooling attribution. These are provenance annotations in comments and note
+    # fields ("Decision (Codex/Gate 1): ..."), never program logic. The decision
+    # and its gate are what a replicator needs; which assistant reviewed it is
+    # project history and stays in the repository, not the supplement.
+    (re.compile(r"\bCodex(?:'s|’s)\b", re.I), "the review's"),
+    (re.compile(r"\bCodex\s*/\s*Gate\b", re.I), "Gate"),
+    (re.compile(r"\bCodex\b", re.I), "independent review"),
 ]
 
 # Extensions scrubbed as text. Files with NO extension (LICENSE, CITATION) are
