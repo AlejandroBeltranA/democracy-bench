@@ -18,12 +18,21 @@ been written into the canonical manuscript.
 endpoint snapshot `d9a5d0e061bf222e…`. Both models completed all 13,200 draws and passed the
 completeness gate. Every figure below is read from those artifacts. Nothing is estimated.
 
-> **VOICE CAVEAT — please check this first.** The `cowork_context` hub was not mounted, so
-> `_shared/alex_voice.md` and `references/academic_register.md` were unavailable. The skill says
-> not to draft in your voice from memory, and you were asleep, so rather than stall I derived
-> the register from your own prose in `democracy_bench.tex` (§5.5 and the limitations). That is
-> a primary source rather than recall, but it is not the canonical voice doc. Please re-read
-> against it before anything goes in.
+> **VOICE CHECK (resolved).** I first drafted this from your own prose in `democracy_bench.tex`,
+> because the skill pointed at a `_shared/alex_voice.md` that was not where it said to look. The
+> hub is in fact mounted at `~/Documents/GitHub/cowork_context`, and I have since audited the
+> draft against the canonical doc. The drafted prose passes the Section 11 self-check: no em
+> dashes, none of the banned connectors, no banned management metaphors (`load-bearing`,
+> `carries`, `survives`, `by construction`, `at scale`, `leverage`), no hedge stacking, British
+> spellings, and sentence lengths ranging from four to seventy words. "Robustness" appears only
+> as the name of §5.5, not as the flagged intensifier "robust".
+>
+> **One genuine discrepancy for you to settle.** The voice doc says no em dashes, ever, and calls
+> the ban reliable. Your `democracy_bench.tex` uses `---` throughout, including in passages that
+> read as yours (`3B)---a $>0.45$ spread`). Either those were AI-assisted redrafts, or the ban
+> does not extend to your LaTeX. I have written these insertions without any, which means they
+> will read slightly differently from the surrounding text. Tell me which convention wins and I
+> will make it consistent.
 
 ---
 
@@ -187,9 +196,10 @@ I have not written any of these into the `.bib`, and I have not guessed a key, a
    checkpoint's profile might survive light adaptation. But we did not test that, and citing it
    invites the reader to hear an inheritance claim we explicitly disclaim two sentences later. I
    would leave it out and let the future-work sentence do the job.
-4. **Em dashes.** The skill's editorial rules say none; your `.tex` uses `---` throughout
-   (`3B)---a $>0.45$ spread`). I have avoided them in the drafted prose, which makes it read
-   slightly unlike the surrounding text. Tell me which way to go and I will make it consistent.
+4. **Em dashes — now evidenced, still yours to settle.** The canonical voice doc is unambiguous
+   ("No em dashes, ever") and says a true em dash only ever appeared in an AI-assisted redraft.
+   Your `.tex` nonetheless uses `---` in prose that reads as yours. The insertions are written
+   without any. If the manuscript convention wins, say so and I will add them back.
 5. **Does the resting floor failure deserve its own sentence?** DeepSeek places $0.33$ on
    `pol_protest_ban` with no payload at all, i.e. it ships below the floor on the bank's hardest
    item. For a paper arguing the starting checkpoint carries an assurance burden, that may be a
