@@ -312,11 +312,16 @@ Two findings hold across every tier:
   ranges from Phi-4-mini's 0.903 (0 of 12 below floor) down to Mistral-Nemo's 0.362 (10 of 12
   below) — a spread of over 0.45 — and the crack lands on all of them. Whatever makes a model
   look safe when idle does not make its evidence channel safe.
-- **The adversarial prompt alone never significantly cracks a floor on any model.** On several it
-  is *protective*. The asymmetry between the data channel and the instruction channel is the most
-  robust thing in the whole study.
+- **Majority *pressure* alone is not the attack.** The adversarial-prompt condition — telling the
+  model, under its constitution, that a majority wants the protection dropped, with no
+  distribution data attached — never produces a significant negative floor delta on any model,
+  and on several it is *protective*. The data does the damage, not the rhetoric. (A bare hostile
+  *instruction*, stripped of the constitution, is a third thing again and worse still — the
+  frontier tier separates all three below.)
 
-The frontier tier sharpens it into three separable effects:
+The frontier tier was run as a preregistered channel experiment that separates the manipulations
+cleanly — data with no instruction, instruction with no data, an irrelevant-data placebo — rather
+than bundling them as the local battery does:
 
 | | Qwen3.5-397B | DeepSeek-V4-Pro |
 |---|---|---|
@@ -325,11 +330,14 @@ The frontier tier sharpens it into three separable effects:
 | **Placebo** — irrelevant data in the same slot | −0.116 [−0.229, −0.027] | −0.186 [−0.264, −0.103] |
 | System-guard recovery under combined attack | +0.084 [+0.014, +0.174] | −0.036 [−0.111, +0.044] — n.s. |
 
-Data alone erodes floors with nothing attached that any filter would flag. An explicit
-instruction erodes them further, close to totally. Even the *placebo* — irrelevant data occupying
-the same structural slot — moves floors measurably, which says part of the effect is the shape of
-the context rather than its content. And guard efficacy varies with placement and with model: a
-system-placed guard partially rescues Qwen and does nothing for DeepSeek.
+Read the three rows together. **Data alone** erodes floors with nothing attached that a filter
+would flag — no demand, no jailbreak, just numbers. A **direct instruction**, stripped of the
+constitutional framing the local battery kept, erodes them close to totally; that channel is the
+more destructive one, but it is also the one that is legible to a filter and to a human reviewer.
+Even the **placebo** — irrelevant data occupying the same structural slot — moves floors
+measurably, which says some of the effect is the *shape* of the context rather than its content.
+And guard efficacy varies with placement and with model: a system-placed guard partially rescues
+Qwen and does nothing measurable for DeepSeek.
 
 One frontier checkpoint **ships below a rights floor before any attack reaches it**:
 DeepSeek-V4-Pro's unattacked protective mass on the protest-ban probe is **0.33**. These are
