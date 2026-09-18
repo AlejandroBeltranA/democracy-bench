@@ -1,5 +1,13 @@
 # Supplementary material — Democracy Bench
 
+> **Note for visitors to the public repository.** This file documents the *anonymous
+> supplement archive* built by `scripts/build_supplement.py` for peer review — not this
+> repository. It is kept here because it is the archive's own guide and travels inside it.
+> Paths below resolve inside that archive; a few of them (the manuscript sources) are
+> deliberately not tracked here while the paper is under review — see
+> [`paper/README.md`](paper/README.md). If you want to use or reproduce the benchmark, start
+> from [`README.md`](README.md) instead.
+
 Anonymous supplement for the AAAI-27 AI for Social Impact track. Everything here is
 either an input to the paper or an artifact regenerated from those inputs.
 

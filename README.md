@@ -388,14 +388,12 @@ python3 -m venv .venv && . .venv/bin/activate
 pip install -e '.[dev]'
 ```
 
-### Tier 0 — verify every reported number (free, offline, ~1 minute)
+### Tier 0 — verify every reported number (free, offline)
 
 This is the tier that matters. It rebuilds the results from the committed artifacts and fails
-loudly if any claim and its evidence disagree.
+loudly if any claim and its evidence disagree. No GPU, no key, no survey access.
 
-```bash
-python -m pytest -q
-```
+The two checks that bind the numbers to the evidence take seconds:
 
 ```bash
 python scripts/extract_paper_results.py --out /tmp/extract.json
@@ -408,7 +406,20 @@ python scripts/verify_repro_reference.py
 The extractor regenerates every reported figure from `out/*.json`. The verifier parses the
 commands recorded in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.md) and checks each against the
 `command` field in the corresponding artifact's own run block — so the documented way to
-reproduce a result must match the way it was actually produced. Both run in CI on every push.
+reproduce a result must match the way it was actually produced. It currently resolves 27
+commands: 20 verified against a run block, 7 asserted by the doc for artifacts that predate the
+standardised block. Both checks run in CI on every push.
+
+Then the suite:
+
+```bash
+python -m pytest -q
+```
+
+On a clean `[dev]` install this is a few minutes — that is what CI runs. If you also install the
+`stage2` extra or MLX, it gets substantially slower: the Stage-2 conformance tests parse a 12.8 MB
+tokenizer and do exact-decimal cost accounting over 528 rendered requests, and that dominates the
+wall clock.
 
 Figures rebuild from the same artifacts:
 
@@ -458,7 +469,10 @@ python -m alignment.activation_steering_run \
   --alphas 0 1 2 4 6 8 --out out/_act_steer_scratch.json
 ```
 
-The evidence-conditioning experiments — tracking, the floor crack, the guard grid:
+The evidence-conditioning experiments — tracking, the floor crack, the guard grid. These drive a
+local model, so on the default `--model` they need Apple Silicon; point `--model` at an
+OpenRouter id to run the floor crack against a hosted model instead, which is how the
+gpt-4o-mini result was produced:
 
 ```bash
 python -m alignment.evidcond_run --tracking
