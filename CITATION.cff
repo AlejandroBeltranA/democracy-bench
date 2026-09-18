@@ -7,7 +7,7 @@ authors:
 type: software
 license: MIT
 year: 2026
-repository-code: "https://github.com/PLACEHOLDER/democracy-bench"
+repository-code: "https://github.com/AlejandroBeltranA/democracy-bench"
 abstract: >-
   A survey-grounded evaluation harness that asks, across a ladder of
   alignment levers (context, decode, activation, weights, scaffold), whether

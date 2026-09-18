@@ -16,3 +16,16 @@ _bib.log
 # directory from the kit before building (see README.md).
 aaai2027.sty
 aaai2027.bst
+
+# Manuscript sources — withheld from the public repo while the paper is under
+# double-blind review. The design specs in this directory are NOT manuscript
+# files: the runners read and SHA-256 them at run time, so they stay tracked.
+democracy_bench.tex
+democracy_bench*.tex
+democracy_bench.pdf
+companion.html
+references.bib
+ReproducibilityChecklist.tex
+ReproducibilityChecklist.pdf
+FUTURE_RESEARCH_TRACKS.md
+*.docx

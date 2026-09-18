@@ -52,12 +52,12 @@ listed here controls.
 | Order | Document | What it controls | Current status |
 |---:|---|---|---|
 | 1 | [PROTOCOL_CONSENSUS.md](PROTOCOL_CONSENSUS.md) | Joint triage, verified corrections, experiment priority, terminology, and limitations | Consensus record; later Q1/Q2 documents supply results and amendments |
-| 2 | [Q1_PRIORITY0_DESIGN.md](Q1_PRIORITY0_DESIGN.md) | Frozen local channel-decomposition design, prompts, estimands, orders, and decision rules | **Frozen and completed** |
+| 2 | [Q1_PRIORITY0_DESIGN.md](../paper/Q1_PRIORITY0_DESIGN.md) | Frozen local channel-decomposition design, prompts, estimands, orders, and decision rules | **Frozen and completed** |
 | 3 | [Q1_RESULTS_CONSENSUS.md](Q1_RESULTS_CONSENSUS.md) | Authoritative outcome-table mapping and permitted interpretation | **Sol concurred; controls Q1 claims** |
 | 4 | [Q1_REWRITE_DRAFT.md](Q1_REWRITE_DRAFT.md) | Approved §5.5, §6, abstract, and consistency rewrite with review trail | **Final vote AGREE; applied to manuscript** |
 | 5 | [democracy_bench.tex](democracy_bench.tex) | Current paper prose | Working submission manuscript |
 | 6 | [Q2_STAGE2_HOSTED_DESIGN.md](Q2_STAGE2_HOSTED_DESIGN.md#v72-closure--c1--c4-incorporated--endpoint-snapshot-created-and-bound-fable-2026-07-27-sol-verified) | Frozen 11-cell hosted estimands, historical v5/v6 trail, and current v7.2 amendment | **V7.2 A/F/S approved; bound snapshot verified; pending freeze commit and runner gate** |
-| 7 | [Q2_STAGE2_RUNNER_REVIEW.md](Q2_STAGE2_RUNNER_REVIEW.md) | Audit and implementation requirements R-E1–R-E7 | **Execution gate failed; paid calls objected to** |
+| 7 | [Q2_STAGE2_RUNNER_REVIEW.md](../paper/Q2_STAGE2_RUNNER_REVIEW.md) | Audit and implementation requirements R-E1–R-E7 | **Execution gate failed; paid calls objected to** |
 | 8 | [Q2_STAGE2_FRONTIER_DECISION.md](Q2_STAGE2_FRONTIER_DECISION.md#alex-reconciliation-with-solcodex-review-2026-07-23) | Current sovereign-AI/open-weight direction and reconciled claim boundary | **A/F/S concur; v7.2 operationalizes the direction; execution gate remains open** |
 
 For the frontier decision memo, read the top **CURRENT STATUS** box and the final
@@ -106,11 +106,11 @@ only as an audit trail and are superseded where the reconciliation says so.
 
 | Decision | Disposition | Source |
 |---|---|---|
-| Label Stage 2 as a post-Q1 hosted follow-up | **Frozen** | [Hosted design status](Q2_STAGE2_HOSTED_DESIGN.md) |
+| Label Stage 2 as a post-Q1 hosted follow-up | **Frozen** | [Hosted design status](../paper/Q2_STAGE2_HOSTED_DESIGN.md) |
 | Preserve the complete 11-cell design and eight within-model estimands | **Accepted** | [Hosted cells](Q2_STAGE2_HOSTED_DESIGN.md#cells-per-model-11-cell-minimum-frozen-per-r-h1) |
 | Use sampling as the uniform headline estimator | **Accepted direction**; must be incorporated into v7 | [Frontier reconciliation, Instrument](Q2_STAGE2_FRONTIER_DECISION.md#instrument) |
 | Use endpoint-specific logprobs as the uniform headline | **Rejected** | [Frontier reconciliation, Instrument](Q2_STAGE2_FRONTIER_DECISION.md#instrument) |
-| Run GPT-5.4 as the primary frontier witness | **Superseded** | [Frontier memo current status](Q2_STAGE2_FRONTIER_DECISION.md) |
+| Run GPT-5.4 as the primary frontier witness | **Superseded** | [Frontier memo current status](../paper/Q2_STAGE2_FRONTIER_DECISION.md) |
 | Run a broad four-model cheap/open-weight panel | **Superseded** | [Frontier reconciliation, Panel](Q2_STAGE2_FRONTIER_DECISION.md#panel--two-models-sampling-only) |
 | Run Qwen3.5-397B-A17B primary plus DeepSeek-V4-Pro replication | **Current proposed panel** | [Frontier reconciliation, Panel](Q2_STAGE2_FRONTIER_DECISION.md#panel--two-models-sampling-only) |
 | Run all 11 cells, 12 probes, four orders, 25 draws/order (S=100), per model | **Accepted in principle, conditional on gates and budget** | [Frontier final position](Q2_STAGE2_FRONTIER_DECISION.md#final-sol-position-on-framing) |
@@ -135,7 +135,7 @@ only as an audit trail and are superseded where the reconciliation says so.
 
 ### Designs and decision drafts
 
-- [FLAGSHIP_AIRTIGHT_PRIORITY_PLAN.md](FLAGSHIP_AIRTIGHT_PRIORITY_PLAN.md) — initial
+- [FLAGSHIP_AIRTIGHT_PRIORITY_PLAN.md](../paper/FLAGSHIP_AIRTIGHT_PRIORITY_PLAN.md) — initial
   high-level priority plan that replaced “add more model names” with mechanism
   identification.
 - [PRE_SUBMISSION_REVIEW_PLAN.md](PRE_SUBMISSION_REVIEW_PLAN.md) — original adversarial
@@ -143,15 +143,15 @@ only as an audit trail and are superseded where the reconciliation says so.
   protocol and Q1 result.
 - [PROTOCOL_CONSENSUS.md](PROTOCOL_CONSENSUS.md) — three-way protocol and writing
   corrections.
-- [Q1_PRIORITY0_DESIGN.md](Q1_PRIORITY0_DESIGN.md) — frozen Q1 design.
-- [Q2_STAGE2_HOSTED_DESIGN.md](Q2_STAGE2_HOSTED_DESIGN.md) — hosted v5/v6 design history
+- [Q1_PRIORITY0_DESIGN.md](../paper/Q1_PRIORITY0_DESIGN.md) — frozen Q1 design.
+- [Q2_STAGE2_HOSTED_DESIGN.md](../paper/Q2_STAGE2_HOSTED_DESIGN.md) — hosted v5/v6 design history
   plus the A/F/S-approved v7.2 amendment. Its snapshot is bound and verified; the freeze
   commit and hardened runner gate remain before any call.
-- [Q2_STAGE2_FRONTIER_DECISION.md](Q2_STAGE2_FRONTIER_DECISION.md) — GPT-5.4 proposal,
+- [Q2_STAGE2_FRONTIER_DECISION.md](../paper/Q2_STAGE2_FRONTIER_DECISION.md) — GPT-5.4 proposal,
   capability review, open-weight redirection, sovereign-AI debate, and final
   reconciliation. Historical text is intentionally retained, so use its final
   reconciliation rather than isolated earlier paragraphs.
-- [Q2_STAGE2_RUNNER_REVIEW.md](Q2_STAGE2_RUNNER_REVIEW.md) — implementation review and
+- [Q2_STAGE2_RUNNER_REVIEW.md](../paper/Q2_STAGE2_RUNNER_REVIEW.md) — implementation review and
   hard execution blockers.
 
 ### Evidence maps and artifacts
@@ -169,7 +169,7 @@ only as an audit trail and are superseded where the reconciliation says so.
   pre-Q1 empirical arc, but **not controlling for Q1**. It still contains stale pre-Q1
   statements (including “blinded” coding and the old evidence-channel narrative), so Q1
   consensus and the current manuscript override it until it is regenerated.
-- [AAAI_SUBMISSION_READINESS_REVIEW.md](../docs/AAAI_SUBMISSION_READINESS_REVIEW.md) —
+- [AAAI_SUBMISSION_READINESS_REVIEW.md](AAAI_SUBMISSION_READINESS_REVIEW.md) —
   pre-Q1 submission audit. Its supplement-packaging warnings remain useful; its scientific
   contribution assessment predates Q1 and must not override the Q1 reframing.
 
@@ -226,7 +226,7 @@ only as an audit trail and are superseded where the reconciliation says so.
    against primary sources.
 5. Render and visually inspect the final paper and checklist, then rebuild the anonymous
    supplement from the strict allowlist described in
-   [AAAI_SUBMISSION_READINESS_REVIEW.md](../docs/AAAI_SUBMISSION_READINESS_REVIEW.md).
+   [AAAI_SUBMISSION_READINESS_REVIEW.md](AAAI_SUBMISSION_READINESS_REVIEW.md).
 
 ## Compact handoff
 
