@@ -9,6 +9,12 @@ name: CI
 # No MLX anywhere: the runners are Linux (no Apple Silicon). Every mlx import in
 # the codebase is lazy (inside driver main()), so collection and these read-only
 # checks never touch it. No secrets are used by any step.
+#
+# The install pulls the `stage2` and `figures` extras, not just `dev`. They are
+# optional for *using* the benchmark but not for testing it: the Q2 Stage-2 study
+# runner needs tokenizers + jinja2 at run time to render and price requests, and
+# tests/test_q2_v7_study_run.py drives that runner rather than stubbing it, so
+# without the extra its fixtures fail at `run.main("walk")` instead of skipping.
 
 on:
   push:
@@ -39,10 +45,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install package + dev extra
+      - name: Install package + dev, stage2 and figures extras
         run: |
           python -m pip install --upgrade pip
-          pip install -e '.[dev]'
+          pip install -e '.[dev,stage2,figures]'
       - name: Run test suite
         run: python -m pytest -q
 
@@ -56,10 +62,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install package + dev extra
+      - name: Install package + dev, stage2 and figures extras
         run: |
           python -m pip install --upgrade pip
-          pip install -e '.[dev]'
+          pip install -e '.[dev,stage2,figures]'
       - name: Extract paper results (pure extraction, no model runs)
         run: python scripts/extract_paper_results.py --out /tmp/extract.json
       - name: Verify reproduction reference against committed artifacts
