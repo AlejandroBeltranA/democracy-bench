@@ -421,13 +421,9 @@ the Stage-2 conformance tests drive the real study runner, parsing a 12.8 MB tok
 exact-decimal cost accounting over 528 rendered requests, and that dominates the wall clock (21
 minutes on my machine, with MLX installed too).
 
-If you install only `[dev]`, the Stage-2 tests will **fail rather than skip** — they need
-`tokenizers` and `jinja2` at run time and are not guarded. Install the extra, which is what CI
-does on both Python 3.10 and 3.12:
-
-```bash
-pip install -e '.[dev,stage2,figures]'
-```
+Install the `stage2` extra as shown above, not bare `[dev]`. The Stage-2 tests drive the real
+study runner rather than stubbing it, so without `tokenizers` and `jinja2` they **fail rather
+than skip**. CI installs the same set on Python 3.10 and 3.12.
 
 Figures rebuild from the same artifacts:
 
