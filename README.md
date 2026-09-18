@@ -385,7 +385,7 @@ survey access — and it checks every number in the results.
 git clone https://github.com/AlejandroBeltranA/democracy-bench.git
 cd democracy-bench
 python3 -m venv .venv && . .venv/bin/activate
-pip install -e '.[dev]'
+pip install -e '.[dev,stage2,figures]'
 ```
 
 ### Tier 0 — verify every reported number (free, offline)
@@ -416,11 +416,18 @@ Then the suite:
 python -m pytest -q
 ```
 
-1,481 tests, all local — no API keys, no model weights, no network. On a clean `[dev]` install
-this is a few minutes, and that is what CI runs on Python 3.10 and 3.12. If you also install the
-`stage2` extra or MLX it gets much slower — 21 minutes on my machine — because the Stage-2
-conformance tests parse a 12.8 MB tokenizer and do exact-decimal cost accounting over 528
-rendered requests, and that dominates the wall clock.
+1,481 tests, all local — no API keys, no model weights, no network. Expect it to take a while:
+the Stage-2 conformance tests drive the real study runner, parsing a 12.8 MB tokenizer and doing
+exact-decimal cost accounting over 528 rendered requests, and that dominates the wall clock (21
+minutes on my machine, with MLX installed too).
+
+If you install only `[dev]`, the Stage-2 tests will **fail rather than skip** — they need
+`tokenizers` and `jinja2` at run time and are not guarded. Install the extra, which is what CI
+does on both Python 3.10 and 3.12:
+
+```bash
+pip install -e '.[dev,stage2,figures]'
+```
 
 Figures rebuild from the same artifacts:
 
