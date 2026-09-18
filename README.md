@@ -416,10 +416,11 @@ Then the suite:
 python -m pytest -q
 ```
 
-On a clean `[dev]` install this is a few minutes — that is what CI runs. If you also install the
-`stage2` extra or MLX, it gets substantially slower: the Stage-2 conformance tests parse a 12.8 MB
-tokenizer and do exact-decimal cost accounting over 528 rendered requests, and that dominates the
-wall clock.
+1,481 tests, all local — no API keys, no model weights, no network. On a clean `[dev]` install
+this is a few minutes, and that is what CI runs on Python 3.10 and 3.12. If you also install the
+`stage2` extra or MLX it gets much slower — 21 minutes on my machine — because the Stage-2
+conformance tests parse a 12.8 MB tokenizer and do exact-decimal cost accounting over 528
+rendered requests, and that dominates the wall clock.
 
 Figures rebuild from the same artifacts:
 
