@@ -249,10 +249,15 @@ Two further layers of discipline sit on top.
 
 ## What it finds
 
-Every number below comes out of a committed artefact via `scripts/extract_paper_results.py`. The
-full claim-to-evidence map, with artefact paths, JSON key paths and originating commits, sits in
-[`docs/PAPER_RESULTS.md`](docs/PAPER_RESULTS.md). It includes a section titled *"Numbers the
-paper must NOT claim"*, which is where an audit should start.
+Every number below comes out of a committed artefact. Two extraction paths produce them. The
+local and cross-family arc, plus the gpt-4o-mini crack, regenerates through
+`scripts/extract_paper_results.py`, and the full claim-to-evidence map, with artefact paths,
+JSON key paths and originating commits, sits in
+[`docs/PAPER_RESULTS.md`](docs/PAPER_RESULTS.md). That document includes a section titled
+*"Numbers the paper must NOT claim"*, which is where an audit should start. The frontier tier
+(Qwen3.5-397B and DeepSeek-V4-Pro) runs through its own frozen extractor,
+`src/alignment/q2_v7/study_extract.py`, into `out/q2_stage2_v7_run_panel/extract_*.json`, each
+carrying the `manifest_sha256` of the run it came from.
 
 ### 1. Prompting is not representation
 
