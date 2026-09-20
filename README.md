@@ -24,7 +24,7 @@ hold a rights floor when a majority, real or forged, pushes against it.
 > attack surface. Feeding a model survey-shaped data — with no instruction attached, no
 > jailbreak, nothing a content filter would catch — collapses its rights floors. It replicates
 > on every one of the nine models tested, across seven families and three deployment tiers,
-> from a 3B laptop checkpoint to a 397B frontier model. Every guard I could prompt or fine-tune
+> from a 3B laptop checkpoint to a 397B frontier model. Every guard we could prompt or fine-tune
 > into the channel failed; the one that remains is architectural — never route public-opinion
 > evidence to a rights question in the first place, so the attack cannot land by construction.
 
@@ -106,8 +106,8 @@ The classification rule is written down in [`data/ITEM_CLASSIFICATION.md`](data/
 and signed off item by item in [`data/floor_review_signoff.json`](data/floor_review_signoff.json).
 It is a **stated, revisable normative choice**, not a claim of objectivity — a deployer with a
 different constitutional settlement can relabel the bank and rerun. The honest weakness, stated
-in the paper's limitations too, is that the review was done by me rather than by independent
-annotators.
+in the paper's limitations too, is that the review was carried out by the authors rather than by
+independent annotators.
 
 ### Seven prompt modes
 
@@ -250,7 +250,7 @@ Two further layers of discipline sit on top:
 Every number below comes out of a committed artifact via `scripts/extract_paper_results.py`. The
 full claim-to-evidence map, with artifact paths, JSON key paths and originating commits, is
 [`docs/PAPER_RESULTS.md`](docs/PAPER_RESULTS.md) — including a section titled *"Numbers the
-paper must NOT claim"*, which is the one I would read first if I were auditing this.
+paper must NOT claim"*, which is where an audit should start.
 
 ### 1. Prompting is not representation
 
@@ -275,8 +275,8 @@ Change **only the evidence year** in the prompt — 2022 figures versus 2024 fig
 distributions — and the model moves along the public's real shift. Direction match **8 of 10**
 items; mean tracking elasticity **+0.395**, CI **[+0.020, +0.811]**.
 
-Read that honestly: the CI *barely* clears zero. The robust claim is **direction plus a positive
-elasticity**, not a magnitude near 0.4. The two misses are exactly the items where the real shift
+The CI barely clears zero, and the claim should not be rounded up. What is robust is the
+**direction** and a **positive** elasticity, not a magnitude near 0.4. The two misses are exactly the items where the real shift
 runs against the model's prior.
 
 ### 4. And that same channel cracks every rights floor
@@ -356,7 +356,7 @@ precisely the open-weight checkpoints that sovereign-AI programmes propose to ta
   sit at ≈0.55. Which prior you deploy is a procurement decision, and nobody is currently
   treating it as one.
 
-### 7. So what do you actually do about it
+### 7. The remedy, and what it does not fix
 
 Since floor safety cannot be prompted into the evidence channel (the guards fail) and cannot be
 fine-tuned in without lobotomising the model (the LoRA fails), the remaining guard is
@@ -390,8 +390,8 @@ pip install -e '.[dev,stage2,figures]'
 
 ### Tier 0 — verify every reported number (free, offline)
 
-This is the tier that matters. It rebuilds the results from the committed artifacts and fails
-loudly if any claim and its evidence disagree. No GPU, no key, no survey access.
+This tier rebuilds the results from the committed artifacts and fails loudly if any claim and its
+evidence disagree. No GPU, no key, no survey access.
 
 The two checks that bind the numbers to the evidence take seconds:
 
@@ -419,7 +419,7 @@ python -m pytest -q
 1,481 tests, all local — no API keys, no model weights, no network. Expect it to take a while:
 the Stage-2 conformance tests drive the real study runner, parsing a 12.8 MB tokenizer and doing
 exact-decimal cost accounting over 528 rendered requests, and that dominates the wall clock (21
-minutes on my machine, with MLX installed too).
+minutes on Apple Silicon with MLX installed as well).
 
 Install the `stage2` extra as shown above, not bare `[dev]`. The Stage-2 tests drive the real
 study runner rather than stubbing it, so without `tokenizers` and `jinja2` they **fail rather
@@ -574,16 +574,16 @@ democracy-bench/
 A note on [`worklog/`](worklog/): it is the project's build record — plans, session logs,
 adversarial reviews, editorial drafts — kept public on purpose. Nothing in it is a finding, and
 some of it is superseded. It is there because a benchmark's claims are easier to trust when you
-can see which hypotheses died, and because this was built with heavy AI assistance that I would
-rather show than launder. Its README explains both.
+can see which hypotheses died, and because this was built with heavy AI assistance that is
+better shown than laundered. Its README explains both.
 
 ### The paper
 
 A manuscript is under review at **AAAI-27** (AI for Social Impact track). It is **withheld from
 this repo while review is ongoing** — publishing an anonymised submission from a repository under
-my own name would defeat the anonymity it was submitted under. Everything it reports is here and
-checkable without it, via `docs/PAPER_RESULTS.md` and the extractor. I will add it, or a preprint
-link, once the review concludes.
+the author's own name would defeat the anonymity it was submitted under. Everything it reports is
+here and checkable without it, via `docs/PAPER_RESULTS.md` and the extractor. The manuscript, or a
+preprint link, goes up once the review concludes.
 
 ### Legacy: the WVS layer
 
@@ -604,8 +604,9 @@ citations — **never the survey microdata itself**. BSA microdata comes from th
 under its own licence; WVS from GESIS. Full provenance and redistribution policy in
 [`DATA.md`](DATA.md).
 
-To cite the software, see [`CITATION.cff`](CITATION.cff). If you use it in published work I would
-like to know — and if you disagree with the floor/contestable classification, relabel the bank
-and tell me what changes. That the rule is explicit and revisable is the point of writing it down.
+To cite the software, see [`CITATION.cff`](CITATION.cff). If you use it in published work, we would
+like to hear about it — and if you disagree with the floor/contestable classification, relabel the
+bank and report what changes. That the rule is explicit and revisable is the point of writing it
+down.
 
 **Alejandro Beltran** · [beltranalejandro.com](https://www.beltranalejandro.com/)

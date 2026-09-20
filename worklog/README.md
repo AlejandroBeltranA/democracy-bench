@@ -2,7 +2,7 @@
 
 This folder is the project's build record: planning documents, phase handoffs, adversarial
 reviews, session logs, editorial drafts, and the pitch material from the hackathon weekend
-this started as. I have kept it in the open repo deliberately.
+this started as. It is kept in the open repo deliberately.
 
 **Read this first, before you read anything in here:**
 
@@ -28,8 +28,8 @@ original result was a real, large, in-sample improvement, and the documents here
 moment it was killed by a held-out test and re-explained as a generic persona axis. A repo that
 only ships the surviving claims hides that the survivors were selected.
 
-The second is that this was built with heavy AI assistance, and I would rather show that than
-launder it. Anthropic's Claude and OpenAI's Codex both appear in these documents as named
+The second is that this was built with heavy AI assistance, and that is better shown than
+laundered. Anthropic's Claude and OpenAI's Codex both appear in these documents as named
 reviewers of designs and code, and several of the adversarial reviews that changed the paper
 were theirs. The discipline that makes that trustworthy is not the model — it is the gates:
 fail-closed elicitation, held-out tests, preregistered channel design, a fail-loud extractor

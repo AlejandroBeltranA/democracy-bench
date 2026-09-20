@@ -30,7 +30,7 @@ The rest are the requirement sources that the conformance tests cite by requirem
 The AAAI-27 manuscript (`democracy_bench.tex`, its PDF, the bibliography, the reproducibility
 checklist and the HTML companion) is **withheld from the public repo while the paper is under
 double-blind review**, and is git-ignored here. Publishing an anonymised submission from a
-repository under my own name would defeat the anonymity it is submitted under.
+repository under the author's own name would defeat the anonymity it is submitted under.
 
 Everything the manuscript reports is still here and still checkable without it:
 
@@ -39,4 +39,4 @@ Everything the manuscript reports is still here and still checkable without it:
 - [`docs/REPRODUCTION.md`](../docs/REPRODUCTION.md) — the verbatim command behind each artifact.
 - `out/figures/` — the figures, regenerable by `python scripts/make_paper_figures.py`.
 
-I will add the manuscript, or a link to the preprint, once the review concludes.
+The manuscript, or a link to the preprint, goes up once the review concludes.
