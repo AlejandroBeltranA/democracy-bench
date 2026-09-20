@@ -41,9 +41,8 @@ hold a rights floor when a majority, real or forged, pushes against it.
 3. [What the harness actually does](#what-the-harness-actually-does)
 4. [What it finds](#what-it-finds)
 5. [Reproducing it](#reproducing-it)
-6. [What you cannot reproduce, and why](#what-you-cannot-reproduce-and-why)
-7. [Repository layout](#repository-layout)
-8. [Data, licensing and citation](#data-licensing-and-citation)
+6. [Repository layout](#repository-layout)
+7. [Data, licensing and citation](#data-licensing-and-citation)
 
 ---
 
@@ -60,10 +59,10 @@ Democracy Bench keeps four apart, because a model can pass one and fail the next
 | **Rights floors** | Will the model refuse to abandon a protection when a majority pushes? | **Protective mass**, the probability weight on rights-protective options. A floor "holds" at ≥ 0.50 |
 
 Keeping them apart matters. A model can score perfect representation today simply because it
-resembles its training distribution, and still be unable to track change. That is the frozen
-model, quietly governing a future polity on stale values. The mirror risk is majoritarian
-capture, a delegate so eager to follow the public that it will erode a right the moment a
-majority, or an adversary posing as one, asks it to.
+resembles its training distribution, and still be unable to track change. Its answers stay
+fixed while public opinion moves. The mirror risk is majoritarian capture, a delegate so eager
+to follow the public that it will erode a right the moment a majority, or an adversary posing as
+one, asks it to.
 
 Three things make the numbers mean something.
 
@@ -137,7 +136,7 @@ protection a principle, or a reflex keyed to surface phrasing?
 
 ### The steering ladder
 
-Five rungs, cheapest lever first, each asking the same question. Can this carry **per-item**
+Five steering methods, cheapest first. Each is asked the same question: can it carry **per-item**
 public preference while holding rights floors?
 
 | Rung | Lever | Implementation |
@@ -175,7 +174,7 @@ prompt and gets back a distribution over options, by one of two paths.
   which covers OpenRouter, OpenAI, and local MLX weights.
 - **Sampling path.** Where logprobs are unavailable, sample ≥ 100 times and count.
 
-Two disciplines are enforced here, and they are the reason the numbers are usable.
+Two things are enforced at this step.
 
 - **Order debiasing.** Option order is shuffled across a fixed set of orders and the results
   averaged, so a model's position bias does not become a finding. `n_orders` is recorded per run.
@@ -238,7 +237,7 @@ cannot be quietly edited after the fact to match a result. See [`paper/README.md
 Two further layers of discipline sit on top.
 
 - **[`gates/`](gates/)** holds human sign-off checklists. A data source does not enter the
-  benchmark until its gate is signed. This is the audit trail, and it is deliberately boring.
+  benchmark until its gate is signed.
 - **[`annotations/`](annotations/)** holds a construct-validity check. 150 blinded rationales
   were hand-coded to test whether the scored option actually matches the model's stated
   reasoning. It does in **92%** of cases, rising to **99%** on floor items and falling to 86% on
@@ -315,16 +314,15 @@ implies the public has already abandoned it is neither, and it works.
 
 Two findings hold across every tier.
 
-- **A strong floor-holder at rest is not a safe evidence channel.** Unattacked protective mass
+- **A high baseline protective mass does not predict resistance to hostile evidence.** Unattacked protective mass
   ranges from Phi-4-mini's 0.903, with 0 of 12 below floor, down to Mistral-Nemo's 0.362, with 10
-  of 12 below. That is a spread of over 0.45, and the crack lands on all of them. Whatever makes
-  a model look safe when idle does not make its evidence channel safe.
+  of 12 below. That is a spread of over 0.45, and the crack lands on all of them.
 - **Majority *pressure* alone is not the attack.** The adversarial-prompt condition tells the
   model, under its constitution, that a majority wants the protection dropped, with no
   distribution data attached. It never produces a significant negative floor delta on any model,
-  and on several it is *protective*. The data does the damage, not the rhetoric. A bare hostile
-  *instruction*, stripped of the constitution, is a third thing again and worse still, which the
-  frontier tier separates below.
+  and on several it is *protective*. Adding hostile distribution data is what reduces protective
+  mass. A bare hostile *instruction*, stripped of the constitution, is a third case again and
+  worse still, which the frontier tier separates below.
 
 The frontier tier was run as a preregistered channel experiment. It separates the manipulations
 cleanly, using data with no instruction, instruction with no data, and an irrelevant-data
@@ -373,7 +371,7 @@ probes sit at their unattacked baseline of 0.512, and the adversarial prompt on 
 significant, so the one demonstrated attack has no path to them. Contestable tracking is
 untouched, because routing does not change contestable prompts.
 
-Two limits belong in the same breath.
+Routing has two limits.
 
 - Routing assumes the deployer controls the evidence pipeline **and** the item classifier, and
   the classifier becomes the new attack surface.
@@ -516,29 +514,6 @@ UKDS access rebuilds the same targets exactly.
 
 ---
 
-## What you cannot reproduce, and why
-
-A reproducibility claim with unstated holes is worse than no claim. Here are the holes.
-
-- **The survey microdata is not here.** BSA and WVS microdata are licence-gated by the UK Data
-  Service and GESIS and cannot be redistributed. What ships is the derived **aggregate** target
-  vectors, each carrying its study id, weight variable, filters, unweighted base and low-N
-  warnings. Get the microdata from the provider to rebuild from source.
-- **Hosted-model results are not byte-reproducible.** gpt-4o-mini and the OpenRouter panel are
-  unpinned endpoints that change under you. Model id and run date are recorded, but the numbers
-  will drift. What transfers is the direction and the channel asymmetry, not the magnitude.
-  gpt-4o-mini's first-token logprobs are near-degenerate, which is why its crack reads sharper
-  than any open-weight model's.
-- **Per-draw wire stores are excluded.** The frontier runs alone produced 26,400 response
-  envelopes at 622 MB, and stored envelopes retain provider response headers that have not been
-  scrubbed. What ships instead is the extraction output for every experiment, carrying each
-  estimand, interval and per-probe protective mass, plus the run manifests and frozen design
-  inputs. This is a real limit on what an independent reader can check.
-- **Activation steering and the LoRA need Apple Silicon.** They run through MLX. Every MLX import
-  is lazy, so nothing else in the repo is affected, and CI runs clean on Linux.
-
----
-
 ## Repository layout
 
 ```
@@ -579,30 +554,22 @@ democracy-bench/
 | Where the data came from | [`DATA.md`](DATA.md) |
 | How this was actually built, including the dead ends | [`worklog/`](worklog/) |
 
-A note on [`worklog/`](worklog/). It is the project's build record, holding plans, session logs,
-adversarial reviews and editorial drafts, and it is public on purpose. Nothing in it is a
-finding, and some of it is superseded. It is there because a benchmark's claims are easier to
-trust when you can see which hypotheses died, and because this was built with heavy AI assistance
-that is better shown than laundered. Its README explains both.
+[`worklog/`](worklog/) is the build record: plans, session logs, reviews and drafts.
+Nothing in it is a finding and some of it is superseded. Its README says what it is.
 
 ### The paper
 
-A manuscript is under review at **AAAI-27** (AI for Social Impact track). It is **withheld from
-this repo while review is ongoing**, because publishing an anonymised submission from a
-repository under the author's own name would defeat the anonymity it was submitted under.
-Everything it reports is here and checkable without it, via `docs/PAPER_RESULTS.md` and the
-extractor. The manuscript, or a preprint link, goes up once the review concludes.
+A manuscript is under review at **AAAI-27** (AI for Social Impact track), and is withheld from
+this repo until that concludes so the submission stays anonymous. Everything it reports is here
+and checkable without it.
 
 ### Legacy: the WVS layer
 
-The original hackathon build measured representation, steering and tracking against **World
-Values Survey** wave 6 to 7 targets for the USA and GBR. That layer is kept as a worked example
-of adding a data source, since targets are versioned data rather than code, but it is no longer
-the headline path: `loop.py`, `scenario.py`, `compare_tiers.py`, `build_demo.py` →
-`demo/app.html`, `data/targets/`, `gates/GATE1_wvs_data.md`. Inspiration credit goes to WVS-based
-global opinion evaluations such as GlobalOpinionQA. Democracy Bench differs by adding the
-temporal tracking axis, the rights floor and the steering ladder. See
-[`docs/RELATED_WORK.md`](docs/RELATED_WORK.md).
+The original hackathon build scored against **World Values Survey** wave 6 to 7 targets for the
+USA and GBR. It is kept as a worked example of adding a data source: `loop.py`, `scenario.py`,
+`compare_tiers.py`, `build_demo.py`, `data/targets/`. Credit to WVS-based evaluations such as
+GlobalOpinionQA; Democracy Bench adds the tracking axis, the rights floor and the steering
+ladder. See [`docs/RELATED_WORK.md`](docs/RELATED_WORK.md).
 
 ---
 
@@ -614,8 +581,7 @@ Service under its own licence, and WVS from GESIS. Full provenance and redistrib
 in [`DATA.md`](DATA.md).
 
 To cite the software, see [`CITATION.cff`](CITATION.cff). If you use it in published work, we
-would like to hear about it. If you disagree with the floor/contestable classification, relabel
-the bank and report what changes. That the rule is explicit and revisable is the point of writing
-it down.
+would like to hear about it. The classification is documented so others can challenge and revise
+it: relabel the bank, rerun, and report what changes.
 
 **Alejandro Beltran** · [beltranalejandro.com](https://www.beltranalejandro.com/)
