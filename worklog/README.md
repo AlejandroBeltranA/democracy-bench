@@ -1,4 +1,4 @@
-# Worklog — the working record, not the documentation
+# Worklog: the working record, not the documentation
 
 This folder is the project's build record: planning documents, phase handoffs, adversarial
 reviews, session logs, editorial drafts, and the pitch material from the hackathon weekend
@@ -7,7 +7,7 @@ this started as. It is kept in the open repo deliberately.
 **Read this first, before you read anything in here:**
 
 - **Nothing in this folder is a finding.** These are point-in-time documents. Several were
-  written *before* the runs they plan, and some of what they predict turned out to be wrong —
+  written *before* the runs they plan, and some of what they predict turned out to be wrong,
   which is the point of keeping them. A few contain unfilled placeholders (`[X]×`, "pending")
   from before the numbers landed.
 - **The findings live elsewhere.** For results, read [`docs/PAPER_RESULTS.md`](../docs/PAPER_RESULTS.md),
@@ -31,9 +31,9 @@ only ships the surviving claims hides that the survivors were selected.
 The second is that this was built with heavy AI assistance, and that is better shown than
 laundered. Anthropic's Claude and OpenAI's Codex both appear in these documents as named
 reviewers of designs and code, and several of the adversarial reviews that changed the paper
-were theirs. The discipline that makes that trustworthy is not the model — it is the gates:
+were theirs. The discipline that makes that trustworthy is not the model. It is the gates:
 fail-closed elicitation, held-out tests, preregistered channel design, a fail-loud extractor
-binding every reported number to a committed artifact, and human sign-off checklists in
+binding every reported number to a committed artefact, and human sign-off checklists in
 [`gates/`](../gates/). Those are what you should audit. The working notes just show them being
 applied.
 
@@ -49,5 +49,5 @@ applied.
 | Editorial drafts | `DECISION_AND_DRAFT_INDEX.md`, `Q1_REWRITE_DRAFT.md` |
 
 Design documents that the code actually depends on are **not** here. Those live in
-[`paper/`](../paper/), because the runners read them and hash them into every run manifest —
-see that folder's README.
+[`paper/`](../paper/), because the runners read them and hash them into every run manifest.
+See that folder's README.
