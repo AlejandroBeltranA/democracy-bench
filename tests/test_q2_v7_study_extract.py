@@ -211,8 +211,12 @@ def _response(text, *, kind=None, cost=1e-7):
 
 def put_draw(store, *, cell_id, probe_id, order_idx, draw_index, text,
              kind=None, model=MODEL, provider=PROVIDER, stage="study",
-             identity_spelling="ledger", cost=1e-7):
-    """Persist one synthetic draw (envelope + linked derived record) into `store`."""
+             identity_spelling="ledger", cost=1e-7, write_derived=True):
+    """Persist one synthetic draw (envelope + linked derived record) into `store`.
+
+    `write_derived=False` persists the envelope ONLY, so a caller can write its own
+    `DerivedRecord` (see `put_draw_with_failures`) over any response-body `kind`.
+    """
     sha = request_sha(cell_id, probe_id, order_idx)
     body, headers, status = _response(text, kind=kind, cost=cost)
     env = LG.build_envelope(
@@ -224,7 +228,7 @@ def put_draw(store, *, cell_id, probe_id, order_idx, draw_index, text,
     if identity_spelling == "identity":
         env = replace(env, draw_id=ID.draw_id(sha, draw_index))
     store.put(env)
-    if kind != "no_derived":
+    if write_derived and kind != "no_derived":
         failures = () if kind is None else (f"synthetic_{kind}",)
         LG.record_validation(store, env, valid=(kind is None), failures=failures,
                              timestamp=TS)
@@ -580,6 +584,182 @@ def test_exclusions_do_not_change_the_estimands_of_the_remaining_draws():
     # draws (all of them excluded here) and probe_02 has 7 (five excluded, two admitted).
     assert res.protective_mass[DATA][PROBES[0]] == pytest.approx(0.0)
     assert res.protective_mass[DATA][PROBES[2]] == pytest.approx(2 / 20)
+
+
+# =======================================================================================
+# 3b. A storage-side attempt-store collision is not evidence about the model's answer
+# =======================================================================================
+#
+# A full run that halts (R-E2) and is later resumed can re-send a coordinate's draw whose
+# TERMINAL study record was never written and allocate an ATTEMPT index a persisted attempt
+# record from the halted process already holds. The wire reply is genuine and its study
+# envelope IS persisted; only the duplicate ATTEMPT record is refused (R-E5/S-F6), and the
+# runner writes `valid: false` with an `EnvelopeExistsError:` failure. Validity must come
+# from the wire evidence, not from that bookkeeping refusal.
+
+STORAGE_FAILURE = (
+    "EnvelopeExistsError:raw envelope "
+    "1462897eb2d2c80e7fe8879cb2ef2504942771e02a7ed30a2760829a239e0366#draw1050 already "
+    "exists at /run/study_attempts/raw/…__draw1050.json — refusing to overwrite an "
+    "immutable audit record (R-E5/S-F6). There is no --force.")
+
+
+def put_draw_with_failures(store, *, failures, valid=False, excluded=None, kind=None,
+                           **kwargs):
+    """One synthetic draw whose DERIVED record carries exactly `failures`.
+
+    `kind` shapes the RESPONSE BODY exactly as in `put_draw` (the derived record is written
+    here either way), so a wire-level defect and a storage-side failure can co-occur.
+    """
+    env = put_draw(store, kind=kind, write_derived=False, **kwargs)
+    store.put_derived(LG.DerivedRecord(
+        draw_id=env.draw_id, raw_sha256=env.content_sha256(), valid=valid,
+        failures=tuple(failures),
+        excluded_from_estimands=(not valid) if excluded is None else excluded,
+        booked_cost_usd=float(env.cost_usd or 0.0), timestamp=TS))
+    return env
+
+
+def test_a_storage_collision_alone_is_revalidated_from_the_wire_evidence(tmp_path):
+    store = LG.EnvelopeStore(tmp_path / "run")
+    env = put_draw_with_failures(store, failures=(STORAGE_FAILURE,), cell_id=DATA,
+                                 probe_id=PROBES[0], order_idx=0, draw_index=0,
+                                 text=reply_for(3, 0))
+    ext = SX.extract_draws(store, probe_ids=PROBES, model=MODEL, manifest=manifest_body())
+
+    record = ext.records[0]
+    assert record.excluded is False
+    assert record.exclusion_reasons == ()
+    expected = SX.parse_reply(reply_for(3, 0)).index         # the display position
+    assert record.choice == expected                         # parseable, and it counts
+    assert record.storage_collision_revalidated is True
+    assert ext.admitted == (record,)
+    assert ext.draws[0].choice == expected
+    assert ext.parse_summary()["n_parsed"] == 1
+    assert ext.parse_summary()["n_excluded"] == 0
+
+    audit = ext.as_audit()
+    assert audit["n_storage_collision_revalidated"] == 1
+    assert audit["storage_collision_revalidated_draw_ids"] == [env.draw_id]
+    assert ext.storage_collision_revalidated_draw_ids == (env.draw_id,)
+
+
+def test_a_storage_collision_beside_a_real_wire_failure_stays_invalid(tmp_path):
+    """The 2-of-26 case in the real Panel B2 run: a genuine HTTP-200 error body."""
+    store = LG.EnvelopeStore(tmp_path / "run")
+    put_draw_with_failures(
+        store, failures=(STORAGE_FAILURE, "parse:empty", "audit:missing_openrouter_metadata",
+                         "reasoning:missing_usage"),
+        cell_id=DATA, probe_id=PROBES[0], order_idx=0, draw_index=0, text=reply_for(3, 0))
+    ext = SX.extract_draws(store, probe_ids=PROBES, model=MODEL, manifest=manifest_body())
+
+    record = ext.records[0]
+    assert record.excluded is True
+    assert record.choice is None
+    assert record.storage_collision_revalidated is False
+    assert "derived_invalid" in record.exclusion_reasons
+    assert "derived_excluded" in record.exclusion_reasons
+    assert f"derived_failure:{STORAGE_FAILURE}" in record.exclusion_reasons
+    assert "derived_failure:parse:empty" in record.exclusion_reasons
+    assert ext.storage_collision_revalidated_draw_ids == ()
+    assert "n_storage_collision_revalidated" not in ext.as_audit()
+
+
+def test_a_revalidated_draw_is_still_judged_by_every_wire_rule(tmp_path):
+    """Setting the storage failure aside never admits a draw the wire rules exclude."""
+    store = LG.EnvelopeStore(tmp_path / "run")
+    for i, kind in enumerate(("reasoning", "cache", "http")):
+        put_draw_with_failures(store, failures=(STORAGE_FAILURE,), cell_id=DATA,
+                               probe_id=PROBES[0], order_idx=0, draw_index=i,
+                               text=reply_for(3, 0), kind=kind)
+    ext = SX.extract_draws(store, probe_ids=PROBES, model=MODEL, manifest=manifest_body())
+    assert len(ext.excluded) == 3
+    assert ext.storage_collision_revalidated_draw_ids == ()
+    assert all(r.choice is None for r in ext.records)
+
+
+def test_a_record_with_no_failures_is_unaffected_and_the_audit_fields_are_absent(tmp_path):
+    store = LG.EnvelopeStore(tmp_path / "run")
+    put_draw(store, cell_id=DATA, probe_id=PROBES[0], order_idx=0, draw_index=0,
+             text=reply_for(3, 0))
+    ext = SX.extract_draws(store, probe_ids=PROBES, model=MODEL, manifest=manifest_body())
+    assert ext.records[0].excluded is False
+    assert ext.records[0].storage_collision_revalidated is False
+    assert ext.storage_collision_revalidated_draw_ids == ()
+    audit = ext.as_audit()
+    assert "n_storage_collision_revalidated" not in audit
+    assert "storage_collision_revalidated_draw_ids" not in audit
+
+
+def test_the_storage_side_code_is_matched_on_the_prefix_before_the_colon():
+    assert SX._is_storage_side_failure(STORAGE_FAILURE) is True
+    assert SX._is_storage_side_failure("EnvelopeExistsError") is True
+    assert SX._is_storage_side_failure("parse:empty") is False
+    assert SX._is_storage_side_failure("audit:missing_openrouter_metadata") is False
+    assert SX._is_storage_side_failure("http_error:502") is False
+    assert SX._is_storage_side_failure("cost_unreconciled") is False
+    # not a prefix match on a LONGER code that merely starts the same way
+    assert SX._is_storage_side_failure("EnvelopeExistsErrorish:x") is False
+
+
+def test_a_revalidated_draws_cost_is_booked_exactly_once(tmp_path):
+    """The attempt record was REFUSED, so the attempt store cannot book this wire call; the
+    study envelope is booked here, once, at its own returned cost — never twice, never not
+    at all — and revalidation does not move the total by a cent."""
+    store = LG.EnvelopeStore(tmp_path / "run")
+    put_draw(store, cell_id=BASE, probe_id=PROBES[0], order_idx=0, draw_index=0,
+             text=reply_for(3, 0), cost=0.002)
+    collided = put_draw_with_failures(
+        store, failures=(STORAGE_FAILURE,), cell_id=BASE, probe_id=PROBES[0], order_idx=0,
+        draw_index=1, text=reply_for(3, 0), cost=0.003)
+
+    ext = SX.extract_draws(store, probe_ids=PROBES, model=MODEL, manifest=manifest_body())
+    spend = SX.reconcile_spend(ext, store)
+    assert ext.storage_collision_revalidated_draw_ids == (collided.draw_id,)
+    assert spend["n_booked_envelopes"] == 2                  # one booking per study envelope
+    assert spend["n_study_draws"] == 2
+    assert spend["run_usd"] == pytest.approx(0.005)
+    assert spend["by_bucket"]["study"] == pytest.approx(0.005)
+    assert spend["is_exact"] is True
+
+    # The SAME store read with the collision recorded as a plain valid draw books the same
+    # total: the booking key is the study envelope's own draw id, not its derived verdict.
+    plain = LG.EnvelopeStore(tmp_path / "plain")
+    put_draw(plain, cell_id=BASE, probe_id=PROBES[0], order_idx=0, draw_index=0,
+             text=reply_for(3, 0), cost=0.002)
+    put_draw(plain, cell_id=BASE, probe_id=PROBES[0], order_idx=0, draw_index=1,
+             text=reply_for(3, 0), cost=0.003)
+    plain_ext = SX.extract_draws(plain, probe_ids=PROBES, model=MODEL,
+                                 manifest=manifest_body())
+    assert SX.reconcile_spend(plain_ext, plain)["run_usd"] == \
+        pytest.approx(spend["run_usd"])
+
+
+def test_a_coordinate_saved_by_revalidation_passes_the_completeness_gate():
+    """The failure mode this fixes end to end: one coordinate whose 6 storage-collided draws
+    drop it to 19/25 (below the frozen R-V7-3 floor) while it truly has 25 real answers."""
+    def kind_fn(cell, probe, order, d):
+        return "collision" if (cell == DATA and probe == PROBES[0] and order == 0
+                               and d < 6) else None
+
+    store = MemoryEnvelopeStore()
+    for cell in CELLS:
+        for probe in PROBES:
+            for order in range(G.N_ORDERS_REQUIRED):
+                for d in range(G.DRAWS_PER_COORDINATE):
+                    text = constructed_text(cell, probe, order, d)
+                    if kind_fn(cell, probe, order, d) == "collision":
+                        put_draw_with_failures(store, failures=(STORAGE_FAILURE,),
+                                               cell_id=cell, probe_id=probe, order_idx=order,
+                                               draw_index=d, text=text)
+                    else:
+                        put_draw(store, cell_id=cell, probe_id=probe, order_idx=order,
+                                 draw_index=d, text=text)
+
+    ext = SX.extract_draws(store, probe_ids=PROBES, model=MODEL, manifest=manifest_body())
+    assert len(ext.storage_collision_revalidated_draw_ids) == 6
+    report = G.completeness_gate(list(ext.draws), expected_probe_ids=PROBES)
+    assert report.complete is True, report.failures
 
 
 # =======================================================================================

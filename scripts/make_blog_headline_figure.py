@@ -40,6 +40,7 @@ MODELS = [
     ("Gemma-2", "9B", "local", "gemma9b"),
     ("Mistral-Nemo", "12B", "local", "mistralnemo"),
     ("gpt-4o-mini", "API", "local", "gpt4omini"),
+    ("GPT-5.6 Sol\n(Panel B2)", "closed", "frontier_b2", "openai__gpt-5.6-sol"),
     ("GLM-5.2\n(Panel B)", "MoE", "frontier_b", "z-ai__glm-5.2"),
     ("DeepSeek\nV4-Pro", "frontier", "frontier", "deepseek__deepseek-v4-pro"),
     ("Qwen3.5\n397B-A17B", "MoE", "frontier", "qwen__qwen3.5-397b-a17b"),
@@ -90,7 +91,7 @@ def plot(rows):
         "axes.edgecolor": "#BBBBBB", "axes.labelcolor": INK,
         "xtick.color": INK, "ytick.color": MUTED,
     })
-    fig, ax = plt.subplots(figsize=(11.5, 5.8), dpi=160)
+    fig, ax = plt.subplots(figsize=(12.5, 5.8), dpi=160)
     n = len(rows)
     xs = list(range(n))
 
@@ -139,7 +140,7 @@ def plot(rows):
     fig.text(0.07, 0.955, "Bigger models don't hold rights floors better. The channel is the problem.",
              fontsize=13, fontweight="bold", color=INK, ha="left", va="top")
     fig.text(0.07, 0.905,
-             "Ten models, eight families, 3B to 397B. Every one drops when opinion data enters the "
+             "Eleven models, nine families, 3B to 397B. Every one drops when opinion data enters the "
              "context.\nRouting that data away from rights items restores the floor.",
              fontsize=9.5, color=MUTED, ha="left", va="top", linespacing=1.4)
     fig.subplots_adjust(left=0.07, right=0.985, top=0.82, bottom=0.25)

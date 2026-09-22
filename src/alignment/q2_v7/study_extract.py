@@ -85,6 +85,30 @@ MANIFEST_FILENAME = "manifest.json"
 #: recorded as ignored rather than forced into a coordinate.
 STUDY_STAGES: frozenset[str] = frozenset({"study", "smoke"})
 
+#: Failure CODES (the token before the first colon in a `DerivedRecord.failures` entry) that
+#: describe the ATTEMPT store's bookkeeping, not the wire evidence for the study draw.
+#:
+#: `EnvelopeExistsError` is raised by `ledger.EnvelopeStore.put` when a record already exists
+#: (R-E5/S-F6 refuse-overwrite). A halted full run (R-E2) that is later resumed can re-send a
+#: coordinate's draw whose TERMINAL study record was never written and allocate an attempt
+#: index a persisted attempt record from the halted process already holds. The wire reply is
+#: genuine — HTTP 200, provider-audited, a parseable option digit — and its study envelope IS
+#: persisted; only the duplicate ATTEMPT record is refused. Treating that refusal as evidence
+#: about the model's answer would discard a real measurement and fail the R-V7-3 completeness
+#: gate on a coordinate that in truth has its answers.
+#:
+#: This NEVER relaxes a wire rule: the parse rule, the C1 provider audit, the R-V7-1
+#: reasoning-off rule, HTTP status, cache-hit and cost checks are all re-derived from the raw
+#: envelope below and still decide the draw. A record carrying ANY other failure alongside the
+#: storage-side one stays invalid exactly as before.
+STORAGE_SIDE_FAILURE_CODES: frozenset[str] = frozenset({"EnvelopeExistsError"})
+
+
+def _is_storage_side_failure(failure: Any) -> bool:
+    """True for a `DerivedRecord.failures` entry whose CODE names a storage/bookkeeping
+    refusal of the attempt store (matched on the prefix before the first colon)."""
+    return str(failure).split(":", 1)[0].strip() in STORAGE_SIDE_FAILURE_CODES
+
 
 class ExtractionError(RuntimeError):
     """A fail-closed extraction failure. Never downgraded to a warning or a default."""
@@ -217,6 +241,12 @@ class DrawRecord:
     cost_status: str
     provider: str
     stage: str
+    #: True when the linked derived record said `valid=false` for a STORAGE-side reason only
+    #: (see `STORAGE_SIDE_FAILURE_CODES`) and the wire evidence admitted the draw. Deliberately
+    #: NOT part of `as_dict()`: the artifact serializes `excluded_draws` only, a revalidated
+    #: draw is by definition not excluded, and the audit reports these draws by id instead —
+    #: so an artifact from a run with no such collisions is unchanged, byte for byte.
+    storage_collision_revalidated: bool = False
 
     @property
     def coordinate(self) -> tuple[str, str, int]:
@@ -256,6 +286,7 @@ class DrawExtraction:
     records: tuple[DrawRecord, ...]
     draws: tuple[SamplingDraw, ...]
     ignored_draw_ids: tuple[str, ...]
+    storage_collision_revalidated_draw_ids: tuple[str, ...] = ()
 
     @property
     def excluded(self) -> tuple[DrawRecord, ...]:
@@ -305,7 +336,7 @@ class DrawExtraction:
         }
 
     def as_audit(self) -> dict:
-        return {
+        body = {
             "model": self.model,
             "manifest_sha256": self.manifest_sha256,
             "endpoint_slug": self.endpoint_slug,
@@ -314,6 +345,20 @@ class DrawExtraction:
             "excluded_draws": [r.as_dict() for r in self.excluded],
             "ignored_draw_ids": list(self.ignored_draw_ids),
         }
+        # Named and reported only when it actually happened, so an artifact from a run with no
+        # attempt-store collision (every v7 run) stays byte-identical to the committed one.
+        if self.storage_collision_revalidated_draw_ids:
+            body["n_storage_collision_revalidated"] = \
+                len(self.storage_collision_revalidated_draw_ids)
+            body["storage_collision_revalidated_draw_ids"] = \
+                list(self.storage_collision_revalidated_draw_ids)
+            body["storage_collision_revalidated_note"] = (
+                "these draws' derived records were written valid=false solely because the "
+                "ATTEMPT store refused a duplicate record (R-E5/S-F6) after a halted run was "
+                "resumed; their persisted study envelopes carry genuine wire evidence and "
+                "were judged by the wire rules alone (S-F4 parse, C1 audit, R-V7-1 "
+                "reasoning-off, HTTP status, cache-hit, cost)")
+        return body
 
 
 def _parse_identity(env: "LG.RawEnvelope") -> tuple[str, int]:
@@ -376,19 +421,38 @@ def _reasoning_tokens(env: "LG.RawEnvelope") -> Optional[int]:
 
 
 def _exclusion_reasons(env: "LG.RawEnvelope",
-                       derived: Optional["LG.DerivedRecord"]) -> tuple[str, ...]:
-    """Every reason this paid draw may not enter an estimand. Order is deterministic."""
+                       derived: Optional["LG.DerivedRecord"]) -> tuple[tuple[str, ...], bool]:
+    """Every reason this paid draw may not enter an estimand, plus whether the derived
+    record's verdict was REVALIDATED FROM WIRE EVIDENCE.
+
+    Order is deterministic. Validity comes from the wire evidence, never from a storage-side
+    bookkeeping failure: a derived record whose ONLY failures are `STORAGE_SIDE_FAILURE_CODES`
+    (the attempt store's refuse-overwrite, R-E5/S-F6) describes a refused duplicate ATTEMPT
+    record, not the study draw — whose raw envelope is in hand here, by construction. Its
+    `valid=false`/`excluded_from_estimands=true` are therefore set aside and the draw is
+    judged by the same wire rules as any other: the S-F4 parse, HTTP status, cache-hit,
+    reasoning tokens, BYOK and the FULL frozen C1 + R-V7-1 proof re-derived below. If any of
+    those still fails, or if the record carries any non-storage failure, the draw stays
+    excluded exactly as before.
+    """
     reasons: list[str] = []
+    revalidated = False
     if derived is None:
         # ledger.estimand_eligible_draw_ids: validation is REQUIRED, never assumed.
         reasons.append("no_derived_record")
     else:
-        if not derived.valid:
-            reasons.append("derived_invalid")
-        if derived.excluded_from_estimands:
-            reasons.append("derived_excluded")
-        for failure in derived.failures:
-            reasons.append(f"derived_failure:{failure}")
+        storage_only = bool(derived.failures) and \
+            all(_is_storage_side_failure(f) for f in derived.failures)
+        # Only a record the storage failure actually CONDEMNED is revalidated; a record that
+        # is already valid needs nothing set aside.
+        revalidated = storage_only and (not derived.valid or derived.excluded_from_estimands)
+        if not revalidated:
+            if not derived.valid:
+                reasons.append("derived_invalid")
+            if derived.excluded_from_estimands:
+                reasons.append("derived_excluded")
+            for failure in derived.failures:
+                reasons.append(f"derived_failure:{failure}")
     if int(env.http_status) != 200:
         reasons.append(f"http_status:{int(env.http_status)}")
     if LG.is_cache_hit(env.response_body or {}, env.response_headers):
@@ -413,7 +477,9 @@ def _exclusion_reasons(env: "LG.RawEnvelope",
     # written by an older or weaker writer must not be able to admit a non-conforming draw.
     if int(env.http_status) == 200:
         reasons.extend(_frozen_proof_failures(env))
-    return tuple(dict.fromkeys(reasons))        # de-duplicated, order preserved
+    out = tuple(dict.fromkeys(reasons))         # de-duplicated, order preserved
+    # A draw the wire rules exclude anyway was not "revalidated" by anything.
+    return out, bool(revalidated and not out)
 
 
 def _frozen_proof_failures(env: "LG.RawEnvelope") -> list[str]:
@@ -505,7 +571,7 @@ def extract_draws(store: "LG.EnvelopeStore", *, probe_ids: Sequence[str], model:
                 f"parser returned display position {choice} outside [0,{N_OPTIONS}) for "
                 f"{env.draw_id} — an out-of-range reply must be recorded as None")
 
-        reasons = _exclusion_reasons(env, derived)
+        reasons, revalidated = _exclusion_reasons(env, derived)
         cell_id, probe_id, order_idx = coord
         records.append(DrawRecord(
             draw_id=env.draw_id, request_sha256=sha, draw_index=draw_index,
@@ -513,7 +579,8 @@ def extract_draws(store: "LG.EnvelopeStore", *, probe_ids: Sequence[str], model:
             choice=(None if reasons else choice), parse_reason=parse_reason,
             excluded=bool(reasons), exclusion_reasons=reasons,
             http_status=int(env.http_status), cost_usd=env.cost_usd,
-            cost_status=env.cost_status, provider=env.provider, stage=env.stage))
+            cost_status=env.cost_status, provider=env.provider, stage=env.stage,
+            storage_collision_revalidated=revalidated))
         if env.provider:
             providers.add(env.provider)
 
@@ -535,7 +602,10 @@ def extract_draws(store: "LG.EnvelopeStore", *, probe_ids: Sequence[str], model:
     return DrawExtraction(model=model, manifest_sha256=index.manifest_sha256,
                           endpoint_slug=index.endpoint_slug, provider=provider,
                           records=tuple(records), draws=draws,
-                          ignored_draw_ids=tuple(sorted(ignored)))
+                          ignored_draw_ids=tuple(sorted(ignored)),
+                          storage_collision_revalidated_draw_ids=tuple(
+                              sorted(r.draw_id for r in records
+                                     if r.storage_collision_revalidated)))
 
 
 def _extract_or_empty(store: "LG.EnvelopeStore", *, probe_ids: Sequence[str], model: str,
@@ -583,6 +653,13 @@ def reconcile_spend(extraction: DrawExtraction, store: "LG.EnvelopeStore", *,
 
     Summation is `math.fsum` over costs sorted by draw id, so the total is deterministic and
     independent of directory-iteration order.
+
+    EXACTLY ONCE, including the attempt-store collision case. The booking key is the STUDY
+    envelope's own `draw_id` and the loop is over `store.envelopes()` — one persisted study
+    envelope, one booking — so a draw whose duplicate ATTEMPT record was refused
+    (`STORAGE_SIDE_FAILURE_CODES`) is booked here at its own returned cost, neither twice nor
+    not at all. Revalidating such a draw changes `excluded`/`choice` only; it never adds,
+    removes or re-keys a booking, so this total is identical before and after.
     """
     declared = store.reconciliations()
     digests = store.raw_digests() if declared else {}
@@ -1007,7 +1084,8 @@ def write_artifact(result: ModelResult, path: Path | str) -> str:
 
 
 __all__ = [
-    "ARTIFACT_SCHEMA", "IL_DIRNAME", "MANIFEST_FILENAME", "STUDY_STAGES",
+    "ARTIFACT_SCHEMA", "IL_DIRNAME", "MANIFEST_FILENAME", "STORAGE_SIDE_FAILURE_CODES",
+    "STUDY_STAGES",
     "CoordinateIndex", "DrawExtraction", "DrawRecord", "ExtractionError", "HeadlineBlocked",
     "ModelResult", "artifact_bytes", "coordinate_index", "crack_diagnostics",
     "extract_draws", "extract_headline", "extract_model", "interlock_run_dir", "load_draws",
