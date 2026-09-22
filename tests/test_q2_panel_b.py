@@ -386,3 +386,27 @@ def test_unset_env_leaves_v7_alone(_no_env):
 def test_activate_from_env_accepts_an_explicit_mapping():
     assert PB.activate_from_env({"Q2_PANEL": "B"}) is True
     assert G.PANEL_ORDER == (GLM, SOL)
+
+
+def test_activate_also_rebinds_a_python_dash_m_main_alias(monkeypatch, tmp_path):
+    """`python -m alignment.q2_v7.canary` runs canary.py as `__main__`, a second module
+    object. Activation must reach that running copy, not only the imported one."""
+    import sys
+    import types
+    from alignment.q2_v7 import canary as C
+    from alignment.q2_v7 import panel_b
+
+    panel_b.deactivate()
+    fake_main = types.ModuleType("__main__")
+    fake_main.__file__ = C.__file__
+    fake_main.DEFAULT_RUN_DIR = C.DEFAULT_RUN_DIR
+    fake_main.PANEL_ORDER = C.PANEL_ORDER
+    monkeypatch.setitem(sys.modules, "__main__", fake_main)
+    try:
+        panel_b.activate()
+        assert fake_main.DEFAULT_RUN_DIR == panel_b.CANARY_RUN_DIR_B
+        assert fake_main.PANEL_ORDER == panel_b.PANEL_B_ORDER
+    finally:
+        panel_b.deactivate()
+    assert fake_main.DEFAULT_RUN_DIR == C.DEFAULT_RUN_DIR
+    assert fake_main.PANEL_ORDER == C.PANEL_ORDER

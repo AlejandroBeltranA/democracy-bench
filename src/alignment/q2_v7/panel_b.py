@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import math
 import os
+import sys
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
 
@@ -118,7 +119,37 @@ class PanelBError(RuntimeError):
 #: module captures BY NAME (or reads as a module global) and would otherwise carry a v7 value
 #: into a Panel B run. Nothing here is a behaviour change: each value is the Panel B analogue
 #: of the v7 constant it replaces.
+def _main_alias(mod: Any) -> Optional[Any]:
+    """The `__main__` copy of `mod`, when `mod` is the file being run with `python -m`.
+
+    `python -m alignment.q2_v7.canary` executes canary.py as `__main__`; a later
+    `import alignment.q2_v7.canary` (this module's `C`) is a SECOND module object with its own
+    globals. Rebinding only the imported copy would leave the RUNNING copy on v7 values — the
+    v7 run dir, the v7 panel — which is exactly the silent misrouting this profile exists to
+    prevent. So every binding is applied to both objects when they are the same file.
+    """
+    main = sys.modules.get("__main__")
+    if main is None or main is mod:
+        return None
+    try:
+        same = (Path(getattr(main, "__file__", "")).resolve()
+                == Path(getattr(mod, "__file__", "")).resolve())
+    except (OSError, ValueError):
+        return None
+    return main if same else None
+
+
 def _bindings() -> tuple[tuple[Any, str, Any], ...]:
+    base = _base_bindings()
+    extra: list[tuple[Any, str, Any]] = []
+    for mod, name, value in base:
+        alias = _main_alias(mod)
+        if alias is not None and hasattr(alias, name):
+            extra.append((alias, name, value))
+    return base + tuple(extra)
+
+
+def _base_bindings() -> tuple[tuple[Any, str, Any], ...]:
     return (
         # --- gate: the panel roster, its endpoints, the stop, the amendment allow-list ---
         (G, "PANEL_ORDER", PANEL_B_ORDER),
