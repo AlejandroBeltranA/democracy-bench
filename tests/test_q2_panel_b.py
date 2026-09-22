@@ -20,7 +20,7 @@ from alignment.q2_v7 import panel_b as PB
 from alignment.q2_v7 import study_run as SR
 
 ROOT = Path(__file__).resolve().parents[1]
-GLM = "z-ai/glm-5.3"
+GLM = "z-ai/glm-5.2"
 SOL = "openai/gpt-5.6-sol"
 
 # The v7 values this module must leave alone.
@@ -99,7 +99,7 @@ def test_activate_is_idempotent_and_still_restores_v7():
 def test_activation_rebinds_every_listed_attribute():
     PB.activate()
     assert G.PANEL_ORDER == (GLM, SOL)
-    assert dict(G.FALLBACK_SEQUENCES) == {GLM: ("reka/fp8",), SOL: ("openai",)}
+    assert dict(G.FALLBACK_SEQUENCES) == {GLM: ("novita/fp8",), SOL: ("openai",)}
     assert dict(G.FALLBACK_SEQUENCE) == dict(G.FALLBACK_SEQUENCES)
     assert G.GLOBAL_STUDY_STOP == pytest.approx(11.00)
     assert G.APPROVED_FALLBACK_AMENDMENTS == frozenset({"AMD-PB-01"})
@@ -116,7 +116,8 @@ def test_activation_rebinds_every_listed_attribute():
     assert dict(C.FALLBACK_SEQUENCES) == dict(G.FALLBACK_SEQUENCES)
     assert C.DEFAULT_RUN_DIR.name == "q2_stage2_panel_b_canary"
     assert C.PRIOR_RECORD_DIRS == (C.DEFAULT_RUN_DIR / "raw",)
-    assert C.PRIOR_DIAGNOSTIC_COMPONENTS == ()
+    assert C.PRIOR_DIAGNOSTIC_COMPONENTS == PB.PRIOR_DIAGNOSTIC_COMPONENTS_B
+    assert sum(c.upper_bound_usd for c in C.PRIOR_DIAGNOSTIC_COMPONENTS) < 0.001
 
     assert SR.DEFAULT_RUN_DIR.name == "q2_stage2_panel_b_run"
     assert dict(SR.FALLBACK_AMENDMENT_BY_MODEL) == {SOL: "AMD-PB-01"}
@@ -134,7 +135,7 @@ def test_frozen_sequence_follows_the_active_panel():
     with pytest.raises(G.SpecViolation):
         G.frozen_sequence(GLM)
     PB.activate()
-    assert G.frozen_sequence(GLM) == ("reka/fp8",)
+    assert G.frozen_sequence(GLM) == ("novita/fp8",)
     assert G.frozen_sequence(SOL) == ("openai",)
     with pytest.raises(G.SpecViolation):
         G.frozen_sequence(V7_PANEL[0])
@@ -148,7 +149,7 @@ MSGS = [{"role": "system", "content": "s"}, {"role": "user", "content": "u"}]
 
 
 def test_sampling_parameters_are_sent_for_every_model_when_panel_b_is_off():
-    for model, tag in ((SOL, "openai"), (GLM, "reka/fp8"), (V7_PANEL[0], "fireworks")):
+    for model, tag in ((SOL, "openai"), (GLM, "novita/fp8"), (V7_PANEL[0], "fireworks")):
         body = E.build_sampling_request(model, tag, MSGS)
         assert body["temperature"] == E.TEMPERATURE
         assert body["top_p"] == E.TOP_P
@@ -162,7 +163,7 @@ def test_sampling_parameters_are_omitted_only_for_sol_and_only_when_active():
     assert sol["max_tokens"] == G.MAX_TOKENS
     assert sol["usage"] == {"include": True}
 
-    glm = E.build_sampling_request(GLM, "reka/fp8", MSGS)
+    glm = E.build_sampling_request(GLM, "novita/fp8", MSGS)
     assert glm["temperature"] == E.TEMPERATURE and glm["top_p"] == E.TOP_P
 
     PB.deactivate()
@@ -330,8 +331,8 @@ def test_panel_b_snapshot_loads_and_its_sha_matches():
     PB.activate()
     snapshot = E.load_snapshot(ROOT / E.SNAPSHOT_PATH)
     assert snapshot.sha256 == PB.SNAPSHOT_SHA256_B
-    assert set(snapshot.candidates) == {(GLM, "reka/fp8"), (SOL, "openai")}
-    assert snapshot.candidates[(GLM, "reka/fp8")].quantization == "fp8"
+    assert set(snapshot.candidates) == {(GLM, "novita/fp8"), (SOL, "openai")}
+    assert snapshot.candidates[(GLM, "novita/fp8")].quantization == "fp8"
     # the closed model pins no tokenizer files; GLM pins three
     assert (snapshot.tokenizers[SOL].get("files") or {}) == {}
     assert len(snapshot.tokenizers[GLM]["files"]) == 3
@@ -347,7 +348,7 @@ def test_the_v7_snapshot_is_refused_under_the_panel_b_binding():
 def test_glm_takes_the_ordinary_frozen_c2_path():
     PB.activate()
     snapshot = E.load_snapshot(ROOT / E.SNAPSHOT_PATH)
-    tokenizer = SR.pinned_tokenizer(GLM, snapshot, ROOT / "out" / "q2_stage2_tokenizers" / "glm")
+    tokenizer = SR.pinned_tokenizer(GLM, snapshot, ROOT / "out" / "q2_stage2_tokenizers" / "glm52")
     assert isinstance(tokenizer, G.PinnedTokenizer)
     assert tokenizer.has_exact_serialization is True
     assert tokenizer.serialization_method in G.FROZEN_C2_SERIALIZATIONS
@@ -410,3 +411,74 @@ def test_activate_also_rebinds_a_python_dash_m_main_alias(monkeypatch, tmp_path)
         panel_b.deactivate()
     assert fake_main.DEFAULT_RUN_DIR == C.DEFAULT_RUN_DIR
     assert fake_main.PANEL_ORDER == C.PANEL_ORDER
+
+
+# --------------------------------------------------------------------------------------
+# AMD-PB-02 — variant B2 (Sol-only re-run with a bounded framing-token tolerance)
+# --------------------------------------------------------------------------------------
+
+def _probe(tag, billed, reasoning_tokens=0, payload=False):
+    from alignment.q2_v7 import gate as G
+    return G.EndpointProbeResult(tag=tag, http_status=200, reasoning_tokens=reasoning_tokens,
+                                 has_reasoning_payload=payload, usage_fields_present=True,
+                                 parsed_leading_digit=2, billed_completion_tokens=billed)
+
+
+def test_v7_keeps_the_strict_billed_token_rule():
+    from alignment.q2_v7 import gate as G
+    from alignment.q2_v7 import panel_b
+    panel_b.deactivate()
+    assert G.FRAMING_TOKEN_TOLERANCE_BY_TAG == {}
+    assert any("exceeds max_tokens" in f for f in G.audit_reasoning_off(_probe("openai", 5)))
+    assert G.audit_reasoning_off(_probe("openai", 4)) == ()
+
+
+def test_variant_b_does_not_tolerate_framing_tokens():
+    from alignment.q2_v7 import gate as G
+    from alignment.q2_v7 import panel_b
+    panel_b.deactivate()
+    panel_b.activate("B")
+    try:
+        assert any("exceeds" in f for f in G.audit_reasoning_off(_probe("openai", 5)))
+    finally:
+        panel_b.deactivate()
+
+
+def test_variant_b2_tolerates_bounded_framing_tokens_only_with_reasoning_off():
+    from alignment.q2_v7 import gate as G
+    from alignment.q2_v7 import ledger as L
+    from alignment.q2_v7 import panel_b
+    panel_b.deactivate()
+    panel_b.activate("B2")
+    try:
+        assert panel_b.active_variant() == "B2"
+        assert G.PANEL_ORDER == ("openai/gpt-5.6-sol",)
+        assert G.GLOBAL_STUDY_STOP == pytest.approx(8.00)
+        assert L.HARD_STOP_USD == pytest.approx(8.00)
+        assert G.audit_reasoning_off(_probe("openai", 5)) == ()
+        assert G.audit_reasoning_off(_probe("openai", 4 + 8)) == ()
+        assert any("exceeds" in f for f in G.audit_reasoning_off(_probe("openai", 4 + 9)))
+        # the tolerance is keyed by tag: GLM's endpoint stays strict
+        assert any("exceeds" in f for f in G.audit_reasoning_off(_probe("novita/fp8", 5)))
+        # and it never applies when reasoning is not demonstrably off
+        fails = G.audit_reasoning_off(_probe("openai", 5, reasoning_tokens=1))
+        assert any("exceeds" in f for f in fails) and any("reasoning_tokens" in f for f in fails)
+        fails = G.audit_reasoning_off(_probe("openai", 5, payload=True))
+        assert any("exceeds" in f for f in fails)
+    finally:
+        panel_b.deactivate()
+    assert G.FRAMING_TOKEN_TOLERANCE_BY_TAG == {}
+    assert G.GLOBAL_STUDY_STOP == pytest.approx(8.50)
+
+
+def test_b2_env_activation_and_variant_switch_guard(monkeypatch):
+    from alignment.q2_v7 import panel_b
+    panel_b.deactivate()
+    assert panel_b.activate_from_env({"Q2_PANEL": "b2"}) is True
+    try:
+        assert panel_b.active_variant() == "B2"
+        with pytest.raises(RuntimeError):
+            panel_b.activate("B")
+    finally:
+        panel_b.deactivate()
+    assert panel_b.activate_from_env({"Q2_PANEL": ""}) is False

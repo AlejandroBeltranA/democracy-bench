@@ -1,13 +1,13 @@
 {
- "artifact": "Q2 Stage-2 Panel B endpoint freeze snapshot (AMD-PB-01)",
+ "artifact": "Q2 Stage-2 Panel B endpoint freeze snapshot (AMD-PB-01), re-frozen after the GLM-5.3 capability exclusion",
  "candidates": [
   {
-   "endpoint_name": "Reka | z-ai/glm-5.3-20260816",
-   "model": "z-ai/glm-5.3",
+   "endpoint_name": "Novita | z-ai/glm-5.2-20260616",
+   "model": "z-ai/glm-5.2",
    "params_all_declared": true,
-   "price_completion_per_token": "0.000002574",
-   "price_prompt_per_token": "0.0000007605",
-   "provider_name": "Reka",
+   "price_completion_per_token": "0.0000020416",
+   "price_prompt_per_token": "0.0000006496",
+   "provider_name": "Novita",
    "quantization": "fp8",
    "supported_parameters_subset": {
     "max_tokens": true,
@@ -15,7 +15,7 @@
     "temperature": true,
     "top_p": true
    },
-   "tag": "reka/fp8"
+   "tag": "novita/fp8"
   },
   {
    "endpoint_name": "OpenAI | openai/gpt-5.6-sol-20260709",
@@ -34,17 +34,17 @@
    "tag": "openai"
   }
  ],
- "fetched_utc": "2026-09-22T10:08:00Z",
+ "fetched_utc": "2026-09-22T10:50:00Z",
  "raw_files": {
   "openai_gpt-5.6-sol_endpoints.json": {
    "sha256": "e141b870e885e957875b25b3e559f11bc1323ecd57794718485b2793e065f10d"
   },
-  "z-ai_glm-5.3_endpoints.json": {
-   "sha256": "bc298fe6ca03209217023e20aab3b9f226cf42c6d1dadc17b8eaf59403e612af"
+  "z-ai_glm-5.2_endpoints.json": {
+   "sha256": "4505b0ffa39ea2570e12dd888d7a3857361f71c84702cf5c2699c4fa459bd9f6"
   }
  },
  "sources": [
-  "https://openrouter.ai/api/v1/models/z-ai/glm-5.3/endpoints",
+  "https://openrouter.ai/api/v1/models/z-ai/glm-5.2/endpoints",
   "https://openrouter.ai/api/v1/models/openai/gpt-5.6-sol/endpoints"
  ],
  "tokenizers": {
@@ -55,15 +55,15 @@
    "revision": null,
    "source": null
   },
-  "z-ai/glm-5.3": {
+  "z-ai/glm-5.2": {
    "files": {
-    "chat_template.jinja": "3740abcea51c45830cb3ca562084ad5fb2ef53589376f73332e9886f93ade41c",
+    "chat_template.jinja": "172dc74a35e1752df75ecfb2b2cf9326d2852bb1379868ebeec9571654489679",
     "tokenizer.json": "19e773648cb4e65de8660ea6365e10acca112d42a854923df93db4a6f333a82d",
     "tokenizer_config.json": "98b1271574f41abf89427ae2dda030d94dc9478f0edc5a8bd240db213c6fd5fc"
    },
-   "repo_id": "zai-org/GLM-5.3",
-   "revision": "aca966e4e02791568aa6a4ced368624b3d897f42",
-   "source": "https://huggingface.co/zai-org/GLM-5.3"
+   "repo_id": "zai-org/GLM-5.2",
+   "revision": "cf457fa734ab149ffef225f80893eb38c6ff5cdc",
+   "source": "https://huggingface.co/zai-org/GLM-5.2"
   }
  }
 }

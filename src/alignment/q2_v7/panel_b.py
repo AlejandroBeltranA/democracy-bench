@@ -5,7 +5,7 @@ changes no v7 constant and no v7 behaviour: every v7 value stays exactly where i
 Panel B is selected explicitly (``panel_b.activate()``, or ``Q2_PANEL=B`` in the environment)
 before any run. With the environment variable unset, nothing in this module executes.
 
-The panel is ``("z-ai/glm-5.3", "openai/gpt-5.6-sol")``, frozen by the operator's decision of
+The panel is ``("z-ai/glm-5.2", "openai/gpt-5.6-sol")``, frozen by the operator's decision of
 2026-09-22 together with the four departures from v7 that the signed pre-outcome amendment
 **AMD-PB-01** authorizes, and nothing else:
 
@@ -25,7 +25,7 @@ The panel is ``("z-ai/glm-5.3", "openai/gpt-5.6-sol")``, frozen by the operator'
    top of the calibrated count, so the projection is conservative in the budget's direction.
    ``gate.require_frozen_c2_serialization`` still refuses that projection unless AMD-PB-01 is
    named, which is the whole point of the amendment: the fallback is auditable, not silent.
-   `z-ai/glm-5.3` publishes a real tokenizer and chat template and takes the ORDINARY frozen
+   `z-ai/glm-5.2` publishes a real tokenizer and chat template and takes the ORDINARY frozen
    C2 path — the amendment applies to the Sol row only.
 
 3. **A Panel-B-only $11.00 hard stop.** Panel B's spend is accounted separately from the v7
@@ -33,8 +33,11 @@ The panel is ``("z-ai/glm-5.3", "openai/gpt-5.6-sol")``, frozen by the operator'
    directory. No v7 record is re-reconciled into Panel B, and no Panel B record counts against
    the v7 stop; the two ledgers do not touch.
 
-4. **GLM on a third-party fp8 endpoint.** `z-ai/glm-5.3` is promoted on ``reka/fp8`` rather
-   than a first-party bf16 endpoint, by budget decision. The quantization is recorded in the
+4. **GLM on a third-party fp8 endpoint.** `z-ai/glm-5.2` is promoted on ``novita/fp8``, the
+   cheapest fp8 endpoint declaring all four parameters, by budget decision (Z.AI's own
+   endpoint is also fp8, at twice the price). GLM-5.3 was the first choice and is recorded as
+   a capability exclusion: it is reasoning-mandatory on every endpoint, so the frozen
+   reasoning-off proof cannot hold for it (see the decision memo). The quantization is recorded in the
    snapshot and travels with every projection and every estimand, so the reader can see it.
 
 Each model has a SINGLE endpoint, so there is no promotion walk to fall back through: a failed
@@ -43,7 +46,7 @@ capability probe ends that model's run rather than selecting a substitute.
 Usage::
 
     Q2_PANEL=B .venv/bin/python -m alignment.q2_v7.canary --i-have-authorized-paid-spend
-    Q2_PANEL=B .venv/bin/python -m alignment.q2_v7.study_run walk --model z-ai/glm-5.3 ...
+    Q2_PANEL=B .venv/bin/python -m alignment.q2_v7.study_run walk --model z-ai/glm-5.2 ...
 
 or, in process::
 
@@ -68,13 +71,25 @@ ROOT = Path(__file__).resolve().parents[3]
 
 #: The signed pre-outcome design amendment this whole module operates under.
 AMENDMENT = "AMD-PB-01"
+#: The second signed pre-outcome amendment (2026-09-22): variant **B2** re-runs the Sol row
+#: in its OWN run directory after the frozen walk excluded it for five billed completion
+#: tokens on a one-digit reply with reasoning tokens exactly 0. B2 (a) tolerates up to
+#: `FRAMING_TOKEN_TOLERANCE_B2` billed tokens above `max_tokens` on the `openai` tag when
+#: reasoning is demonstrably off, (b) carries a Sol-only roster, and (c) runs under a
+#: Panel-B2 stop of $8.00 so that B ($2.5785 projected for GLM-5.2) + B2 stays inside the
+#: $11.00 Panel B ceiling Alex set. Nothing else differs from variant B.
+AMENDMENT_2 = "AMD-PB-02"
+FRAMING_TOKEN_TOLERANCE_B2: Mapping[str, int] = {"openai": 8}
+PANEL_B2_ORDER: tuple[str, ...] = ("openai/gpt-5.6-sol",)
+HARD_STOP_B2_USD = 8.00
+STUDY_RUN_DIR_B2 = None   # set below, after ROOT-relative dirs are defined
 
 #: The frozen Panel B roster, in order: GLM (primary) then Sol (independent replication).
-PANEL_B_ORDER: tuple[str, ...] = ("z-ai/glm-5.3", "openai/gpt-5.6-sol")
+PANEL_B_ORDER: tuple[str, ...] = ("z-ai/glm-5.2", "openai/gpt-5.6-sol")
 
 #: One endpoint per model — there is no walk fallback on Panel B.
 FALLBACK_SEQUENCES_B: Mapping[str, tuple[str, ...]] = {
-    "z-ai/glm-5.3": ("reka/fp8",),
+    "z-ai/glm-5.2": ("novita/fp8",),
     "openai/gpt-5.6-sol": ("openai",),
 }
 
@@ -83,11 +98,12 @@ HARD_STOP_B_USD = 11.00
 
 #: The committed Panel B endpoint snapshot, SHA-256-bound exactly as v7's is.
 SNAPSHOT_PATH_B = "out/q2_stage2_panel_b_snapshot/manifest.json"
-SNAPSHOT_SHA256_B = "56f64dd974e2e7bfd86d0570e67feded34e9a6a1e274af2901d7cb7be41c061b"
+SNAPSHOT_SHA256_B = "fc781eb7a41a32b5caae33fc6bbf12ee2c3e671be183faea90620d4f0d632e2f"
 
 #: Run directories. Panel B never writes into a v7 run directory.
 CANARY_RUN_DIR_B = ROOT / "out" / "q2_stage2_panel_b_canary"
 STUDY_RUN_DIR_B = ROOT / "out" / "q2_stage2_panel_b_run"
+STUDY_RUN_DIR_B2 = ROOT / "out" / "q2_stage2_panel_b2_run"
 
 #: AMD-PB-01 (1): the closed endpoint declares no sampling parameters, so the envelope omits
 #: them rather than sending nulls under `require_parameters: true`.
@@ -104,7 +120,25 @@ APPROVED_FALLBACK_AMENDMENTS_B: frozenset[str] = frozenset({AMENDMENT})
 #: AMD-PB-01 (3): prior Panel B spend is reconciled from Panel B's OWN canary records only.
 PRIOR_RECORD_DIRS_B: tuple[Path, ...] = (CANARY_RUN_DIR_B / "raw",)
 #: Panel B has no pre-v7-era ad-hoc diagnostic artifacts to debit at an upper bound.
-PRIOR_DIAGNOSTIC_COMPONENTS_B: tuple[Any, ...] = ()
+#: Two synthetic diagnostic probes (GLM-5.3 first-party: 400, no cost; GLM-5.2 first-party:
+#: $0.0000506) sent outside the runner to establish the GLM-5.3 exclusion. Debited as a
+#: conservative upper bound, labelled non-reconciled, exactly as R-V7-6 prescribes.
+PRIOR_DIAGNOSTIC_COMPONENTS_B: tuple[Any, ...] = (
+    L.NonReconciledComponent(
+        label="panel_b_glm_reasoning_off_diagnostics",
+        upper_bound_usd=0.0002,
+        reason="two ad-hoc curl probes in out/q2_stage2_panel_b_diagnostics/ (GLM-5.3 and "
+               "GLM-5.2 first-party, reasoning off); returned cost $0.0000506 total, debited "
+               "at an upper bound"),
+    L.NonReconciledComponent(
+        label="panel_b_canary_attempts_1_and_2",
+        upper_bound_usd=0.0003,
+        reason="out/q2_stage2_panel_b_canary_attempt1_ssl_failed/ (two HTTP-0 TLS failures, "
+               "no cost) and out/q2_stage2_panel_b_canary_attempt2_glm53_excluded/ (GLM-5.3 "
+               "HTTP 400, no cost; Sol HTTP 200, $0.000142). Error records carry no finite "
+               "returned cost, so the attempts are debited at an upper bound rather than "
+               "reconciled record by record"),
+)
 
 
 class PanelBError(RuntimeError):
@@ -139,8 +173,33 @@ def _main_alias(mod: Any) -> Optional[Any]:
     return main if same else None
 
 
-def _bindings() -> tuple[tuple[Any, str, Any], ...]:
+#: Which variant `activate()` applied: None (inactive), "B" or "B2".
+_VARIANT: Optional[str] = None
+
+
+def active_variant() -> Optional[str]:
+    return _VARIANT
+
+
+def _b2_overrides() -> tuple[tuple[Any, str, Any], ...]:
+    """AMD-PB-02: the three Sol-row departures from variant B."""
+    return (
+        (G, "PANEL_ORDER", PANEL_B2_ORDER),
+        (C, "PANEL_ORDER", PANEL_B2_ORDER),
+        (G, "GLOBAL_STUDY_STOP", HARD_STOP_B2_USD),
+        (L, "HARD_STOP_USD", HARD_STOP_B2_USD),
+        (G, "FRAMING_TOKEN_TOLERANCE_BY_TAG", dict(FRAMING_TOKEN_TOLERANCE_B2)),
+        (SR, "DEFAULT_RUN_DIR", STUDY_RUN_DIR_B2),
+    )
+
+
+def _bindings(variant: str = "B") -> tuple[tuple[Any, str, Any], ...]:
     base = _base_bindings()
+    if variant == "B2":
+        # later entries win: apply B, then overlay the B2 departures
+        base = base + _b2_overrides()
+    elif variant != "B":
+        raise ValueError(f"unknown Panel B variant {variant!r}; expected 'B' or 'B2'")
     extra: list[tuple[Any, str, Any]] = []
     for mod, name, value in base:
         alias = _main_alias(mod)
@@ -193,41 +252,50 @@ def is_active() -> bool:
     return _SAVED is not None
 
 
-def activate() -> None:
+def activate(variant: str = "B") -> None:
     """Rebind every v7 constant Panel B replaces. Idempotent; reversed by `deactivate()`.
+    `variant="B2"` additionally applies the AMD-PB-02 overrides (Sol-only re-run).
 
     This is the ONLY way Panel B's values enter the harness. It is deliberately explicit: no
     module activates itself at import, so importing `panel_b` (as `study_run.pinned_tokenizer`
     does, lazily) can never change a v7 run's behaviour.
     """
-    global _SAVED
+    global _SAVED, _VARIANT
     if _SAVED is not None:
+        if _VARIANT != variant:
+            raise RuntimeError(f"Panel {_VARIANT} is already active; deactivate() first")
         return                                   # already active; rebinding again is a no-op
-    bindings = _bindings()
-    _SAVED = tuple((mod, name, getattr(mod, name)) for mod, name, _ in bindings)
+    bindings = _bindings(variant)
+    saved: dict[tuple[int, str], tuple[Any, str, Any]] = {}
+    for mod, name, _ in bindings:
+        saved.setdefault((id(mod), name), (mod, name, getattr(mod, name)))   # first = v7
+    _SAVED = tuple(saved.values())
+    _VARIANT = variant
     for mod, name, value in bindings:
         setattr(mod, name, value)
 
 
 def deactivate() -> None:
     """Restore every v7 constant `activate()` rebound. Idempotent."""
-    global _SAVED
+    global _SAVED, _VARIANT
     if _SAVED is None:
         return
     for mod, name, value in _SAVED:
         setattr(mod, name, value)
     _SAVED = None
+    _VARIANT = None
 
 
 def activate_from_env(env: Optional[Mapping[str, str]] = None) -> bool:
-    """Activate Panel B iff ``Q2_PANEL=B`` (case-insensitive) is set. Returns whether it is.
+    """Activate Panel B iff ``Q2_PANEL=B`` (or ``B2`` for the AMD-PB-02 Sol re-run) is set.
 
     Wired into `canary.main`, `study_run.main` and `study_extract.load_draws`, so one
     environment variable selects the panel for a whole run. Unset, it does nothing at all.
     """
     source = os.environ if env is None else env
-    if str(source.get("Q2_PANEL", "") or "").strip().upper() == "B":
-        activate()
+    value = str(source.get("Q2_PANEL", "") or "").strip().upper()
+    if value in ("B", "B2"):
+        activate(value)
         return True
     return False
 

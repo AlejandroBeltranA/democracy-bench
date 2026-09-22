@@ -143,6 +143,13 @@ GLOBAL_STUDY_STOP = 8.50                # USD; all paid Q2 spend counts against 
 #: fallback projection. A labelled panel extension populates this at activation (AMD-PB-01,
 #: `alignment.q2_v7.panel_b`) for closed models that publish no tokenizer.
 APPROVED_FALLBACK_AMENDMENTS: frozenset[str] = frozenset()
+#: Provider framing-token tolerance for criterion (b), keyed by endpoint TAG: the number of
+#: billed completion tokens above `MAX_TOKENS` that are accepted when — and only when — the
+#: reported reasoning tokens are exactly 0 and no reasoning payload is present. EMPTY for the
+#: v7 panel, so v7 keeps the strict `billed <= MAX_TOKENS` rule. Populated by a labelled
+#: panel extension under signed amendment AMD-PB-02 (`alignment.q2_v7.panel_b`, variant B2)
+#: for an OpenAI endpoint that bills hidden per-message framing tokens on a one-token reply.
+FRAMING_TOKEN_TOLERANCE_BY_TAG: Mapping[str, int] = {}
 
 # --- C3 retry policy ---
 MAX_ATTEMPTS = 5                        # one initial attempt + four retries
@@ -1507,10 +1514,17 @@ def audit_reasoning_off(result: EndpointProbeResult) -> tuple[str, ...]:
         failures.append("required usage fields absent")
     if result.parsed_leading_digit is None or not (1 <= int(result.parsed_leading_digit) <= 4):
         failures.append(f"parsed_leading_digit={result.parsed_leading_digit!r} not in [1,4]")
-    if result.billed_completion_tokens is not None and result.billed_completion_tokens > MAX_TOKENS:
+    cap = MAX_TOKENS
+    if (result.reasoning_tokens == 0 and not result.has_reasoning_payload
+            and result.tag in FRAMING_TOKEN_TOLERANCE_BY_TAG):
+        # AMD-PB-02 (panel extension only; the mapping is empty for v7): provider framing
+        # tokens on a reply whose reasoning is demonstrably off. Bounded, never open-ended.
+        cap = MAX_TOKENS + int(FRAMING_TOKEN_TOLERANCE_BY_TAG[result.tag])
+    if result.billed_completion_tokens is not None and result.billed_completion_tokens > cap:
         failures.append(
             f"billed_completion_tokens={result.billed_completion_tokens} exceeds "
-            f"max_tokens={MAX_TOKENS}")
+            f"max_tokens={MAX_TOKENS}"
+            + (f" (+{cap - MAX_TOKENS} framing tolerance)" if cap != MAX_TOKENS else ""))
     return tuple(failures)
 
 
