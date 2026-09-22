@@ -1008,7 +1008,9 @@ class V7Ledger:
     routing/parsing/scoring subsequently passed.
     """
     reconciliation: ReconciliationResult
-    hard_stop_usd: float = HARD_STOP_USD
+    # Resolved at CONSTRUCTION time from the module global, so a panel profile that rebinds
+    # `HARD_STOP_USD` after import is honoured; the v7 value is unchanged.
+    hard_stop_usd: float = field(default_factory=lambda: HARD_STOP_USD)
     manifest: Optional[RunManifest] = None
     _booked: dict = field(default_factory=dict)      # draw_id -> quantized Decimal cost
     _bucket_spend: dict = field(default_factory=dict)   # bucket -> quantized Decimal spend
@@ -1239,7 +1241,7 @@ class V7Ledger:
 
 def reconstruct_ledger(store: EnvelopeStore, *, manifest: RunManifest,
                        reconciliation: Optional[ReconciliationResult] = None,
-                       hard_stop_usd: float = HARD_STOP_USD) -> V7Ledger:
+                       hard_stop_usd: Optional[float] = None) -> V7Ledger:
     """Rebuild the full ledger from EVERY persisted raw record in the run directory.
 
     Verifies that each record belongs to the frozen manifest and appears exactly once, then
@@ -1248,6 +1250,8 @@ def reconstruct_ledger(store: EnvelopeStore, *, manifest: RunManifest,
     """
     if reconciliation is None:
         reconciliation = ReconciliationResult(reconciled_usd=0.0, record_count=0)
+    if hard_stop_usd is None:
+        hard_stop_usd = HARD_STOP_USD                  # module global, read at call time
 
     ledger = V7Ledger(reconciliation=reconciliation, hard_stop_usd=hard_stop_usd,
                       manifest=manifest)

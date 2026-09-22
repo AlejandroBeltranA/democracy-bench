@@ -1317,7 +1317,9 @@ def _install_study_fakes(monkeypatch):
     # authorization flow while still exercising the exact-serialization path.
     monkeypatch.setattr(
         S, "pinned_tokenizer",
-        lambda model, snapshot, tokenizer_dir: _fake_pinned_tokenizer(model))
+        # `run_dir` is accepted and ignored: this fake stands in for the pinned-tokenizer
+        # path, which does not read it (only the AMD-PB-01 calibrated path does).
+        lambda model, snapshot, tokenizer_dir, run_dir=None: _fake_pinned_tokenizer(model))
 
 
 class AuthorizedRun:

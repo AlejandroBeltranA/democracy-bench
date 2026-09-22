@@ -561,7 +561,13 @@ def load_draws(store: "LG.EnvelopeStore", *, probe_ids: Sequence[str], model: st
     An excluded draw is retained as an ATTEMPTED draw whose `choice` is None, so it can never
     reach an estimand while the attempted count stays honest (see the module docstring).
     `extract_draws` returns the same rows plus the full audit trail.
+
+    This module has no CLI, so it is the top-level load that selects the panel: `Q2_PANEL=B`
+    binds the Panel B snapshot and stop (AMD-PB-01) before any record is judged against them.
+    Unset, it does nothing and the frozen v7 panel is used exactly as before.
     """
+    from alignment.q2_v7 import panel_b                          # noqa: WPS433
+    panel_b.activate_from_env()
     return list(extract_draws(store, probe_ids=probe_ids, model=model, manifest=manifest).draws)
 
 

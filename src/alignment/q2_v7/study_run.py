@@ -105,6 +105,12 @@ PROBE_WORST_CASE_USD = 0.01
 #: Separately quantified retry reserve (C2 `total` term). Overridable per run; never zero by
 #: default, because a projection with no reserve can authorise a run it cannot finish.
 DEFAULT_RETRY_RESERVE_USD = 0.25
+#: Panel-extension seams (EMPTY for v7; populated by `alignment.q2_v7.panel_b.activate`).
+#: `FALLBACK_AMENDMENT_BY_MODEL` names the signed amendment under which a model's projection
+#: may use the non-C2 fallback; `USAGE_CALIBRATED_MODELS` are the models whose token counter
+#: is calibrated from the walk probe's provider-reported usage instead of a pinned tokenizer.
+FALLBACK_AMENDMENT_BY_MODEL: Mapping[str, str] = {}
+USAGE_CALIBRATED_MODELS: frozenset[str] = frozenset()
 
 USAGE = ("python -m alignment.q2_v7.study_run {walk,project,authorize,smoke,full} "
          "--model MODEL --run-dir DIR --i-have-authorized-paid-spend")
@@ -697,6 +703,7 @@ def build_projection(*, model: str, candidate: G.EndpointCandidate,
         candidate=candidate,
         requests=[r.rendered for r in requests],
         tokenizer=tokenizer,
+        fixed_overhead_fallback_signed_amendment=FALLBACK_AMENDMENT_BY_MODEL.get(model),
         completion_allowance_tokens=allowance,
         reconciled_prior_gate_spend=ledger.total_spent_usd,
         retry_reserve=float(retry_reserve_usd),
@@ -1561,8 +1568,8 @@ def load_promotion_authorization(run_dir: Path | str, model: str) -> dict:
 
 def build_funding_authorization(run_dir: Path | str, *, decision: str, authorized: bool,
                                 reconciliation: L.ReconciliationResult,
-                                hard_stop_usd: float = L.HARD_STOP_USD,
-                                panel: Sequence[str] = G.PANEL_ORDER,
+                                hard_stop_usd: Optional[float] = None,
+                                panel: Optional[Sequence[str]] = None,
                                 recorded_by: str = "") -> dict:
     """Derive the panel funding authorization payload from the recorded promotion decisions.
 
@@ -1572,6 +1579,10 @@ def build_funding_authorization(run_dir: Path | str, *, decision: str, authorize
     digest (PS-1.3) alongside the $8.50 hard stop, the reconciled prior spend and the headroom
     that decision leaves.
     """
+    if hard_stop_usd is None:
+        hard_stop_usd = L.HARD_STOP_USD                # module globals, read at call time
+    if panel is None:
+        panel = G.PANEL_ORDER
     models: list[dict] = []
     for model in panel:
         record = load_promotion_authorization(run_dir, model)
@@ -2287,11 +2298,23 @@ def run_full(*, model: str, tag: str, key: str, requests: Sequence[StudyRequestL
 # Pinned tokenizer (C2) — a local, hash-verified read; never a download
 # =======================================================================================
 
-def pinned_tokenizer(model: str, snapshot: E.Snapshot, tokenizer_dir: Path | str
-                     ) -> G.Tokenizer:
+def pinned_tokenizer(model: str, snapshot: E.Snapshot, tokenizer_dir: Path | str,
+                     run_dir: Optional[Path] = None) -> G.Tokenizer:
     """Load the pinned official tokenizer from a LOCAL directory, verifying every file hash
     against the committed snapshot. There is no download and no fallback: an unverifiable
-    tokenizer means no projection, which means no promotion."""
+    tokenizer means no projection, which means no promotion.
+
+    `run_dir` is the RUN directory (not the tokenizer directory) and is used only by the
+    usage-calibrated path below, which reads that run's own persisted walk records."""
+    if model in USAGE_CALIBRATED_MODELS:
+        # AMD-PB-01: a closed model publishes no tokenizer. Its counter is calibrated from
+        # the persisted walk probe's provider-reported `prompt_tokens`; see `panel_b`.
+        from alignment.q2_v7 import panel_b                      # noqa: WPS433
+        if run_dir is None:
+            raise StudyRunError(
+                f"{model!r} is usage-calibrated under AMD-PB-01, so its counter needs the "
+                "RUN directory holding its persisted walk probe; none was given")
+        return panel_b.usage_calibrated_counter(model, run_dir=Path(run_dir))
     spec = snapshot.tokenizers.get(model)
     if not isinstance(spec, Mapping):
         raise StudyRunError(f"the committed snapshot pins no tokenizer for {model!r}")
@@ -2327,7 +2350,8 @@ def _print_ledger(ledger: L.V7Ledger) -> None:
 
 def _stage_walk(args, *, key: str, snapshot: E.Snapshot, run_dir: Path) -> int:
     probes = probe_ids_for(args.primary)
-    tokenizer = pinned_tokenizer(args.model, snapshot, args.tokenizer_dir)
+    tokenizer = pinned_tokenizer(args.model, snapshot, args.tokenizer_dir,
+                                 run_dir=run_dir)
     ledger = open_ledger(run_dir, model=args.model, reconciliation=default_reconciliation())
     _print_ledger(ledger)
     result = run_walk(model=args.model, key=key, snapshot=snapshot,
@@ -2354,7 +2378,8 @@ def _stage_project(args, *, key: str, snapshot: E.Snapshot, run_dir: Path) -> in
     tag = load_promotion(run_dir, args.model)
     probes = probe_ids_for(args.primary)
     requests = render_study_grid(args.model, tag, probes)
-    tokenizer = pinned_tokenizer(args.model, snapshot, args.tokenizer_dir)
+    tokenizer = pinned_tokenizer(args.model, snapshot, args.tokenizer_dir,
+                                 run_dir=run_dir)
     ledger = open_ledger(run_dir, model=args.model, endpoint=tag,
                          study_draw_ids=[I.draw_id(r.request_sha256, i) for r in requests
                                          for i in range(I.DRAWS_PER_COORDINATE)],
@@ -2537,7 +2562,8 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=f"usage: {USAGE}")
     parser.add_argument("stage", choices=STAGES)
     parser.add_argument("--model", required=True,
-                        help=f"one of the frozen panel, in order: {list(G.PANEL_ORDER)}")
+                        help=("one of the ACTIVE panel, in order: "
+                              f"{list(G.PANEL_ORDER)} (set Q2_PANEL=B to select Panel B)"))
     parser.add_argument("--run-dir", default=str(DEFAULT_RUN_DIR))
     parser.add_argument("--i-have-authorized-paid-spend", action="store_true", dest="ack",
                         help="required acknowledgement that this makes PAID OpenRouter calls")
@@ -2558,6 +2584,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    # Panel selection happens BEFORE the parser is built, because the parser's help text and
+    # every check below read the ACTIVE panel's constants. Without `Q2_PANEL=B` this is a
+    # no-op and the frozen v7 panel runs exactly as before.
+    from alignment.q2_v7 import panel_b                          # noqa: WPS433
+    panel_b.activate_from_env()
     args = build_parser().parse_args(argv)
 
     if not args.ack:
@@ -2574,7 +2605,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"{args.model!r} is not in the frozen v7 panel {list(G.PANEL_ORDER)}; the "
               f"panel and its order are frozen and no model is substituted", file=sys.stderr)
         return 2
-    if args.stage in ("walk", "project") and not args.tokenizer_dir:
+    if (args.stage in ("walk", "project") and not args.tokenizer_dir
+            and args.model not in USAGE_CALIBRATED_MODELS):
+        # A usage-calibrated model (AMD-PB-01) has no pinned tokenizer directory to verify:
+        # its counter comes from its own persisted walk records under --run-dir.
         print("--tokenizer-dir is required: the C2 full-grid projection uses the PINNED "
               "official tokenizer, hash-verified against the committed snapshot",
               file=sys.stderr)

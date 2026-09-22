@@ -66,6 +66,15 @@ SNAPSHOT_PATH = "out/q2_stage2_endpoint_snapshot/manifest.json"
 SNAPSHOT_SHA256 = "d9a5d0e061bf222ee7d12bd056c0f7ccaeadfab16db47da1fcf581d52dd3a72b"
 SNAPSHOT_SHA256_PRE_AMD_V72_01 = (
     "4b4b11a466cdf3af377a1a96b8478aac72fc2a22290315eac15aff9c780b295f")
+#: Models whose promoted endpoint declares NO `temperature` / `top_p`, so the frozen sampling
+#: body omits those two keys and the provider's default sampling applies. EMPTY for the v7
+#: panel: both v7 models declare both parameters and are sent both. A labelled panel
+#: extension (`alignment.q2_v7.panel_b`, signed amendment AMD-PB-01) populates this set at
+#: activation; nothing here reads it for a v7 model.
+PROVIDER_DEFAULT_SAMPLING_MODELS: frozenset[str] = frozenset()
+#: Sentinel: "use the module-level SNAPSHOT_SHA256 AT CALL TIME" (a panel profile may rebind
+#: it after import). Distinct from `None`, which is still refused.
+_MODULE_SNAPSHOT_SHA256 = object()
 #: C1 proof: OpenRouter must have routed directly, first attempt, one candidate, no BYOK.
 REQUIRED_STRATEGY = "direct"
 REQUIRED_ATTEMPT = 1
@@ -162,7 +171,7 @@ def build_sampling_request(model_slug: str,
         raise EnvelopeError("model_slug must be a non-empty string")
     if not isinstance(provider_tag, str) or not provider_tag.strip():
         raise EnvelopeError("provider_tag must be a non-empty string")
-    return {
+    body: dict = {
         "model": model_slug,
         "messages": _normalise_messages(messages),
         "temperature": TEMPERATURE,
@@ -172,6 +181,12 @@ def build_sampling_request(model_slug: str,
         "provider": _provider_block(provider_tag),
         "usage": {"include": True},
     }
+    if model_slug in PROVIDER_DEFAULT_SAMPLING_MODELS:
+        # AMD-PB-01 (panel extension only): the promoted endpoint declares neither sampling
+        # parameter, so under `require_parameters:true` they must be ABSENT, not null.
+        del body["temperature"]
+        del body["top_p"]
+    return body
     # NOTE: no "seed", no "stop", no "logprobs" — the sampling path is the only v7 path.
 
 
@@ -328,7 +343,7 @@ def _parse_candidate(raw: Mapping[str, Any], idx: int) -> SnapshotCandidate:
 
 
 def load_snapshot(path: str | Path,
-                  expected_sha256: str = SNAPSHOT_SHA256) -> Snapshot:
+                  expected_sha256: Any = _MODULE_SNAPSHOT_SHA256) -> Snapshot:
     """Load and SHA-256-BIND the committed endpoint snapshot (`manifest.json`).
 
     Fails closed if the file is missing, is not JSON, is structurally wrong, contains duplicate
@@ -336,6 +351,8 @@ def load_snapshot(path: str | Path,
     `expected_sha256`. `expected_sha256` defaults to the digest frozen in the v7.2 closure;
     passing `None` is refused rather than silently skipping verification.
     """
+    if expected_sha256 is _MODULE_SNAPSHOT_SHA256:
+        expected_sha256 = SNAPSHOT_SHA256          # resolved at CALL time, not at import
     if not isinstance(expected_sha256, str) or not expected_sha256.strip():
         raise SnapshotError("expected_sha256 is required; the snapshot binding is not optional")
     p = Path(path)

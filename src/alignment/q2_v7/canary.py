@@ -409,10 +409,14 @@ def _evaluate(model: str, tag: str, *, status: int, response: Mapping[str, Any],
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    # `Q2_PANEL=B` selects the labelled Panel B extension (AMD-PB-01) before any constant
+    # below is read. Unset, this does nothing and the frozen v7 panel runs unchanged.
+    from alignment.q2_v7 import panel_b                          # noqa: WPS433
+    panel_b.activate_from_env()
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--i-have-authorized-paid-spend", action="store_true", dest="ack",
                     help="required acknowledgement that this makes PAID OpenRouter calls")
-    ap.add_argument("--run-dir", default=str(DEFAULT_RUN_DIR))
+    ap.add_argument("--run-dir", default=None)
     ap.add_argument("--ca-file", default=None)
     ap.add_argument("--models", default=None,
                     help="comma-separated model slugs (default: the frozen panel order)")
@@ -428,7 +432,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
 
     snapshot = E.load_snapshot(ROOT / E.SNAPSHOT_PATH)
-    run_dir = Path(args.run_dir)
+    # Resolved AFTER panel selection, so `--run-dir` still wins but the default follows the
+    # active panel rather than whichever value this module was imported with.
+    run_dir = Path(args.run_dir) if args.run_dir else Path(DEFAULT_RUN_DIR)
     run_dir.mkdir(parents=True, exist_ok=True)
     store = L.EnvelopeStore(run_dir)
 

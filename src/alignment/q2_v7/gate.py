@@ -138,6 +138,11 @@ _MARGIN_RATIO = (11, 10)                # the same margin as an exact rational (
 MAX_TOKENS = 4                          # frozen envelope cap
 MIN_COMPLETION_ALLOWANCE = MAX_TOKENS   # allowance is never below the configured cap
 GLOBAL_STUDY_STOP = 8.50                # USD; all paid Q2 spend counts against this (R-V7-6)
+#: Signed pre-outcome amendments under which a FIXED-OVERHEAD (non-C2) projection may
+#: authorize spend. EMPTY for the v7 panel: `require_frozen_c2_serialization` refuses every
+#: fallback projection. A labelled panel extension populates this at activation (AMD-PB-01,
+#: `alignment.q2_v7.panel_b`) for closed models that publish no tokenizer.
+APPROVED_FALLBACK_AMENDMENTS: frozenset[str] = frozenset()
 
 # --- C3 retry policy ---
 MAX_ATTEMPTS = 5                        # one initial attempt + four retries
@@ -1005,7 +1010,7 @@ def project_full_grid(
     retry_reserve: float,
     draws_per_request: int = DRAWS_PER_COORDINATE,
     expected_requests: int = N_COORDINATES,
-    stop: float = GLOBAL_STUDY_STOP,
+    stop: Optional[float] = None,
     fixed_overhead_fallback_signed_amendment: Optional[str] = None,
 ) -> CostProjection:
     """The frozen C2 full-grid projection.
@@ -1041,6 +1046,8 @@ def project_full_grid(
     `serialization_is_frozen_c2` is False. `require_frozen_c2_serialization` turns that label
     into a hard refusal wherever a projection is about to authorize spend.
     """
+    if stop is None:
+        stop = GLOBAL_STUDY_STOP                       # module global, read at call time
     if candidate.model != model:
         raise SpecViolation(
             f"candidate {candidate.tag!r} belongs to {candidate.model!r}, not {model!r}")
@@ -1178,6 +1185,10 @@ def require_frozen_c2_serialization(projection: CostProjection) -> None:
     if projection.serialization_is_frozen_c2:
         return
     amendment = projection.fixed_overhead_fallback_signed_amendment
+    if amendment is not None and amendment in APPROVED_FALLBACK_AMENDMENTS:
+        # A panel profile has activated a signed amendment approving this fallback for its
+        # closed models. Empty for v7, so this branch is unreachable on the v7 panel.
+        return
     raise MissingChatTemplate(
         f"the projection for {projection.model!r} @ {projection.endpoint_tag!r} used "
         f"{projection.serialization_method!r}, not the frozen C2 pinned chat serialization"
