@@ -28,6 +28,7 @@ dev = [
 stage2 = [
     "tokenizers>=0.15",
     "jinja2>=3.1",
+    "tiktoken>=0.7",
 ]
 bayes = [
     "pymc>=5.10",

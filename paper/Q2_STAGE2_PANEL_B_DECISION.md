@@ -214,3 +214,27 @@ and is not edited. Three departures from variant B, nothing else:
 The projection allowance for Sol becomes 5 completion tokens per draw (the observed billed
 value), so the projected total rises accordingly. Signed: Alex Beltran (decision in chat).
 Recorded by: Claude.
+
+### AMD-PB-02 addendum — projection method for the Sol row (pre-outcome, 2026-09-22)
+
+The first B2 walk passed criteria (a) and (b) under the framing tolerance and failed (c):
+the ratio-calibrated projection was $11.13 against the $8.00 stop. The projection
+reproduces offline: the 150-character synthetic probe bills 46 prompt tokens, of which 10
+are provider framing and 36 are content (OpenAI's published `o200k_base` encoding), so a
+per-character ratio taken from it runs about three times the real rate over the
+1,040-character study requests. That run directory is kept at
+`out/q2_stage2_panel_b2_run_attempt1_cost_excluded/` and its one paid probe ($0.000142) is
+debited as a non-reconciled component.
+
+Refinement, applying to the Sol row only and to the cost projection only:
+
+- Input tokens are counted with OpenAI's published `tiktoken` `o200k_base` encoding on the
+  message contents; the runner's fixed 32-token overhead is added on top as before. This is
+  not the model's exact tokenizer, which is not published; it is OpenAI's own public encoding.
+- The walk probe is used to measure provider framing (billed minus encoded content). The
+  projection is refused if that framing exceeds the 32-token overhead the runner adds, so
+  the projection stays conservative in the budget's direction.
+- The B2 stop is $8.40: $11.00 minus GLM-5.2's bound projection $2.5785, floored.
+
+No estimand, cell, probe, order, draw count or scoring rule changes. Signed: Alex Beltran
+(decision in chat: "do option 2, sign the amendment and run sol"). Recorded by: Claude.

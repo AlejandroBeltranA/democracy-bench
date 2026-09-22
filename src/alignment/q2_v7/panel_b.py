@@ -16,13 +16,14 @@ The panel is ``("z-ai/glm-5.2", "openai/gpt-5.6-sol")``, frozen by the operator'
    default sampling then applies and is recorded as such. This is a wire-format concession,
    not a design change: the envelope is otherwise byte-identical to v7's.
 
-2. **Usage-calibrated projection for a closed model.** `openai/gpt-5.6-sol` publishes no
+2. **Public-encoding projection for a closed model.** `openai/gpt-5.6-sol` publishes no
    tokenizer and no chat template, so the frozen C2 pinned-serialization projection is not
-   executable for it at all. Its input-token counter is instead CALIBRATED from its own
-   persisted walk probe: the provider's reported ``prompt_tokens`` divided by the probe's
-   character length, applied per character. `gate.project_full_grid` labels the resulting
-   projection ``fixed_overhead_fallback`` and adds the frozen per-message template overhead on
-   top of the calibrated count, so the projection is conservative in the budget's direction.
+   executable for it at all. Its input-token counter instead counts message CONTENT with
+   OpenAI's published ``o200k_base`` encoding (tiktoken), and the model's own persisted walk
+   probe is used to CHECK that the provider's real request framing is no larger than the fixed
+   overhead the gate adds on top. `gate.project_full_grid` labels the resulting projection
+   ``fixed_overhead_fallback`` and adds the frozen per-message template overhead on top of the
+   content count, so the projection stays conservative in the budget's direction.
    ``gate.require_frozen_c2_serialization`` still refuses that projection unless AMD-PB-01 is
    named, which is the whole point of the amendment: the fallback is auditable, not silent.
    `z-ai/glm-5.2` publishes a real tokenizer and chat template and takes the ORDINARY frozen
@@ -55,7 +56,6 @@ or, in process::
 """
 from __future__ import annotations
 
-import math
 import os
 import sys
 from pathlib import Path
@@ -76,12 +76,13 @@ AMENDMENT = "AMD-PB-01"
 #: tokens on a one-digit reply with reasoning tokens exactly 0. B2 (a) tolerates up to
 #: `FRAMING_TOKEN_TOLERANCE_B2` billed tokens above `max_tokens` on the `openai` tag when
 #: reasoning is demonstrably off, (b) carries a Sol-only roster, and (c) runs under a
-#: Panel-B2 stop of $8.00 so that B ($2.5785 projected for GLM-5.2) + B2 stays inside the
-#: $11.00 Panel B ceiling Alex set. Nothing else differs from variant B.
+#: Panel-B2 stop of $8.40: the $11.00 Panel B ceiling Alex set minus GLM-5.2's bound
+#: projection of $2.5785 leaves $8.4215, floored to $8.40, so B + B2 stays inside $11.00.
+#: Nothing else differs from variant B.
 AMENDMENT_2 = "AMD-PB-02"
 FRAMING_TOKEN_TOLERANCE_B2: Mapping[str, int] = {"openai": 8}
 PANEL_B2_ORDER: tuple[str, ...] = ("openai/gpt-5.6-sol",)
-HARD_STOP_B2_USD = 8.00
+HARD_STOP_B2_USD = 8.40
 STUDY_RUN_DIR_B2 = None   # set below, after ROOT-relative dirs are defined
 
 #: The frozen Panel B roster, in order: GLM (primary) then Sol (independent replication).
@@ -138,6 +139,12 @@ PRIOR_DIAGNOSTIC_COMPONENTS_B: tuple[Any, ...] = (
                "HTTP 400, no cost; Sol HTTP 200, $0.000142). Error records carry no finite "
                "returned cost, so the attempts are debited at an upper bound rather than "
                "reconciled record by record"),
+    L.NonReconciledComponent(
+        label="panel_b2_walk_attempt1_cost_excluded",
+        upper_bound_usd=0.0002,
+        reason="out/q2_stage2_panel_b2_run_attempt1_cost_excluded/: one Sol walk probe, "
+               "HTTP 200, $0.000142, whose ratio-calibrated projection ($11.13) exceeded "
+               "the $8.00 stop; debited at an upper bound"),
 )
 
 
@@ -305,43 +312,93 @@ def activate_from_env(env: Optional[Mapping[str, str]] = None) -> bool:
 # =======================================================================================
 
 class UsageCalibratedCounter:
-    """A ``str -> int`` token counter calibrated from a closed model's own walk probe.
+    """A ``str -> int`` input-token counter for a closed model with no published tokenizer.
+
+    This is **not** the model's exact tokenizer, and it does not claim to be. It counts text
+    with OpenAI's PUBLISHED ``o200k_base`` encoding (`tiktoken`), which is the closest public
+    stand-in available for a closed OpenAI-family model; the true billed count may differ.
 
     Deliberately NOT a `gate.PinnedTokenizer`: `gate.project_full_grid` dispatches on the type,
     and a plain callable is labelled `fixed_overhead_fallback` — which is exactly the honest
     label for this counter, and is why `require_frozen_c2_serialization` must be shown the
     AMD-PB-01 signature before the projection may authorize spend.
 
-    Calibration is LAZY: the persisted walk envelope is read on the FIRST call, not at
-    construction, so building a runner does not depend on a run directory that a `walk` stage
-    has not yet written. The ratio is ``prompt_tokens / characters`` taken from the LATEST
-    successful (HTTP 200, usage present) probe for this model, and each subsequent count is
-    ``ceil(len(text) * ratio)``. `gate.project_full_grid` then adds the frozen per-message
-    template overhead on top, so the projected total sits ABOVE a true tokenizer count.
+    `__call__` counts the request's message CONTENT only. The gate then adds the frozen
+    fixed per-message template overhead (`gate.chat_template_overhead`) on top, standing in
+    for the provider's request framing (role markers, turn delimiters, the generation prompt).
+    That substitution is conservative only while the provider's REAL framing is at or below
+    that fixed overhead, so the model's own persisted walk probe is used to BOUND it:
 
-    Fails closed: with no such envelope on disk there is no calibration, and therefore no
-    projection and no promotion.
+        framing = probe.usage.prompt_tokens - o200k_base(probe payload text)
+
+    and the counter fails closed if that framing is negative (the probe cannot be reconciled
+    at all) or larger than `gate.chat_template_overhead(len(messages))` (the gate's overhead
+    would understate the real framing, so the projection would no longer be conservative).
+
+    The probe is read LAZILY on the FIRST call, not at construction, so building a runner does
+    not depend on a run directory that a `walk` stage has not yet written. The probe selected
+    is the LATEST successful (HTTP 200, integer `usage.prompt_tokens`) one for this model.
+
+    Fails closed: with no usable envelope on disk, or with `tiktoken` unavailable, there is no
+    framing check and therefore no projection and no promotion.
     """
+
+    #: OpenAI's published encoding. Not the model's pinned tokenizer — see the docstring.
+    ENCODING = "o200k_base"
+    METHOD = "tiktoken_content_count_plus_fixed_overhead"
 
     def __init__(self, model: str, *, run_dir: Path):
         self.model = str(model)
         self.run_dir = Path(run_dir)
-        self._ratio: Optional[float] = None
+        self._enc: Any = None
+        self._checked = False
         self._source_draw_id: Optional[str] = None
-        self._prompt_tokens: Optional[int] = None
-        self._chars: Optional[int] = None
         self._timestamp: Optional[str] = None
+        self._probe_prompt_tokens: Optional[int] = None
+        self._probe_payload_tokens: Optional[int] = None
+        self._framing: Optional[int] = None
+        self._framing_cap: Optional[int] = None
 
-    # --- calibration -------------------------------------------------------------------
-    def _calibrate(self) -> float:
-        if self._ratio is not None:
-            return self._ratio
+    # --- the public encoding --------------------------------------------------------------
+    def _encoding(self) -> Any:
+        if self._enc is not None:
+            return self._enc
+        try:
+            import tiktoken                                          # noqa: WPS433
+        except Exception as exc:                                     # pragma: no cover
+            raise SR.StudyRunError(
+                f"`tiktoken` is not importable, so the AMD-PB-01 input-token count for "
+                f"{self.model!r} cannot be produced ({type(exc).__name__}: {exc}); install "
+                "the `stage2` extra. There is no projection and no promotion without it"
+            ) from exc
+        try:
+            self._enc = tiktoken.get_encoding(self.ENCODING)
+        except Exception as exc:
+            raise SR.StudyRunError(
+                f"`tiktoken` cannot load the {self.ENCODING!r} encoding needed to count "
+                f"input tokens for {self.model!r} ({type(exc).__name__}: {exc})") from exc
+        return self._enc
+
+    @staticmethod
+    def _tiktoken_version() -> Optional[str]:
+        try:
+            import tiktoken                                          # noqa: WPS433
+            return str(getattr(tiktoken, "__version__", "") or "") or None
+        except Exception:                                            # pragma: no cover
+            return None
+
+    # --- the framing check ------------------------------------------------------------------
+    def _check_framing(self) -> None:
+        """Bound the provider's fixed request framing with this model's own walk probe."""
+        if self._checked:
+            return
+        enc = self._encoding()
         try:
             envelopes = SR.walk_store(self.run_dir).envelopes()
         except Exception as exc:
             raise SR.StudyRunError(
-                f"cannot read the walk records under {self.run_dir} to calibrate the "
-                f"{self.model!r} token counter ({type(exc).__name__}: {exc}); AMD-PB-01 "
+                f"cannot read the walk records under {self.run_dir} to bound the provider "
+                f"framing for {self.model!r} ({type(exc).__name__}: {exc}); AMD-PB-01 "
                 "requires a persisted successful walk probe before any projection") from exc
 
         usable = []
@@ -357,59 +414,75 @@ class UsageCalibratedCounter:
         if not usable:
             raise SR.StudyRunError(
                 f"no successful walk probe with reported `usage.prompt_tokens` for "
-                f"{self.model!r} under {self.run_dir}; AMD-PB-01's usage-calibrated counter "
-                "has nothing to calibrate against, so there is no projection")
+                f"{self.model!r} under {self.run_dir}; AMD-PB-01's framing check has nothing "
+                "to bound the provider framing against, so there is no projection")
 
         _, env, prompt_tokens = max(usable, key=lambda row: row[0])
         messages = (getattr(env, "request_body", None) or {}).get("messages")
         if not isinstance(messages, list) or not messages:
             raise SR.StudyRunError(
-                f"the calibrating walk envelope for {self.model!r} carries no request "
-                "messages; the character count it was billed for cannot be reconstructed")
+                f"the walk envelope for {self.model!r} carries no request messages; the "
+                "payload it was billed for cannot be reconstructed")
         try:
             text = "\n".join(m["content"] for m in messages)
         except (KeyError, TypeError) as exc:
             raise SR.StudyRunError(
-                f"the calibrating walk envelope for {self.model!r} has a message with no "
-                f"`content`; its character count cannot be reconstructed ({exc})") from exc
-        chars = len(text)
-        if chars <= 0:
-            raise SR.StudyRunError(
-                f"the calibrating walk envelope for {self.model!r} serialises to zero "
-                "characters; a zero denominator is not a calibration")
+                f"the walk envelope for {self.model!r} has a message with no `content`; its "
+                f"payload cannot be reconstructed ({exc})") from exc
 
-        self._prompt_tokens = prompt_tokens
-        self._chars = chars
+        payload_tokens = len(enc.encode(text))
+        framing = prompt_tokens - payload_tokens
+        cap = G.chat_template_overhead(len(messages))
+        if framing < 0:
+            raise SR.StudyRunError(
+                f"the walk probe for {self.model!r} was billed {prompt_tokens} prompt tokens "
+                f"but its payload encodes to {payload_tokens} {self.ENCODING} tokens: a "
+                "NEGATIVE provider framing means this encoding over-counts the provider's "
+                "own tokenizer, so the projection would not be conservative")
+        if framing > cap:
+            raise SR.StudyRunError(
+                f"the walk probe for {self.model!r} implies {framing} tokens of provider "
+                f"framing, above the {cap} tokens `gate.chat_template_overhead"
+                f"({len(messages)})` adds on the fallback path; the projection would "
+                "UNDERSTATE the billed request, so it is refused")
+
         self._source_draw_id = str(getattr(env, "draw_id", "") or "")
         self._timestamp = str(getattr(env, "timestamp", "") or "")
-        self._ratio = prompt_tokens / chars
-        return self._ratio
+        self._probe_prompt_tokens = prompt_tokens
+        self._probe_payload_tokens = payload_tokens
+        self._framing = framing
+        self._framing_cap = cap
+        self._checked = True
 
     # --- the counter itself -------------------------------------------------------------
     def __call__(self, text: str) -> int:
-        ratio = self._calibrate()
-        return int(math.ceil(len(text) * ratio))
+        self._check_framing()
+        return len(self._encoding().encode(str(text)))
 
     def identity(self) -> dict:
-        """The record of HOW this counter was calibrated, for the projection's audit trail."""
-        ratio = self._calibrate()
+        """The record of HOW this count was produced, for the projection's audit trail."""
+        self._check_framing()
         return {
-            "method": "usage_calibrated",
+            "method": self.METHOD,
+            "encoding": self.ENCODING,
+            "tiktoken_version": self._tiktoken_version(),
+            "amendment": AMENDMENT,
             "signed_amendment": AMENDMENT,
             "model": self.model,
             "run_dir": str(self.run_dir),
-            "source_draw_id": self._source_draw_id,
-            "source_timestamp": self._timestamp,
-            "prompt_tokens": self._prompt_tokens,
-            "characters": self._chars,
-            "tokens_per_character": ratio,
+            "calibration_draw_id": self._source_draw_id,
+            "calibration_timestamp": self._timestamp,
+            "probe_prompt_tokens": self._probe_prompt_tokens,
+            "probe_payload_tokens": self._probe_payload_tokens,
+            "provider_framing_tokens": self._framing,
+            "framing_cap_tokens": self._framing_cap,
         }
 
     def __repr__(self) -> str:                                    # pragma: no cover
         return (f"UsageCalibratedCounter(model={self.model!r}, run_dir={str(self.run_dir)!r}, "
-                f"calibrated={self._ratio is not None})")
+                f"framing_checked={self._checked})")
 
 
 def usage_calibrated_counter(model: str, *, run_dir: Path) -> Callable[[str], int]:
-    """The AMD-PB-01 counter for a closed model. See `UsageCalibratedCounter`."""
+    """The AMD-PB-01 input-token counter for a closed model. See `UsageCalibratedCounter`."""
     return UsageCalibratedCounter(model, run_dir=Path(run_dir))

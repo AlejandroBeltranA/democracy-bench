@@ -7,7 +7,6 @@ leak Panel B constants into the rest of the suite.
 """
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 import pytest
@@ -257,21 +256,47 @@ def _put_walk_envelope(run_dir: Path, *, model=SOL, prompt_tokens=40, status=200
     return store
 
 
-def test_usage_calibrated_counter_math(tmp_path):
-    _put_walk_envelope(tmp_path, prompt_tokens=40)          # 40 tokens / 20 chars = 2.0
-    counter = PB.usage_calibrated_counter(SOL, run_dir=tmp_path)
-    assert counter("x" * 7) == 14
-    assert counter("") == 0
-    ident = counter.identity()
-    assert ident["tokens_per_character"] == pytest.approx(2.0)
-    assert ident["signed_amendment"] == "AMD-PB-01"
-    assert ident["prompt_tokens"] == 40 and ident["characters"] == 20
+def _enc():
+    import tiktoken
+    return tiktoken.get_encoding("o200k_base")
 
 
-def test_usage_calibrated_counter_rounds_up(tmp_path):
-    _put_walk_envelope(tmp_path, prompt_tokens=7)           # 7 / 20 = 0.35
+#: The default fixture payload: "abcdefghij" + "\n" + "klmnopqrs".
+DEFAULT_PAYLOAD = "abcdefghij\nklmnopqrs"
+
+
+def _payload_tokens(text=DEFAULT_PAYLOAD):
+    return len(_enc().encode(text))
+
+
+def test_usage_calibrated_counter_counts_with_o200k_base(tmp_path):
+    """The count IS tiktoken o200k_base on the text — no ratio, no scaling."""
+    # framing must sit in [0, chat_template_overhead(2)] = [0, 32]
+    _put_walk_envelope(tmp_path, prompt_tokens=_payload_tokens() + 10)
     counter = PB.usage_calibrated_counter(SOL, run_dir=tmp_path)
-    assert counter("x" * 10) == math.ceil(10 * 0.35) == 4
+    enc = _enc()
+    for text in ("", "x" * 7, "The Member for Ashford asked about the funding formula.",
+                 "abcdefghij\nklmnopqrs"):
+        assert counter(text) == len(enc.encode(text))
+
+
+def test_usage_calibrated_counter_identity(tmp_path):
+    import tiktoken
+    payload = _payload_tokens()
+    _put_walk_envelope(tmp_path, prompt_tokens=payload + 10, draw_id="draw-1",
+                       timestamp="2026-09-22T06:00:00Z")
+    ident = PB.usage_calibrated_counter(SOL, run_dir=tmp_path).identity()
+    assert ident["method"] == "tiktoken_content_count_plus_fixed_overhead"
+    assert ident["encoding"] == "o200k_base"
+    assert ident["tiktoken_version"] == tiktoken.__version__
+    assert ident["amendment"] == "AMD-PB-01"
+    assert ident["calibration_draw_id"] == "draw-1"
+    assert ident["calibration_timestamp"] == "2026-09-22T06:00:00Z"
+    assert ident["probe_prompt_tokens"] == payload + 10
+    assert ident["probe_payload_tokens"] == payload
+    assert ident["provider_framing_tokens"] == 10
+    assert ident["framing_cap_tokens"] == G.chat_template_overhead(2) == 32
+    assert "tokens_per_character" not in ident
 
 
 def test_usage_calibrated_counter_is_lazy(tmp_path):
@@ -282,11 +307,47 @@ def test_usage_calibrated_counter_is_lazy(tmp_path):
 
 
 def test_usage_calibrated_counter_takes_the_latest_envelope(tmp_path):
-    _put_walk_envelope(tmp_path, prompt_tokens=40, timestamp="2026-09-22T00:00:00Z",
-                       draw_id="draw-old")
-    _put_walk_envelope(tmp_path, prompt_tokens=60, timestamp="2026-09-22T06:00:00Z",
-                       draw_id="draw-new")
-    assert PB.usage_calibrated_counter(SOL, run_dir=tmp_path)("x" * 10) == 30
+    """The framing check reads the LATEST usable probe, not the first one written."""
+    payload = _payload_tokens()
+    _put_walk_envelope(tmp_path, prompt_tokens=payload + 31,
+                       timestamp="2026-09-22T00:00:00Z", draw_id="draw-old")
+    _put_walk_envelope(tmp_path, prompt_tokens=payload + 7,
+                       timestamp="2026-09-22T06:00:00Z", draw_id="draw-new")
+    ident = PB.usage_calibrated_counter(SOL, run_dir=tmp_path).identity()
+    assert ident["calibration_draw_id"] == "draw-new"
+    assert ident["provider_framing_tokens"] == 7
+
+
+def test_usage_calibrated_counter_fails_closed_on_negative_framing(tmp_path):
+    """Billed fewer prompt tokens than the public encoding counts: not conservative."""
+    _put_walk_envelope(tmp_path, prompt_tokens=_payload_tokens() - 1)
+    with pytest.raises(SR.StudyRunError, match="NEGATIVE"):
+        PB.usage_calibrated_counter(SOL, run_dir=tmp_path)("abc")
+
+
+def test_usage_calibrated_counter_fails_closed_above_the_overhead_cap(tmp_path):
+    """Real framing above gate.chat_template_overhead(n) would understate the grid."""
+    cap = G.chat_template_overhead(2)
+    _put_walk_envelope(tmp_path, prompt_tokens=_payload_tokens() + cap + 1)
+    with pytest.raises(SR.StudyRunError, match="framing"):
+        PB.usage_calibrated_counter(SOL, run_dir=tmp_path)("abc")
+    # exactly at the cap is still allowed
+    _put_walk_envelope(tmp_path, prompt_tokens=_payload_tokens() + cap,
+                       timestamp="2026-09-23T00:00:00Z", draw_id="draw-at-cap")
+    assert PB.usage_calibrated_counter(SOL, run_dir=tmp_path)("abc") == len(
+        _enc().encode("abc"))
+
+
+def test_the_framing_cap_follows_the_message_count(tmp_path):
+    """A three-message probe is capped at chat_template_overhead(3), not (2)."""
+    msgs = [{"role": "system", "content": "abc"},
+            {"role": "user", "content": "def"},
+            {"role": "user", "content": "ghi"}]
+    payload = _payload_tokens("abc\ndef\nghi")
+    _put_walk_envelope(tmp_path, messages=msgs,
+                       prompt_tokens=payload + G.chat_template_overhead(3))
+    ident = PB.usage_calibrated_counter(SOL, run_dir=tmp_path).identity()
+    assert ident["framing_cap_tokens"] == G.chat_template_overhead(3) == 44
 
 
 @pytest.mark.parametrize("kwargs", [
@@ -308,13 +369,13 @@ def test_usage_calibrated_counter_fails_closed_on_an_empty_run_dir(tmp_path):
 
 
 def test_pinned_tokenizer_routes_sol_to_the_calibrated_counter(tmp_path):
-    _put_walk_envelope(tmp_path, prompt_tokens=40)
+    _put_walk_envelope(tmp_path, prompt_tokens=_payload_tokens() + 10)
     PB.activate()
     counter = SR.pinned_tokenizer(SOL, None, tmp_path / "unused-tokenizer-dir",
                                   run_dir=tmp_path)
     assert isinstance(counter, PB.UsageCalibratedCounter)
     assert not isinstance(counter, G.PinnedTokenizer)   # so the projection is LABELLED fallback
-    assert counter("x" * 5) == 10
+    assert counter("x" * 5) == len(_enc().encode("x" * 5))
 
 
 def test_pinned_tokenizer_refuses_a_calibrated_model_with_no_run_dir(tmp_path):
@@ -453,8 +514,8 @@ def test_variant_b2_tolerates_bounded_framing_tokens_only_with_reasoning_off():
     try:
         assert panel_b.active_variant() == "B2"
         assert G.PANEL_ORDER == ("openai/gpt-5.6-sol",)
-        assert G.GLOBAL_STUDY_STOP == pytest.approx(8.00)
-        assert L.HARD_STOP_USD == pytest.approx(8.00)
+        assert G.GLOBAL_STUDY_STOP == pytest.approx(8.40)
+        assert L.HARD_STOP_USD == pytest.approx(8.40)
         assert G.audit_reasoning_off(_probe("openai", 5)) == ()
         assert G.audit_reasoning_off(_probe("openai", 4 + 8)) == ()
         assert any("exceeds" in f for f in G.audit_reasoning_off(_probe("openai", 4 + 9)))
