@@ -540,6 +540,32 @@ def openrouter_available() -> bool:
     return bool(os.environ.get("OPENROUTER_API_KEY"))
 
 
+def openrouter_payload(model: str, prompt: str, *, system: str = SURVEY_SYSTEM,
+                       temperature: float = 0.8, max_tokens: int = 16) -> dict:
+    """The sampling request body. `OPENROUTER_REASONING_EFFORT` (e.g. `none`) adds OpenRouter's
+    documented reasoning control so a reasoning-default model (GPT-5.x, Gemini 3.x, GLM, Qwen3.5)
+    answers the forced choice inside `max_tokens` instead of spending it on hidden reasoning.
+    Anthropic endpoints reject `none` and run without thinking unless asked, so the control is
+    not sent to them."""
+    body = {
+        "model": model,
+        "messages": [{"role": "system", "content": system},
+                     {"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    effort = os.environ.get("OPENROUTER_REASONING_EFFORT", "").strip()
+    if effort and not model.startswith("anthropic/"):
+        body["reasoning"] = {"effort": effort}
+    # A reasoning-MANDATORY model (Gemini 3.x, GLM-5.3) rejects `none` and spends a 16-token
+    # budget on hidden reasoning, returning no answer. `OPENROUTER_MAX_TOKENS` raises the cap
+    # so the option number arrives after the reasoning; the parser still reads only the reply.
+    override = os.environ.get("OPENROUTER_MAX_TOKENS", "").strip()
+    if override:
+        body["max_tokens"] = max(int(override), int(max_tokens))
+    return body
+
+
 def openrouter_elicitor(model: str, temperature: float = 0.8, max_tokens: int = 16,
                         timeout: float = 60.0, system: str = SURVEY_SYSTEM,
                         retries: int = 6, backoff: float = 3.0) -> Elicitor:
@@ -552,13 +578,9 @@ def openrouter_elicitor(model: str, temperature: float = 0.8, max_tokens: int = 
         raise RuntimeError("OPENROUTER_API_KEY not set — export it to use OpenRouter models")
 
     def _call(prompt: str) -> str:
-        payload = json.dumps({
-            "model": model,
-            "messages": [{"role": "system", "content": system},
-                         {"role": "user", "content": prompt}],
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }).encode()
+        payload = json.dumps(openrouter_payload(model, prompt, system=system,
+                                                temperature=temperature,
+                                                max_tokens=max_tokens)).encode()
         req = urllib.request.Request(
             "https://openrouter.ai/api/v1/chat/completions", data=payload,
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
