@@ -935,19 +935,31 @@ def test_cli_runs_exactly_one_stage_and_never_auto_advances(monkeypatch, run_dir
         assert called == [stage]                     # exactly one stage, no successor
 
 
-def test_cli_stage_names_are_the_five_frozen_steps():
+def test_cli_stage_names_are_the_frozen_steps():
     """`authorize` sits between `project` and `smoke` because the frozen staged authorization
     (v7 requirement 4) makes the recorded promotion+funding decisions a PRECONDITION of the
     240-call smoke. The earlier four-stage tuple encoded the defect PS-1 names: there was no
-    stage that could create the records the smoke is required to check."""
-    assert S.STAGES == ("walk", "project", "authorize", "smoke", "full")
+    stage that could create the records the smoke is required to check.
+
+    `reconcile` joins them for the same shape of reason: R-E2 halts a run on an attempt with
+    no returned cost, the frozen rule's only exit without a generation id is a DECLARED upper
+    bound, and there was no stage that could write one — so the halt had no legal resolution."""
+    assert S.STAGES == ("walk", "project", "authorize", "reconcile", "smoke", "full")
     assert set(S._DISPATCH) == set(S.STAGES)
+    assert S.PAID_STAGES == ("walk", "smoke", "full")
     assert "authorize" not in S.PAID_STAGES
+    # `reconcile` moves MONEY into the ledger, but it does it from records already on disk.
+    assert "reconcile" not in S.PAID_STAGES
+    # ...and it is exempt from the credential requirement for the same reason `authorize`
+    # is: it constructs no transport. `project` is deliberately NOT exempt — narrowing a
+    # fail-closed gate is not this stage's business.
+    assert S.NO_CREDENTIAL_STAGES == ("authorize", "reconcile")
+    assert not set(S.NO_CREDENTIAL_STAGES) & set(S.PAID_STAGES)
 
 
 def test_usage_line_documents_the_required_acknowledgement():
     assert "--i-have-authorized-paid-spend" in S.USAGE
-    assert "{walk,project,authorize,smoke,full}" in S.USAGE
+    assert "{walk,project,authorize,reconcile,smoke,full}" in S.USAGE
 
 
 # =======================================================================================
@@ -1672,3 +1684,241 @@ def test_a_second_panel_model_reconstructs_the_shared_stop(tmp_path, monkeypatch
                       study_draw_ids=ids_second,
                       reconciliation=L.ReconciliationResult(reconciled_usd=0.0,
                                                             record_count=0))
+
+
+# =======================================================================================
+# 13. The `reconcile` stage — R-E2's only exit for a costless attempt with no generation id
+# =======================================================================================
+#
+# Both live Panel B runs halted on the same thing: `SingleAttemptTransport` records a
+# client-side read timeout as a synthetic 503 with `usage: {}`, `generation_id: None` and no
+# cost. R-E2 refuses to book that as free, and there is no generation id to reconcile it
+# through, so the run halts. The frozen rule's remaining exit is a DECLARED conservative upper
+# bound, and until this stage existed the runner had no way to write one: a correct halt with
+# no legal resolution. These tests drive the real CLI stage end to end, with no network.
+
+def timeout_503():
+    """Byte-for-byte what the live transport persisted for a client-side read timeout."""
+    return (503, {}, {"error": {"message": "TimeoutError: The read operation timed out"}})
+
+
+def _plant_timeout_attempt(run_dir, request, draw_index=0, attempt=0) -> str:
+    """Persist ONE costless synthetic-503 attempt under a manifest-bound attempt identity."""
+    status, headers, body = timeout_503()
+    draw = S.StudyDraw(request_sha256=request.request_sha256,
+                       draw_index=S.attempt_draw_index(draw_index, attempt))
+    envelope = L.build_envelope(
+        draw=draw, request_body=request.body, request_headers={}, response_body=body,
+        response_headers=headers, http_status=status, bucket=S.FULL_BUCKET, model=MODEL,
+        provider=PRIMARY_TAG, stage=f"{S.FULL_STAGE}_attempt")
+    assert envelope.cost_usd is None and envelope.cost_status == "missing"
+    assert envelope.usage == {} and envelope.generation_id is None
+    S.attempt_store(run_dir).put(envelope)
+    return draw.draw_id
+
+
+def _open_prepared_ledger(run_dir, tag=PRIMARY_TAG):
+    ids = [I.draw_id(r.request_sha256, i) for r in fake_study_grid(tag=tag)
+           for i in range(I.DRAWS_PER_COORDINATE)]
+    return S.open_ledger(run_dir, model=MODEL, endpoint=tag, study_draw_ids=ids,
+                         reconciliation=L.ReconciliationResult(reconciled_usd=0.0,
+                                                               record_count=0))
+
+
+def _worst_case_for(run_dir, request, tag=PRIMARY_TAG) -> float:
+    binding = S.load_projection_binding(run_dir, MODEL, tag)
+    artifact = S.read_projection(run_dir / binding["artifact_filename"])
+    return S.worst_case_lookup(artifact)(request.request_sha256)
+
+
+def test_reconcile_resolves_the_halt_a_costless_timeout_attempt_causes(authorized, capsys):
+    request = fake_study_grid()[0]
+    draw_id = _plant_timeout_attempt(authorized.run_dir, request)
+
+    # BEFORE: the ledger cannot be rebuilt at all — R-E2 fails closed, as it must.
+    with pytest.raises(L.CostAccountingError):
+        _open_prepared_ledger(authorized.run_dir)
+
+    before = authorized.factory.calls
+    assert authorized.main("reconcile", "--attempt-draw-id", draw_id,
+                           "--reason", "client-side read timeout; no generation id exists",
+                           "--recorded-by", "test") == 0
+    assert authorized.factory.calls == before          # not one wire call
+
+    worst_case = _worst_case_for(authorized.run_dir, request)
+    out = capsys.readouterr().out
+    assert "no network call and no paid call" in out
+    assert draw_id in out
+
+    # AFTER: the ledger rebuilds, books the DECLARED BOUND, and reports itself inexact.
+    ledger = _open_prepared_ledger(authorized.run_dir)
+    assert ledger.reconciled_draw_ids() == [draw_id]
+    assert ledger.reconciled_upper_bound_usd == pytest.approx(worst_case)
+    assert ledger.booked_cost_exact_usd(draw_id) == L.to_money(worst_case)
+    assert ledger.is_exact is False
+
+    record = S.attempt_store(authorized.run_dir).get_reconciliation(draw_id)
+    assert record.method == "declared_upper_bound"
+    assert record.upper_bound_usd == pytest.approx(worst_case)
+    assert record.reason == "client-side read timeout; no generation id exists"
+    assert record.recorded_by == "test"
+    # The bound is derived from the projection, never transcribed by hand.
+    assert request.request_sha256[:12] in record.basis
+    assert record.envelope_sha256 == \
+        S.attempt_store(authorized.run_dir).raw_sha256(draw_id)
+
+
+def test_reconcile_is_write_once_for_a_given_attempt(authorized, capsys):
+    request = fake_study_grid()[1]
+    draw_id = _plant_timeout_attempt(authorized.run_dir, request)
+    assert authorized.main("reconcile", "--attempt-draw-id", draw_id,
+                           "--reason", "read timeout") == 0
+    first = S.attempt_store(authorized.run_dir).get_reconciliation(draw_id)
+    # A second, cheaper declaration would retroactively shrink booked spend.
+    assert authorized.main("reconcile", "--attempt-draw-id", draw_id,
+                           "--reason", "second thoughts",
+                           "--upper-bound-usd", "99.0") == 1
+    assert "already reconciled" in capsys.readouterr().err
+    assert S.attempt_store(authorized.run_dir).get_reconciliation(draw_id) == first
+
+
+def test_reconcile_refuses_an_attempt_that_returned_a_cost(authorized, capsys, snapshot):
+    request = fake_study_grid()[2]
+    draw = S.StudyDraw(request_sha256=request.request_sha256,
+                       draw_index=S.attempt_draw_index(0, 0))
+    _status, _hdrs, body = ok(PRIMARY_TAG, snapshot, cost=3e-06)
+    S.attempt_store(authorized.run_dir).put(L.build_envelope(
+        draw=draw, request_body=request.body, request_headers={}, response_body=body,
+        response_headers={}, http_status=200, bucket=S.FULL_BUCKET, model=MODEL,
+        provider=PRIMARY_TAG, stage=f"{S.FULL_STAGE}_attempt"))
+
+    assert authorized.main("reconcile", "--attempt-draw-id", draw.draw_id,
+                           "--reason", "trying to replace a fact with an estimate") == 1
+    assert "nothing to reconcile" in capsys.readouterr().err
+    assert S.attempt_store(authorized.run_dir).get_reconciliation(draw.draw_id) is None
+
+
+def test_reconcile_refuses_a_bound_below_the_projection_worst_case(authorized, capsys):
+    request = fake_study_grid()[3]
+    draw_id = _plant_timeout_attempt(authorized.run_dir, request)
+    worst_case = _worst_case_for(authorized.run_dir, request)
+
+    assert authorized.main("reconcile", "--attempt-draw-id", draw_id,
+                           "--reason", "read timeout",
+                           "--upper-bound-usd", f"{worst_case / 2:.12f}") == 1
+    assert "below the projection worst case" in capsys.readouterr().err
+    assert S.attempt_store(authorized.run_dir).get_reconciliation(draw_id) is None
+
+    # At or above the worst case is accepted, and it is the DECLARED figure that is booked.
+    assert authorized.main("reconcile", "--attempt-draw-id", draw_id,
+                           "--reason", "read timeout",
+                           "--upper-bound-usd", f"{worst_case * 2:.12f}") == 0
+    assert S.attempt_store(authorized.run_dir).get_reconciliation(
+        draw_id).upper_bound_usd == pytest.approx(worst_case * 2)
+
+
+def test_reconcile_refuses_an_unbilled_rejection_and_an_unknown_attempt(authorized, capsys):
+    request = fake_study_grid()[4]
+    draw = S.StudyDraw(request_sha256=request.request_sha256,
+                       draw_index=S.attempt_draw_index(0, 0))
+    _status, _hdrs, body = hard_404()
+    S.attempt_store(authorized.run_dir).put(L.build_envelope(
+        draw=draw, request_body=request.body, request_headers={}, response_body=body,
+        response_headers={}, http_status=404, bucket=S.FULL_BUCKET, model=MODEL,
+        provider=PRIMARY_TAG, stage=f"{S.FULL_STAGE}_attempt"))
+    assert authorized.main("reconcile", "--attempt-draw-id", draw.draw_id,
+                           "--reason", "no need") == 1
+    # `build_envelope` already books a provable router rejection at $0 on the persisted
+    # evidence, so it reads as a returned cost here; either way there is nothing to declare.
+    assert "nothing to reconcile" in capsys.readouterr().err
+
+    assert authorized.main("reconcile", "--attempt-draw-id", I.draw_id("f" * 64, 0),
+                           "--reason", "nothing is there") == 1
+    assert "no attempt record" in capsys.readouterr().err
+
+
+def test_reconcile_refuses_an_attempt_outside_this_models_manifest(authorized, capsys):
+    """Spend this run never authorised gets no bound: it gets a refusal."""
+    outsider = _make_request(MODEL, PRIMARY_TAG, "cell_x", "pol_not_a_probe", 0)
+    draw_id = _plant_timeout_attempt(authorized.run_dir, outsider)
+    assert authorized.main("reconcile", "--attempt-draw-id", draw_id,
+                           "--reason", "read timeout") == 1
+    assert "not bound by this model's manifest" in capsys.readouterr().err
+
+
+def test_reconcile_requires_an_attempt_and_a_reason(authorized, capsys):
+    assert authorized.main("reconcile", "--reason", "r") == 2
+    assert "--attempt-draw-id is required" in capsys.readouterr().err
+    assert authorized.main("reconcile", "--attempt-draw-id", "x", "--reason", "   ") == 2
+    assert "--reason is required" in capsys.readouterr().err
+
+
+def test_reconcile_needs_no_credential(authorized, monkeypatch, capsys):
+    """`reconcile` reads and writes records already on disk; it never opens a socket."""
+    request = fake_study_grid()[5]
+    draw_id = _plant_timeout_attempt(authorized.run_dir, request)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    assert authorized.main("reconcile", "--attempt-draw-id", draw_id,
+                           "--reason", "read timeout") == 0
+    assert "OPENROUTER_API_KEY" not in capsys.readouterr().err
+
+
+def test_reconcile_refuses_to_price_from_a_tampered_projection_artifact(authorized, capsys):
+    request = fake_study_grid()[6]
+    draw_id = _plant_timeout_attempt(authorized.run_dir, request)
+    binding = S.load_projection_binding(authorized.run_dir, MODEL, PRIMARY_TAG)
+    artifact_path = authorized.run_dir / binding["artifact_filename"]
+    obj = json.loads(artifact_path.read_text())
+    obj["total"] = 0.0
+    _rewrite(artifact_path, json.dumps(obj, sort_keys=True, separators=(",", ":")))
+
+    assert authorized.main("reconcile", "--attempt-draw-id", draw_id,
+                           "--reason", "read timeout") == 1
+    assert "edited" in capsys.readouterr().err
+    assert S.attempt_store(authorized.run_dir).get_reconciliation(draw_id) is None
+
+
+def test_a_reconciled_attempt_is_not_booked_twice_by_its_sampling_outcome(authorized):
+    """The terminal sampling record must not re-debit the stop for the same wire response."""
+    request = fake_study_grid()[7]
+    draw_id = _plant_timeout_attempt(authorized.run_dir, request)
+    # The same costless response also persisted as the terminal sampling outcome.
+    _status, _hdrs, body = timeout_503()
+    S.study_store(authorized.run_dir).put(L.build_envelope(
+        draw=S.StudyDraw(request_sha256=request.request_sha256, draw_index=0),
+        request_body=request.body, request_headers={}, response_body=body,
+        response_headers={}, http_status=503, bucket=S.FULL_BUCKET, model=MODEL,
+        provider=PRIMARY_TAG, stage=S.FULL_STAGE))
+    assert authorized.main("reconcile", "--attempt-draw-id", draw_id,
+                           "--reason", "read timeout") == 0
+
+    worst_case = _worst_case_for(authorized.run_dir, request)
+    ledger = _open_prepared_ledger(authorized.run_dir)
+    assert ledger.reconciled_upper_bound_usd == pytest.approx(worst_case)   # once, not twice
+    assert len(ledger.reconciled_draw_ids()) == 1
+
+
+def test_reconcile_uses_the_manifest_the_run_paid_under_not_a_recomputation(
+        authorized, monkeypatch):
+    """A halted run must stay reconcilable by the code written to reconcile it.
+
+    `runner_revision()` is a content hash of `study_run.py`, and the manifest binds it — so
+    ADDING the `reconcile` stage changes every recomputed manifest. If the stage recomputed,
+    it would refuse every run that halted before it existed, which is every run it is for.
+    The persisted manifest is write-once and is the binding the spend was incurred under.
+    """
+    request = fake_study_grid()[8]
+    draw_id = _plant_timeout_attempt(authorized.run_dir, request)
+    on_disk = S.load_study_manifest(authorized.run_dir, MODEL)
+
+    monkeypatch.setattr(S, "runner_revision", lambda: "sha256:a_later_runner")
+    recomputed = S.build_study_manifest(
+        model=MODEL, endpoint_tag=PRIMARY_TAG, requests=fake_study_grid(),
+        probe_ids=PROBE_IDS, snapshot_sha256=real_snapshot().sha256,
+        binding=S.DesignBinding(design_sha256="a" * 64, item_bank_sha256="b" * 64,
+                                payload_sha256="c" * 64, guard_sha256="d" * 64,
+                                runner_revision=S.runner_revision()))
+    assert recomputed.sha256 != on_disk.sha256           # the runner moved on...
+    assert authorized.main("reconcile", "--attempt-draw-id", draw_id,
+                           "--reason", "read timeout") == 0      # ...the record did not
+    assert S.attempt_store(authorized.run_dir).get_reconciliation(draw_id) is not None

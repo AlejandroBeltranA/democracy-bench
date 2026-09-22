@@ -84,6 +84,11 @@ FRAMING_TOKEN_TOLERANCE_B2: Mapping[str, int] = {"openai": 8}
 PANEL_B2_ORDER: tuple[str, ...] = ("openai/gpt-5.6-sol",)
 HARD_STOP_B2_USD = 8.40
 STUDY_RUN_DIR_B2 = None   # set below, after ROOT-relative dirs are defined
+#: B2-ONLY non-reconciled component: the one paid Sol walk probe of the cost-excluded first
+#: B2 attempt. It is a B2 debit, not a Panel B one — adding it to the shared list after
+#: GLM-5.2's funding record was written moved B's reconciled prior spend and made the frozen
+#: authorization refuse GLM's resume, so it lives in the B2 overrides alone.
+PRIOR_DIAGNOSTIC_COMPONENTS_B2_EXTRA = None   # set below, after `L` components are defined
 
 #: The frozen Panel B roster, in order: GLM (primary) then Sol (independent replication).
 PANEL_B_ORDER: tuple[str, ...] = ("z-ai/glm-5.2", "openai/gpt-5.6-sol")
@@ -139,6 +144,8 @@ PRIOR_DIAGNOSTIC_COMPONENTS_B: tuple[Any, ...] = (
                "HTTP 400, no cost; Sol HTTP 200, $0.000142). Error records carry no finite "
                "returned cost, so the attempts are debited at an upper bound rather than "
                "reconciled record by record"),
+)
+PRIOR_DIAGNOSTIC_COMPONENTS_B2_EXTRA = (
     L.NonReconciledComponent(
         label="panel_b2_walk_attempt1_cost_excluded",
         upper_bound_usd=0.0002,
@@ -197,6 +204,8 @@ def _b2_overrides() -> tuple[tuple[Any, str, Any], ...]:
         (L, "HARD_STOP_USD", HARD_STOP_B2_USD),
         (G, "FRAMING_TOKEN_TOLERANCE_BY_TAG", dict(FRAMING_TOKEN_TOLERANCE_B2)),
         (SR, "DEFAULT_RUN_DIR", STUDY_RUN_DIR_B2),
+        (C, "PRIOR_DIAGNOSTIC_COMPONENTS",
+         PRIOR_DIAGNOSTIC_COMPONENTS_B + PRIOR_DIAGNOSTIC_COMPONENTS_B2_EXTRA),
     )
 
 

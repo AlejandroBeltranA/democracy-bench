@@ -238,3 +238,26 @@ Refinement, applying to the Sol row only and to the cost projection only:
 
 No estimand, cell, probe, order, draw count or scoring rule changes. Signed: Alex Beltran
 (decision in chat: "do option 2, sign the amendment and run sol"). Recorded by: Claude.
+
+## Run log (2026-09-22)
+
+- **Both full runs halted once** on a client-side 60-second read timeout, which the
+  transport records as a synthetic HTTP 503 with no generation id and no usage. The C3
+  ladder retried and both coordinates completed, but the frozen R-E2 rule halts a run
+  whose cumulative total would otherwise be understated. The runner had no stage to
+  declare such an attempt, so an unpaid `reconcile` stage was added: it writes an immutable
+  per-attempt record binding the envelope's SHA-256 and a declared upper bound at or above
+  the projection's worst case for that request; the ledger books the bound and reports
+  itself not exact. Declared: GLM-5.2 attempt `9d5c1728…#draw1120` at $0.000129; Sol
+  attempt `5294e430…#draw1040` at $0.000452. OpenRouter's credit usage matched the
+  ledger-booked totals to within noise, so neither timed-out call was in fact billed.
+- **Resume under the bound runner.** A study manifest binds a content hash of
+  `study_run.py`, so the edit that added `reconcile` would have made `full` refuse to
+  resume. Both runs were resumed from an overlay pairing the committed runner source the
+  manifests bind (`sha256:3939d0418645a2fa`) with the new ledger, which reads the
+  reconciliation records. Manifests resumed byte-identical.
+- GLM-5.2's first resume was refused because a B2-only non-reconciled component had been
+  added to the shared Panel B list after GLM's funding record; it was moved to the B2
+  overrides (B reconciles $0.0005 as funded; B2 $0.0007) and the resume succeeded.
+- Rule for the future: never edit `study_run.py` or `study_render.py` while a run is in
+  flight; land accounting changes in `ledger.py`, which the manifest does not hash.

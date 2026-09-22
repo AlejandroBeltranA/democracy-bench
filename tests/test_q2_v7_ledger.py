@@ -17,13 +17,15 @@ import pytest
 
 from alignment.q2_v7.ledger import (EPS, FORCE_OVERWRITTEN_CANARY, HARD_STOP_USD,
                                     MONEY_DECIMAL_PLACES, MONEY_QUANTUM_USD, MONEY_ROUNDING,
-                                    CostAccountingError, DerivedRecord, DoubleBookingError,
+                                    AttemptReconciliation, CostAccountingError,
+                                    DerivedRecord, DoubleBookingError,
                                     DrawIdentity, EnvelopeExistsError, EnvelopeStore,
                                     HardStopExceeded, ManifestBindingError, ModelProjection,
                                     NonReconciledComponent, RawEnvelope, ReconciliationError,
                                     ReconciliationResult, RunManifest, V7Ledger,
                                     build_envelope, canonical_sha256,
                                     estimand_eligible_draw_ids, from_money, is_cache_hit,
+                                    is_unbilled_rejection,
                                     money_sum, reconcile_prior_spend, reconstruct_ledger,
                                     record_response, record_validation, redact_headers,
                                     redact_request_body, returned_cost, to_money)
@@ -900,3 +902,165 @@ def test_projection_and_reconciliation_totals_use_the_same_rule():
     assert result.total_exact_usd == Decimal("0.000300000000000")
     assert result.total_usd == projection.complete_run_usd
     assert result.to_dict()["total_usd"] == result.total_usd
+
+
+# =======================================================================================
+# R-E2's SECOND exit — a declared per-attempt upper bound (`AttemptReconciliation`)
+# =======================================================================================
+#
+# A client-side read timeout is persisted as a synthetic 503 with no usage, no generation id
+# and no cost. It is not an unbilled router rejection (that is 4xx-only and provable), so
+# R-E2 refuses to book it as free; and with no generation id there is nothing to reconcile it
+# THROUGH. The frozen rule's remaining exit is a documented conservative UPPER bound. These
+# tests pin that it is a bound, that it is bound to the exact bytes it prices, that it is
+# write-once, and that it makes the total inexact.
+
+def _timeout_503() -> dict:
+    """What `study_run.SingleAttemptTransport` records for a client-side read timeout."""
+    return {"error": {"message": "TimeoutError: The read operation timed out"}}
+
+
+def _costless_attempt(store: EnvelopeStore, draw: DrawIdentity) -> RawEnvelope:
+    env = build_envelope(draw=draw, request_body=_request(), request_headers=_headers(),
+                         response_body=_timeout_503(), response_headers={}, http_status=503,
+                         bucket="study", model=QWEN, provider="alibaba",
+                         stage="study_attempt", timestamp="2026-09-22T00:00:00Z")
+    # Exactly what the live runs persisted: a synthetic 503, empty usage, no generation id.
+    assert env.cost_usd is None and env.cost_status == "missing"
+    assert env.usage == {} and env.generation_id is None
+    store.put(env)
+    return env
+
+
+def _reconciliation_for(store: EnvelopeStore, draw_id: str, *, bound: float = 0.0004,
+                        digest: Optional[str] = None) -> AttemptReconciliation:
+    return AttemptReconciliation(
+        draw_id=draw_id,
+        envelope_sha256=digest if digest is not None else store.raw_sha256(draw_id),
+        upper_bound_usd=bound,
+        basis="projection worst case for request " + SHA_A[:12],
+        reason="client-side read timeout: no generation id exists to reconcile through",
+        recorded_by="test",
+        recorded_utc="2026-09-22T00:00:00Z")
+
+
+def test_a_costless_timeout_attempt_with_no_reconciliation_still_fails_closed(tmp_path: Path):
+    store = EnvelopeStore(tmp_path / "run")
+    draw = DrawIdentity(SHA_A, 0)
+    _costless_attempt(store, draw)
+    manifest = _manifest(draw.draw_id)
+    # The synthetic 503 is NOT a provable unbilled rejection, so nothing books it as free.
+    assert not is_unbilled_rejection(_timeout_503(), 503, {})
+    with pytest.raises(CostAccountingError):
+        reconstruct_ledger(EnvelopeStore(tmp_path / "run"), manifest=manifest)
+
+
+def test_a_bound_reconciliation_books_the_upper_bound_and_makes_the_total_inexact(
+        tmp_path: Path):
+    store = EnvelopeStore(tmp_path / "run")
+    draw = DrawIdentity(SHA_A, 0)
+    _costless_attempt(store, draw)
+    store.put_reconciliation(_reconciliation_for(store, draw.draw_id, bound=0.00031))
+
+    ledger = reconstruct_ledger(EnvelopeStore(tmp_path / "run"),
+                                manifest=_manifest(draw.draw_id))
+    assert ledger.run_usd == pytest.approx(0.00031)
+    assert ledger.booked_cost_exact_usd(draw.draw_id) == to_money(0.00031)
+    assert ledger.reconciled_upper_bound_usd == pytest.approx(0.00031)
+    assert ledger.reconciled_draw_ids() == [draw.draw_id]
+    # A bound is not a returned cost: the total can no longer be called exact.
+    assert ledger.is_exact is False
+    summary = ledger.audit_summary()
+    assert summary["is_exact"] is False
+    assert summary["n_reconciled_attempts"] == 1
+    assert summary["reconciled_upper_bound_usd"] == pytest.approx(0.00031)
+    # Bucket-neutral: the bound is in the total the $8.50 stop sees, but it is not reported
+    # as returned spend in a bucket.
+    assert summary["spend_by_bucket"]["study"] == pytest.approx(0.0)
+    assert json.dumps(summary)                               # stays JSON-serializable
+
+
+def test_a_reconciliation_bound_to_different_bytes_is_refused(tmp_path: Path):
+    store = EnvelopeStore(tmp_path / "run")
+    draw = DrawIdentity(SHA_A, 0)
+    _costless_attempt(store, draw)
+    store.put_reconciliation(_reconciliation_for(store, draw.draw_id, digest="f" * 64))
+    with pytest.raises(CostAccountingError, match="different bytes"):
+        reconstruct_ledger(EnvelopeStore(tmp_path / "run"),
+                           manifest=_manifest(draw.draw_id))
+
+
+def test_a_reconciliation_without_the_envelope_digest_is_ignored(tmp_path: Path):
+    """`book_envelope` called with no digest cannot verify the binding, so it fails closed."""
+    store = EnvelopeStore(tmp_path / "run")
+    draw = DrawIdentity(SHA_A, 0)
+    env = _costless_attempt(store, draw)
+    manifest = _manifest(draw.draw_id)
+    ledger = V7Ledger(reconciliation=ReconciliationResult(reconciled_usd=0.0, record_count=0),
+                      manifest=manifest,
+                      reconciliations={draw.draw_id: _reconciliation_for(store,
+                                                                        draw.draw_id)})
+    with pytest.raises(CostAccountingError):
+        ledger.book_envelope(env)
+    assert ledger.book_envelope(env, store.raw_sha256(draw.draw_id)) == pytest.approx(0.0004)
+
+
+def test_a_reconciliation_record_is_write_once(tmp_path: Path):
+    store = EnvelopeStore(tmp_path / "run")
+    draw = DrawIdentity(SHA_A, 0)
+    _costless_attempt(store, draw)
+    store.put_reconciliation(_reconciliation_for(store, draw.draw_id, bound=0.001))
+    with pytest.raises(EnvelopeExistsError):
+        store.put_reconciliation(_reconciliation_for(store, draw.draw_id, bound=0.0))
+    # ...and the declared bound on disk is the FIRST one, not the cheaper second.
+    assert store.get_reconciliation(draw.draw_id).upper_bound_usd == pytest.approx(0.001)
+
+
+def test_a_reconciliation_round_trips_and_validates_its_fields(tmp_path: Path):
+    store = EnvelopeStore(tmp_path / "run")
+    draw = DrawIdentity(SHA_A, 0)
+    _costless_attempt(store, draw)
+    record = _reconciliation_for(store, draw.draw_id, bound=0.00025)
+    store.put_reconciliation(record)
+    loaded = store.reconciliations()[draw.draw_id]
+    assert loaded == record
+    assert loaded.schema == "q2_v7.ledger.attempt_reconciliation.v1"
+    assert loaded.method == "declared_upper_bound"
+    assert AttemptReconciliation.from_dict(record.as_dict()) == record
+
+    digest = store.raw_sha256(draw.draw_id)
+    for bad in ({"upper_bound_usd": float("nan")}, {"upper_bound_usd": -1.0},
+                {"reason": "   "}, {"basis": ""}, {"envelope_sha256": "short"},
+                {"method": "generation_id"}, {"schema": "q2_v7.something_else.v1"},
+                {"draw_id": ""}):
+        fields = dict(draw_id=draw.draw_id, envelope_sha256=digest, upper_bound_usd=0.0001,
+                      basis="b", reason="r")
+        fields.update(bad)
+        with pytest.raises(ReconciliationError):
+            AttemptReconciliation(**fields)
+
+
+def test_a_declared_bound_counts_against_the_single_hard_stop(tmp_path: Path):
+    """The bound is money: it must be visible to the pre-call gate, not merely reported."""
+    store = EnvelopeStore(tmp_path / "run")
+    draw = DrawIdentity(SHA_A, 0)
+    _costless_attempt(store, draw)
+    store.put_reconciliation(_reconciliation_for(store, draw.draw_id, bound=HARD_STOP_USD))
+    ledger = reconstruct_ledger(EnvelopeStore(tmp_path / "run"),
+                                manifest=_manifest(draw.draw_id))
+    assert ledger.remaining_usd == pytest.approx(0.0)
+    with pytest.raises(HardStopExceeded):
+        ledger.check_before_call(0.01)
+
+
+def test_an_envelope_with_a_returned_cost_ignores_any_declaration(tmp_path: Path):
+    """A returned cost is a fact; a declared bound never displaces it."""
+    store = EnvelopeStore(tmp_path / "run")
+    draw = DrawIdentity(SHA_A, 0)
+    manifest = _manifest(draw.draw_id)
+    _post(store, _fresh_ledger(manifest), draw, cost=0.0004)
+    store.put_reconciliation(_reconciliation_for(store, draw.draw_id, bound=5.0))
+    ledger = reconstruct_ledger(EnvelopeStore(tmp_path / "run"), manifest=manifest)
+    assert ledger.run_usd == pytest.approx(0.0004)
+    assert ledger.is_exact is True
+    assert ledger.reconciled_draw_ids() == []

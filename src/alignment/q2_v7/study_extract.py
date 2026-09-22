@@ -584,8 +584,11 @@ def reconcile_spend(extraction: DrawExtraction, store: "LG.EnvelopeStore", *,
     Summation is `math.fsum` over costs sorted by draw id, so the total is deterministic and
     independent of directory-iteration order.
     """
+    declared = store.reconciliations()
+    digests = store.raw_digests() if declared else {}
     by_draw: dict[str, float] = {}
     by_bucket: dict[str, float] = {}
+    bounded: dict[str, float] = {}
     for env in store.envelopes():
         cost = env.cost_usd
         if cost is None:
@@ -593,20 +596,41 @@ def reconcile_spend(extraction: DrawExtraction, store: "LG.EnvelopeStore", *,
                                         env.response_headers):
                 cost = 0.0
             else:
-                raise ExtractionError(
-                    f"envelope {env.draw_id} was persisted without a returned cost "
-                    f"(cost_status={env.cost_status!r}); refusing to book it as free (R-E2)")
+                # R-E2's second exit: a DECLARED upper bound, bound to the exact bytes it
+                # prices. It enters the total like any other booking — an upper bound that
+                # were left OUT of the total would understate spend exactly as a write-off
+                # does — but it is counted separately and makes the total inexact.
+                record = declared.get(env.draw_id)
+                if record is not None and \
+                        record.envelope_sha256 == digests.get(env.draw_id):
+                    cost = float(record.upper_bound_usd)
+                    bounded[env.draw_id] = cost
+                else:
+                    raise ExtractionError(
+                        f"envelope {env.draw_id} was persisted without a returned cost "
+                        f"(cost_status={env.cost_status!r}); refusing to book it as free "
+                        f"(R-E2)")
+        # A declared bound DOES enter `by_bucket` here, unlike in `V7Ledger`, where the
+        # booking is bucket-neutral. The two structures answer different questions: the
+        # ledger's buckets report RETURNED spend, and attributing a bound to one would dress
+        # an estimate up as a returned cost; this breakdown is a decomposition of `run_usd`
+        # for an artifact people read, and a breakdown that does not add up to its own total
+        # is a worse failure than one line being an upper bound. The bound is flagged either
+        # way, by `reconciled_upper_bound_usd`, `n_reconciled_attempts` and `is_exact`.
         by_draw[env.draw_id] = float(cost)
         by_bucket[env.bucket] = by_bucket.get(env.bucket, 0.0) + float(cost)
 
     run_usd = math.fsum(by_draw[k] for k in sorted(by_draw))
     prior_usd = reconciliation.total_usd if reconciliation is not None else 0.0
+    prior_exact = bool(reconciliation.is_exact) if reconciliation is not None else True
     return {
         "run_usd": run_usd,
         "prior_usd": prior_usd,
         "total_usd": run_usd + prior_usd,
         "hard_stop_usd": LG.HARD_STOP_USD,
-        "is_exact": bool(reconciliation.is_exact) if reconciliation is not None else True,
+        "is_exact": prior_exact and not bounded,
+        "reconciled_upper_bound_usd": math.fsum(bounded[k] for k in sorted(bounded)),
+        "n_reconciled_attempts": len(bounded),
         "n_booked_envelopes": len(by_draw),
         "n_study_draws": len(extraction.records),
         "by_bucket": {k: by_bucket[k] for k in sorted(by_bucket)},

@@ -58,8 +58,10 @@ class MemoryEnvelopeStore(LG.EnvelopeStore):
         self.run_dir = Path(str(run_dir))
         self.raw_dir = self.run_dir / "raw"
         self.derived_dir = self.run_dir / "derived"
+        self.reconciled_dir = self.run_dir / "reconciled"
         self._raw: dict[str, str] = {}
         self._derived: dict[str, str] = {}
+        self._reconciled: dict[str, str] = {}
 
     def raw_path(self, draw_id: str) -> Path:
         return self.raw_dir / (draw_id.replace("#", "__") + ".json")
@@ -96,6 +98,34 @@ class MemoryEnvelopeStore(LG.EnvelopeStore):
     def derived_records(self):
         return [LG.DerivedRecord.from_dict(json.loads(self._derived[d]))
                 for d in sorted(self._derived)]
+
+    # `raw_sha256`/`raw_digests` hash the PERSISTED bytes; here the canonical JSON string is
+    # the persisted form, so the digest an `AttemptReconciliation` binds means the same thing.
+    def raw_sha256(self, draw_id: str):
+        blob = self._raw.get(draw_id)
+        return None if blob is None else hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+    def raw_digests(self) -> dict:
+        return {d: hashlib.sha256(self._raw[d].encode("utf-8")).hexdigest()
+                for d in sorted(self._raw)}
+
+    def reconciliation_path(self, draw_id: str) -> Path:
+        return self.reconciled_dir / (draw_id.replace("#", "__") + ".json")
+
+    def put_reconciliation(self, record: LG.AttemptReconciliation) -> Path:
+        if record.draw_id in self._reconciled:
+            raise LG.EnvelopeExistsError(
+                f"reconciliation for {record.draw_id} already exists")
+        self._reconciled[record.draw_id] = LG.canonical_json(record.to_dict())
+        return self.reconciliation_path(record.draw_id)
+
+    def get_reconciliation(self, draw_id: str):
+        blob = self._reconciled.get(draw_id)
+        return None if blob is None else LG.AttemptReconciliation.from_dict(json.loads(blob))
+
+    def reconciliations(self) -> dict:
+        return {d: LG.AttemptReconciliation.from_dict(json.loads(self._reconciled[d]))
+                for d in sorted(self._reconciled)}
 
 
 def request_sha(cell_id: str, probe_id: str, order_idx: int) -> str:
@@ -1222,6 +1252,60 @@ def test_prior_spend_is_reconciled_and_never_called_exact(tmp_path):
     assert spend["total_usd"] == pytest.approx(spend["run_usd"] + spend["prior_usd"])
     assert spend["is_exact"] is False
     assert spend["total_usd"] < LG.HARD_STOP_USD
+
+
+def test_a_declared_upper_bound_enters_the_total_and_flags_it_inexact(tmp_path):
+    """R-E2's second exit, seen from the extraction side.
+
+    The bound must be IN the total — an upper bound left out understates spend exactly as a
+    write-off does — while being counted separately so the total is never called exact.
+    """
+    store = LG.EnvelopeStore(tmp_path / "run")
+    put_draw(store, cell_id=BASE, probe_id=PROBES[0], order_idx=0, draw_index=0, text="1",
+             cost=0.001)
+    sha = request_sha(BASE, PROBES[1], 0)
+    timeout = LG.build_envelope(
+        draw=LG.DrawIdentity(sha, 0), request_body={"model": MODEL}, request_headers={},
+        response_headers={}, http_status=503,
+        response_body={"error": {"message": "TimeoutError: The read operation timed out"}},
+        bucket="study", model=MODEL, provider=PROVIDER, stage="study", timestamp=TS)
+    store.put(timeout)
+    ext = SX.extract_draws(store, probe_ids=PROBES, model=MODEL, manifest=manifest_body())
+
+    # Without a declaration it still fails closed.
+    with pytest.raises(SX.ExtractionError, match="refusing to book it as free"):
+        SX.reconcile_spend(ext, store)
+
+    store.put_reconciliation(LG.AttemptReconciliation(
+        draw_id=timeout.draw_id, envelope_sha256=store.raw_sha256(timeout.draw_id),
+        upper_bound_usd=0.0004, basis="projection worst case", reason="read timeout"))
+    spend = SX.reconcile_spend(ext, LG.EnvelopeStore(tmp_path / "run"))
+    assert spend["run_usd"] == pytest.approx(0.001 + 0.0004)
+    assert spend["reconciled_upper_bound_usd"] == pytest.approx(0.0004)
+    assert spend["n_reconciled_attempts"] == 1
+    assert spend["is_exact"] is False
+
+    # A declaration bound to different bytes buys nothing: it still fails closed.
+    other = LG.EnvelopeStore(tmp_path / "other")
+    other.put(timeout)
+    other.put_reconciliation(LG.AttemptReconciliation(
+        draw_id=timeout.draw_id, envelope_sha256="f" * 64, upper_bound_usd=0.0004,
+        basis="projection worst case", reason="read timeout"))
+    with pytest.raises(SX.ExtractionError, match="refusing to book it as free"):
+        SX.reconcile_spend(ext, other)
+
+
+def test_a_run_with_no_declarations_reports_the_flags_at_their_neutral_values(tmp_path):
+    """The two new keys must not disturb a run that has nothing to reconcile."""
+    store = LG.EnvelopeStore(tmp_path / "run")
+    put_draw(store, cell_id=BASE, probe_id=PROBES[0], order_idx=0, draw_index=0, text="1",
+             cost=0.001)
+    ext = SX.extract_draws(store, probe_ids=PROBES, model=MODEL, manifest=manifest_body())
+    spend = SX.reconcile_spend(ext, store)
+    assert spend["reconciled_upper_bound_usd"] == 0.0
+    assert spend["n_reconciled_attempts"] == 0
+    assert spend["is_exact"] is True
+    assert spend["run_usd"] == pytest.approx(0.001)
 
 
 # =======================================================================================

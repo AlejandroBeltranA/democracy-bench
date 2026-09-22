@@ -48,8 +48,13 @@ as an argument, so the whole module is exercised with no network in
 
 Usage (each stage is invoked separately; no stage ever starts its successor):
 
-    python -m alignment.q2_v7.study_run {walk,project,authorize,smoke,full} \
+    python -m alignment.q2_v7.study_run {walk,project,authorize,reconcile,smoke,full} \
         --model MODEL --run-dir DIR --i-have-authorized-paid-spend
+
+`reconcile` is the one stage that writes money into the ledger without a wire call: it
+declares a documented UPPER bound for a single costless attempt (a client-side read timeout
+has no generation id, so no lookup can recover its cost) and makes every subsequent total
+report itself NOT exact.
 """
 from __future__ import annotations
 
@@ -80,7 +85,7 @@ DESIGN_DOC = ROOT / "paper" / "Q2_STAGE2_HOSTED_DESIGN.md"
 DEFAULT_RUN_DIR = ROOT / "out" / "q2_stage2_v7_study"
 V7_CANARY_RAW = ROOT / "out" / "q2_stage2_v7_canary" / "raw"
 
-STAGES: tuple[str, ...] = ("walk", "project", "authorize", "smoke", "full")
+STAGES: tuple[str, ...] = ("walk", "project", "authorize", "reconcile", "smoke", "full")
 
 #: Reporting labels only — ALL buckets share the single $8.50 stop (R-V7-6).
 WALK_STAGE, WALK_BUCKET = "gate", "gate"
@@ -112,7 +117,8 @@ DEFAULT_RETRY_RESERVE_USD = 0.25
 FALLBACK_AMENDMENT_BY_MODEL: Mapping[str, str] = {}
 USAGE_CALIBRATED_MODELS: frozenset[str] = frozenset()
 
-USAGE = ("python -m alignment.q2_v7.study_run {walk,project,authorize,smoke,full} "
+USAGE = ("python -m alignment.q2_v7.study_run "
+         "{walk,project,authorize,reconcile,smoke,full} "
          "--model MODEL --run-dir DIR --i-have-authorized-paid-spend")
 
 
@@ -1197,6 +1203,25 @@ def write_study_manifest(run_dir: Path | str, model: str,
     return I.write_or_resume_manifest(manifest_path(run_dir, model), manifest)
 
 
+def load_study_manifest(run_dir: Path | str, model: str) -> I.Manifest:
+    """The manifest this run ACTUALLY executed under, read from its write-once file.
+
+    `build_study_manifest` answers "what manifest would this source produce today?"; that is
+    the right question before a paid call and the WRONG one for a post-hoc accounting stage.
+    A manifest binds `runner_revision()`, which is a content hash of this module, so any edit
+    to the runner — including adding the `reconcile` stage — changes the recomputed manifest
+    and would make a halted run permanently unreconcilable by the very code written to
+    reconcile it. The persisted manifest is immutable (`write_or_resume_manifest` never
+    rewrites or repairs it) and is the binding the spend was actually incurred under, so it,
+    not a recomputation, is what a reconciliation must be checked against.
+    """
+    path = manifest_path(run_dir, model)
+    if not path.exists():
+        raise StudyRunError(
+            f"no manifest at {path} — there is no binding to reconcile an attempt against")
+    return I.Manifest(json.loads(path.read_text(encoding="utf-8")))
+
+
 def walk_store(run_dir: Path | str) -> L.EnvelopeStore:
     """Records of the synthetic capability probes (non-study, but paid)."""
     return L.EnvelopeStore(Path(run_dir) / "walk")
@@ -1345,18 +1370,15 @@ def _other_panel_study_draw_ids(run_dir: Path | str, model: str,
     return out
 
 
-def open_ledger(run_dir: Path | str, *, model: str, endpoint: str = "",
-                study_draw_ids: Sequence[str] = (),
-                reconciliation: Optional[L.ReconciliationResult] = None,
-                max_attempts: int = G.MAX_ATTEMPTS) -> L.V7Ledger:
-    """R-C2: rebuild the ledger from EVERY persisted record BEFORE the first budget check.
+def authorised_run_manifest(run_dir: Path | str, *, model: str, endpoint: str = "",
+                            study_draw_ids: Sequence[str] = (),
+                            max_attempts: int = G.MAX_ATTEMPTS) -> L.RunManifest:
+    """The EXACT set of draw identities this run directory is allowed to have paid for.
 
-    Both stores are reconstructed under one manifest binding, so walk probes and study draws
-    share the single $8.50 stop and a restarted process resumes at the cumulative spend rather
-    than at zero.
+    Factored out of `open_ledger` so the `reconcile` stage can ask the one question it must
+    ask before declaring a bound — "is this attempt bound by the manifest at all?" — against
+    the same binding the ledger reconstructs under, rather than a second, looser copy of it.
     """
-    if reconciliation is None:
-        reconciliation = L.ReconciliationResult(reconciled_usd=0.0, record_count=0)
     # The walk store is deliberately SHARED across the frozen panel so that every model's
     # spend counts against the one $8.50 stop. The manifest must therefore authorise the walk
     # draws of EVERY panel model, not just the current one: otherwise reconstructing the
@@ -1381,7 +1403,28 @@ def open_ledger(run_dir: Path | str, *, model: str, endpoint: str = "",
     # and are derived from each model's own persisted walk record, so this widens the binding
     # without weakening it: anything outside the panel's authorised set is still refused.
     authorised |= _other_panel_study_draw_ids(run_dir, model, max_attempts)
-    manifest = L.RunManifest.from_draw_ids(authorised, model=model, endpoint=endpoint)
+    return L.RunManifest.from_draw_ids(authorised, model=model, endpoint=endpoint)
+
+
+def open_ledger(run_dir: Path | str, *, model: str, endpoint: str = "",
+                study_draw_ids: Sequence[str] = (),
+                reconciliation: Optional[L.ReconciliationResult] = None,
+                max_attempts: int = G.MAX_ATTEMPTS) -> L.V7Ledger:
+    """R-C2: rebuild the ledger from EVERY persisted record BEFORE the first budget check.
+
+    Both stores are reconstructed under one manifest binding, so walk probes and study draws
+    share the single $8.50 stop and a restarted process resumes at the cumulative spend rather
+    than at zero.
+
+    Declared per-attempt upper bounds travel with the attempt store and are loaded by
+    `L.reconstruct_ledger`, so an attempt reconciled by the `reconcile` stage is booked at its
+    documented bound (and the ledger reports itself INEXACT) instead of failing closed.
+    """
+    if reconciliation is None:
+        reconciliation = L.ReconciliationResult(reconciled_usd=0.0, record_count=0)
+    manifest = authorised_run_manifest(run_dir, model=model, endpoint=endpoint,
+                                       study_draw_ids=study_draw_ids,
+                                       max_attempts=max_attempts)
     # Money is reconstructed from the ATTEMPT store: it holds every returned wire response,
     # including the paid non-terminal retries the old runner discarded.
     ledger = L.reconstruct_ledger(attempt_store(run_dir), manifest=manifest,
@@ -1403,6 +1446,12 @@ def _verify_sampling_outcomes(store: L.EnvelopeStore, attempts: L.EnvelopeStore,
     would count one paid response twice against the $8.50 stop. A study record with NO attempt
     record at all (written before the attempt store existed) is still booked here — otherwise
     a pre-PS-4 run would silently understate its spend.
+
+    An attempt booked at a DECLARED upper bound counts as booked here: it is in
+    `booked_draw_ids()` like any other booking, so its sampling outcome is not booked a second
+    time. Re-booking it would debit the stop for one wire response twice — once at the bound
+    and once at whatever the sampling record carries — which is the exact double-count this
+    function exists to prevent.
     """
     booked = set(ledger.booked_draw_ids())
     seen: set[str] = set()
@@ -2542,16 +2591,145 @@ def _stage_full(args, *, key: str, snapshot: E.Snapshot, run_dir: Path) -> int:
     return 0 if report.emit_headline else 1
 
 
+def _stage_reconcile(args, *, key: str, snapshot: E.Snapshot, run_dir: Path) -> int:
+    """Declare a documented UPPER bound for ONE costless attempt (R-E2's second exit).
+
+    A client-side read timeout is persisted as a synthetic 503 with no usage, no generation
+    id and no cost. R-E2 refuses to book it as free, and with no generation id there is
+    nothing to reconcile it *through*; the only honest exit the frozen rule leaves is a
+    declared conservative upper bound (R-V7-6), recorded immutably and alongside the exact
+    bytes it prices. That is what this stage writes, and it is all it writes.
+
+    It NEVER opens a socket and never needs a credential: every input is already on disk.
+
+    The default bound is not a number anyone types. It is the SAME per-draw worst case the
+    hard stop is checked against before every call, read out of the bound projection artifact
+    through `verify_projection` — so a tampered or unbound artifact refuses the declaration
+    instead of pricing it. A hand-supplied `--upper-bound-usd` may only ever be HIGHER: a
+    bound below the figure that authorised the call would understate the total, which is the
+    failure this whole path exists to prevent.
+    """
+    if not args.attempt_draw_id:
+        print("--attempt-draw-id is required: a reconciliation names exactly ONE attempt",
+              file=sys.stderr)
+        return 2
+    if not str(args.reason).strip():
+        print("--reason is required: a declared bound with no recorded justification is a "
+              "write-off wearing a record's clothes", file=sys.stderr)
+        return 2
+
+    draw_id = str(args.attempt_draw_id)
+    print("reconcile: no network call and no paid call is made by this stage.\n")
+
+    tag = load_promotion(run_dir, args.model)
+    probes = probe_ids_for(args.primary)
+    requests = render_study_grid(args.model, tag, probes)
+    # The manifest this run PAID under, read from its immutable file — never a recomputation.
+    # See `load_study_manifest` for why the distinction is load-bearing here and nowhere else.
+    manifest = load_study_manifest(run_dir, args.model)
+
+    store = attempt_store(run_dir)
+    envelope = store.get(draw_id)
+    if envelope is None:
+        print(f"no attempt record {draw_id} under {store.raw_dir} — a reconciliation may only "
+              f"be declared against a persisted envelope", file=sys.stderr)
+        return 1
+    if store.get_reconciliation(draw_id) is not None:
+        print(f"attempt {draw_id} is already reconciled at "
+              f"{store.reconciliation_path(draw_id)} — refusing to overwrite a declared upper "
+              f"bound (R-E5/S-F6)", file=sys.stderr)
+        return 1
+    if envelope.cost_usd is not None:
+        print(f"attempt {draw_id} returned a cost (${envelope.cost_usd:.8f}, "
+              f"cost_status={envelope.cost_status!r}) — there is nothing to reconcile, and a "
+              f"declared bound would replace a fact with an estimate", file=sys.stderr)
+        return 1
+    if L.is_unbilled_rejection(envelope.response_body or {}, envelope.http_status,
+                               envelope.response_headers):
+        print(f"attempt {draw_id} is a provable unbilled router rejection — it books as $0 on "
+              f"the persisted evidence and needs no declaration", file=sys.stderr)
+        return 1
+
+    bound_manifest = authorised_run_manifest(
+        run_dir, model=args.model, endpoint=tag,
+        study_draw_ids=manifest.draw_identities)
+    if not bound_manifest.contains(draw_id):
+        print(f"attempt {draw_id} is not bound by this model's manifest "
+              f"{bound_manifest.manifest_sha256[:12]} — refusing to declare a bound for spend "
+              f"this run never authorised", file=sys.stderr)
+        return 1
+
+    # PS-3: the projection is verified END TO END before a single figure is read out of it.
+    artifact, artifact_sha256 = verify_projection(
+        run_dir, model=args.model, tag=tag, snapshot=snapshot, manifest=manifest,
+        requests=requests)
+    worst_case = worst_case_lookup(artifact)(envelope.request_sha256)
+
+    bound = worst_case
+    basis = (f"projection worst case for request {envelope.request_sha256[:12]} "
+             f"(artifact {artifact_sha256[:12]})")
+    if args.upper_bound_usd is not None:
+        supplied = float(args.upper_bound_usd)
+        if not (supplied >= worst_case):
+            print(f"--upper-bound-usd {supplied:.8f} is below the projection worst case "
+                  f"{worst_case:.8f} for request {envelope.request_sha256[:12]} — a bound "
+                  f"under the figure that authorised the call would understate the total",
+                  file=sys.stderr)
+            return 1
+        bound = supplied
+        basis = (f"declared bound at or above the projection worst case "
+                 f"{worst_case:.8f} for request {envelope.request_sha256[:12]} "
+                 f"(artifact {artifact_sha256[:12]})")
+
+    digest = store.raw_sha256(draw_id)
+    record = L.AttemptReconciliation(
+        draw_id=draw_id,
+        envelope_sha256=str(digest),
+        upper_bound_usd=bound,
+        basis=basis,
+        reason=str(args.reason),
+        recorded_by=str(args.recorded_by or ""),
+        recorded_utc=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
+    path = store.put_reconciliation(record)
+
+    print(f"reconciled attempt {draw_id}")
+    print(f"    http status          {envelope.http_status} "
+          f"(cost_status={envelope.cost_status!r}, generation_id="
+          f"{envelope.generation_id!r})")
+    print(f"    request sha256       {envelope.request_sha256}")
+    print(f"    envelope sha256      {digest}")
+    print(f"    projection worst case ${worst_case:.8f}")
+    print(f"    declared upper bound  ${bound:.8f}")
+    print(f"    basis                {basis}")
+    print(f"    reason               {record.reason}")
+    print(f"    recorded by          {record.recorded_by or '(unrecorded)'} "
+          f"at {record.recorded_utc}")
+    print(f"    record               {path}")
+    print("\nthe ledger will book this attempt at the DECLARED BOUND and report itself "
+          "NOT exact (is_exact=False); the bound is never a returned cost.")
+    return 0
+
+
 _DISPATCH: Mapping[str, Callable[..., int]] = {
     "walk": _stage_walk,
     "project": _stage_project,
     "authorize": _stage_authorize,
+    "reconcile": _stage_reconcile,
     "smoke": _stage_smoke,
     "full": _stage_full,
 }
 
-#: Stages that can send a paid request. `authorize` is deliberately NOT one of them.
+#: Stages that can send a paid request. `authorize` and `reconcile` are deliberately NOT
+#: among them: both only read and write records that are already on disk.
 PAID_STAGES: tuple[str, ...] = ("walk", "smoke", "full")
+
+#: Stages that are exempt from the `OPENROUTER_API_KEY` requirement because they neither open
+#: a socket nor construct a transport: they only read and write records already on disk. This
+#: is NOT the complement of `PAID_STAGES` — `project` sends nothing either, but it is left
+#: requiring a credential exactly as it always has, because narrowing a fail-closed gate is
+#: not this change's business.
+NO_CREDENTIAL_STAGES: tuple[str, ...] = ("authorize", "reconcile")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2559,7 +2737,13 @@ def build_parser() -> argparse.ArgumentParser:
         prog="python -m alignment.q2_v7.study_run",
         description=("Q2 Stage-2 v7.2 study runner. Each stage is invoked SEPARATELY and "
                      "never starts its successor."),
-        epilog=f"usage: {USAGE}")
+        epilog=(f"usage: {USAGE}\n\n"
+                "`authorize` and `reconcile` make NO network call and need no credential. "
+                "`reconcile --attempt-draw-id ID --reason TEXT` declares a documented upper "
+                "bound for one attempt that returned no cost and has no generation id to "
+                "reconcile through; the bound defaults to that request's worst case in the "
+                "bound projection artifact, a supplied bound may only be higher, the record "
+                "is write-once, and every total that carries one is reported NOT exact."))
     parser.add_argument("stage", choices=STAGES)
     parser.add_argument("--model", required=True,
                         help=("one of the ACTIVE panel, in order: "
@@ -2580,6 +2764,13 @@ def build_parser() -> argparse.ArgumentParser:
                         help="`authorize --record-funding`: the decision, recorded verbatim")
     parser.add_argument("--refuse-funding", action="store_true",
                         help="`authorize --record-funding`: record a REFUSAL (authorized=false)")
+    parser.add_argument("--attempt-draw-id", default="",
+                        help="`reconcile`: the ONE attempt draw id to declare a bound for")
+    parser.add_argument("--reason", default="",
+                        help="`reconcile`: why this attempt has no returned cost, verbatim")
+    parser.add_argument("--upper-bound-usd", type=float, default=None,
+                        help=("`reconcile`: override the default bound; must be >= the "
+                              "projection worst case for this request"))
     return parser
 
 
@@ -2595,10 +2786,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("This makes PAID OpenRouter calls. Re-run with "
               "--i-have-authorized-paid-spend", file=sys.stderr)
         return 2
-    # `authorize` records decisions from files already on disk; it never opens a socket, so it
-    # neither needs nor is given a credential.
+    # `authorize` records decisions, and `reconcile` records a declared upper bound, from
+    # files already on disk; neither opens a socket, so neither needs nor is given a
+    # credential.
     key = os.environ.get("OPENROUTER_API_KEY") or ""
-    if not key and args.stage != "authorize":
+    if not key and args.stage not in NO_CREDENTIAL_STAGES:
         print("OPENROUTER_API_KEY not set", file=sys.stderr)
         return 2
     if args.model not in G.PANEL_ORDER:

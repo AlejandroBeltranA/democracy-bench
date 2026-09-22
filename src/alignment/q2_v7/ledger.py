@@ -23,6 +23,12 @@ Frozen rules this module enforces:
              parsing, coverage, or scoring later fail. Validation status lives in a SEPARATE
              derived record linked to the raw envelope; invalid calls are excluded from
              estimands but never erased from the audit trail or the ledger.
+             The rule leaves exactly two exits for a missing cost: reconcile it through the
+             generation id, or DECLARE it at a documented conservative upper bound. A
+             client-side read timeout is persisted as a synthetic 503 with no usage and no
+             generation id, so only the second exit exists for it; `AttemptReconciliation` is
+             that declaration at attempt granularity, bound to the exact envelope bytes it
+             prices, write-once, and it makes the ledger report itself NOT exact.
 
   R-E3       Restart reconstructs the full ledger from every persisted raw record in the run
              directory BEFORE the first budget check. Every record must belong to the frozen
@@ -651,6 +657,109 @@ class DerivedRecord:
 
 
 # =======================================================================================
+# Per-attempt reconciliation record (R-E2 / R-V7-6, applied at the level of ONE attempt)
+# =======================================================================================
+
+#: The only method a per-attempt reconciliation may declare. A returned cost is not a
+#: "method" — it needs no record — and a generation-id lookup would produce an EXACT cost,
+#: which belongs in the envelope itself, not here.
+RECONCILIATION_METHOD_DECLARED_UPPER_BOUND = "declared_upper_bound"
+
+ATTEMPT_RECONCILIATION_SCHEMA = "q2_v7.ledger.attempt_reconciliation.v1"
+
+
+@dataclass(frozen=True)
+class AttemptReconciliation:
+    """One immutable declaration that a costless attempt is debited at a documented UPPER bound.
+
+    R-E2 fails a record with no returned cost closed: it is never booked as free. The frozen
+    rule leaves exactly two honest exits — reconcile through the generation id, or declare the
+    spend as a non-reconciled component at a documented conservative upper bound (R-V7-6). A
+    client-side read timeout has NO generation id (the response never arrived), so only the
+    second exit exists, and `NonReconciledComponent` is prior-spend-shaped: it cannot name the
+    one attempt it belongs to. This record is that declaration at attempt granularity.
+
+    It is bound to the exact bytes it reconciles by `envelope_sha256`. Re-writing the raw
+    envelope (which the store refuses anyway) or pointing a record at a different attempt
+    invalidates it, so a declaration can never be made to absorb a cost it did not price.
+
+    A ledger carrying one of these is NOT exact: an upper bound is not a returned cost.
+    """
+    draw_id: str
+    envelope_sha256: str
+    upper_bound_usd: float
+    basis: str
+    reason: str
+    recorded_by: str = ""
+    recorded_utc: str = ""
+    method: str = RECONCILIATION_METHOD_DECLARED_UPPER_BOUND
+    schema: str = ATTEMPT_RECONCILIATION_SCHEMA
+
+    def __post_init__(self) -> None:
+        if not str(self.draw_id).strip():
+            raise ReconciliationError("an attempt reconciliation must name a draw id")
+        digest = str(self.envelope_sha256 or "")
+        if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest.lower()):
+            raise ReconciliationError(
+                f"attempt reconciliation {self.draw_id}: `envelope_sha256` must be a sha-256 "
+                f"hex digest binding the raw envelope it reconciles, got {digest!r}")
+        if self.schema != ATTEMPT_RECONCILIATION_SCHEMA:
+            raise ReconciliationError(
+                f"attempt reconciliation {self.draw_id}: unknown schema {self.schema!r}")
+        if self.method != RECONCILIATION_METHOD_DECLARED_UPPER_BOUND:
+            raise ReconciliationError(
+                f"attempt reconciliation {self.draw_id}: the only supported method is "
+                f"{RECONCILIATION_METHOD_DECLARED_UPPER_BOUND!r}, not {self.method!r}")
+        if _money_or_none(self.upper_bound_usd) is None:
+            raise ReconciliationError(
+                f"attempt reconciliation {self.draw_id}: the declared upper bound must be "
+                f"finite and non-negative, got {self.upper_bound_usd!r}")
+        if not str(self.reason).strip():
+            raise ReconciliationError(
+                f"attempt reconciliation {self.draw_id}: a reason is REQUIRED — a bound with "
+                f"no recorded justification is a write-off wearing a record's clothes")
+        if not str(self.basis).strip():
+            raise ReconciliationError(
+                f"attempt reconciliation {self.draw_id}: a basis is REQUIRED (what the bound "
+                f"is derived from)")
+
+    @property
+    def upper_bound_exact_usd(self) -> Decimal:
+        """The declared bound under the canonical quantization rule."""
+        return to_money(self.upper_bound_usd)
+
+    def to_dict(self) -> dict:
+        return {
+            "schema": self.schema,
+            "draw_id": self.draw_id,
+            "envelope_sha256": self.envelope_sha256,
+            "method": self.method,
+            "upper_bound_usd": from_money(self.upper_bound_exact_usd),
+            "basis": self.basis,
+            "reason": self.reason,
+            "recorded_by": self.recorded_by,
+            "recorded_utc": self.recorded_utc,
+        }
+
+    #: `as_dict` is the spelling the runner's record writers use; both are the same mapping.
+    as_dict = to_dict
+
+    @staticmethod
+    def from_dict(obj: Mapping[str, Any]) -> "AttemptReconciliation":
+        return AttemptReconciliation(
+            draw_id=obj["draw_id"],
+            envelope_sha256=obj["envelope_sha256"],
+            upper_bound_usd=from_money(to_money(obj["upper_bound_usd"])),
+            basis=obj.get("basis", ""),
+            reason=obj.get("reason", ""),
+            recorded_by=obj.get("recorded_by", ""),
+            recorded_utc=obj.get("recorded_utc", ""),
+            method=obj.get("method", RECONCILIATION_METHOD_DECLARED_UPPER_BOUND),
+            schema=obj.get("schema", ATTEMPT_RECONCILIATION_SCHEMA),
+        )
+
+
+# =======================================================================================
 # Store — temp file + atomic rename, refuse-overwrite
 # =======================================================================================
 
@@ -672,16 +781,19 @@ def _atomic_write(path: Path, text: str) -> None:
 class EnvelopeStore:
     """Immutable envelope store: one file per draw, atomic write, NEVER overwritten.
 
-    `run_dir/raw/<draw>.json`      immutable raw envelopes
-    `run_dir/derived/<draw>.json`  linked validation records
+    `run_dir/raw/<draw>.json`         immutable raw envelopes
+    `run_dir/derived/<draw>.json`     linked validation records
+    `run_dir/reconciled/<draw>.json`  declared per-attempt upper bounds (R-E2 exit)
     """
 
     def __init__(self, run_dir: Path | str):
         self.run_dir = Path(run_dir)
         self.raw_dir = self.run_dir / "raw"
         self.derived_dir = self.run_dir / "derived"
+        self.reconciled_dir = self.run_dir / "reconciled"
         self.raw_dir.mkdir(parents=True, exist_ok=True)
         self.derived_dir.mkdir(parents=True, exist_ok=True)
+        self.reconciled_dir.mkdir(parents=True, exist_ok=True)
 
     # ---- raw -------------------------------------------------------------------------
     def raw_path(self, draw_id: str) -> Path:
@@ -721,6 +833,24 @@ class EnvelopeStore:
             out.append(env)
         return out
 
+    def raw_sha256(self, draw_id: str) -> Optional[str]:
+        """SHA-256 of the PERSISTED raw envelope's bytes, or None if there is no record.
+
+        This hashes the file, not a re-serialization of the parsed object: it is what an
+        `AttemptReconciliation` binds itself to, so it must be the exact audit artifact.
+        """
+        path = self.raw_path(draw_id)
+        if not path.exists():
+            return None
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    def raw_digests(self) -> dict:
+        """`draw_id -> sha-256 of its persisted raw file`, for every record in the store."""
+        return {RawEnvelope.from_dict(
+            json.loads(p.read_text(encoding="utf-8"))).draw_id:
+                hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in self.raw_paths()}
+
     # ---- derived ---------------------------------------------------------------------
     def put_derived(self, record: DerivedRecord) -> Path:
         path = self.derived_dir / _safe_name(record.draw_id)
@@ -739,6 +869,45 @@ class EnvelopeStore:
     def derived_records(self) -> list[DerivedRecord]:
         return [DerivedRecord.from_dict(json.loads(p.read_text(encoding="utf-8")))
                 for p in sorted(self.derived_dir.glob("*.json"))]
+
+    # ---- reconciliations ---------------------------------------------------------------
+    def reconciliation_path(self, draw_id: str) -> Path:
+        return self.reconciled_dir / _safe_name(draw_id)
+
+    def put_reconciliation(self, record: AttemptReconciliation) -> Path:
+        """Persist ONE immutable per-attempt reconciliation. REFUSES to overwrite.
+
+        A declared upper bound is an audit record in exactly the sense R-E5/S-F6 mean: if it
+        could be rewritten, the bound it documents would be a draft, and a cheaper second
+        declaration could retroactively shrink booked spend. There is no --force.
+        """
+        path = self.reconciliation_path(record.draw_id)
+        if path.exists():
+            raise EnvelopeExistsError(
+                f"reconciliation for {record.draw_id} already exists at {path} — refusing to "
+                f"overwrite a declared upper bound (R-E5/S-F6). There is no --force.")
+        _atomic_write(path, canonical_json(record.to_dict()))
+        return path
+
+    def get_reconciliation(self, draw_id: str) -> Optional[AttemptReconciliation]:
+        path = self.reconciliation_path(draw_id)
+        if not path.exists():
+            return None
+        return AttemptReconciliation.from_dict(
+            json.loads(path.read_text(encoding="utf-8")))
+
+    def reconciliations(self) -> dict:
+        """`draw_id -> AttemptReconciliation` for every declaration in this store."""
+        out: dict = {}
+        for path in sorted(self.reconciled_dir.glob("*.json")):
+            record = AttemptReconciliation.from_dict(
+                json.loads(path.read_text(encoding="utf-8")))
+            if _safe_name(record.draw_id) != path.name:
+                raise ManifestBindingError(
+                    f"reconciliation {path.name} carries draw id {record.draw_id!r} — "
+                    f"filename/content mismatch, refusing to trust the audit trail")
+            out[record.draw_id] = record
+        return out
 
 
 # =======================================================================================
@@ -1016,6 +1185,11 @@ class V7Ledger:
     _bucket_spend: dict = field(default_factory=dict)   # bucket -> quantized Decimal spend
     current_model: Optional[str] = None
     current_model_complete: bool = False
+    #: Declared per-attempt upper bounds, by draw id (see `AttemptReconciliation`). A booking
+    #: made from one of these is a documented BOUND, never a returned cost, so it makes the
+    #: ledger inexact for exactly the same reason a `NonReconciledComponent` does.
+    reconciliations: Mapping[str, AttemptReconciliation] = field(default_factory=dict)
+    _reconciled_upper_bounds: dict = field(default_factory=dict)  # draw_id -> Decimal bound
 
     # ---- totals (exact) ---------------------------------------------------------------
     # Every decision and every reported figure below is derived from THESE four Decimals, so
@@ -1066,9 +1240,31 @@ class V7Ledger:
         return from_money(self.remaining_exact_usd)
 
     @property
+    def reconciled_upper_bound_exact_usd(self) -> Decimal:
+        """Exact sum of every booking made from a DECLARED per-attempt upper bound."""
+        with localcontext(MONEY_CONTEXT):
+            total = MONEY_ZERO
+            for draw_id in sorted(self._reconciled_upper_bounds):
+                total += self._reconciled_upper_bounds[draw_id]
+            return total
+
+    @property
+    def reconciled_upper_bound_usd(self) -> float:
+        return from_money(self.reconciled_upper_bound_exact_usd)
+
+    def reconciled_draw_ids(self) -> list[str]:
+        """Draws booked at a declared upper bound rather than a returned cost."""
+        return sorted(self._reconciled_upper_bounds)
+
+    @property
     def is_exact(self) -> bool:
-        """False whenever any component of the total is a non-reconciled upper bound."""
-        return self.reconciliation.is_exact
+        """False whenever any component of the total is a non-reconciled upper bound.
+
+        A per-attempt declared bound counts: it is an UPPER bound on what that attempt cost,
+        not the cost itself, so a total carrying one cannot be called exact any more than one
+        carrying a `NonReconciledComponent` can.
+        """
+        return self.reconciliation.is_exact and not self._reconciled_upper_bounds
 
     def booked_draw_ids(self) -> list[str]:
         return sorted(self._booked)
@@ -1084,9 +1280,17 @@ class V7Ledger:
         return {bucket: from_money(amount) for bucket, amount in self._bucket_spend.items()}
 
     # ---- booking ---------------------------------------------------------------------
-    def book_envelope(self, envelope: RawEnvelope) -> float:
+    def book_envelope(self, envelope: RawEnvelope,
+                      envelope_sha256: Optional[str] = None) -> float:
         """Book one envelope's RETURNED cost. Raises if the cost is missing (R-E2) or the draw
-        was already booked. Called for valid AND invalid-but-paid responses alike (R-E1.2)."""
+        was already booked. Called for valid AND invalid-but-paid responses alike (R-E1.2).
+
+        `envelope_sha256` is the sha-256 of the envelope's PERSISTED file. It is required only
+        to honour a declared per-attempt upper bound, because such a declaration binds the
+        exact bytes it reconciles; a `RawEnvelope` does not know its own path, so the digest
+        travels from the store that read it (`reconstruct_ledger` supplies it). Without a
+        matching digest a declaration is ignored and the missing cost still fails closed.
+        """
         if envelope.draw_id in self._booked:
             raise DoubleBookingError(
                 f"draw {envelope.draw_id} already booked at "
@@ -1106,6 +1310,27 @@ class V7Ledger:
                 self._bucket_spend[envelope.bucket] = self._bucket_spend.get(
                     envelope.bucket, MONEY_ZERO)
                 return from_money(MONEY_ZERO)
+            # The second honest exit R-E2/R-V7-6 allow: a DECLARED upper bound, bound to the
+            # exact bytes it reconciles. Booked at that bound (never at zero), recorded as a
+            # bound rather than a cost, and it makes the whole total inexact.
+            declared = self.reconciliations.get(envelope.draw_id)
+            if declared is not None and envelope_sha256 is not None \
+                    and declared.envelope_sha256 == envelope_sha256:
+                bound = declared.upper_bound_exact_usd
+                self._booked[envelope.draw_id] = bound
+                self._reconciled_upper_bounds[envelope.draw_id] = bound
+                # Bucket-neutral: the bound is in the total that the $8.50 stop sees, but it
+                # is not a returned cost and is not attributed to a bucket as if it were.
+                self._bucket_spend[envelope.bucket] = self._bucket_spend.get(
+                    envelope.bucket, MONEY_ZERO)
+                return from_money(bound)
+            if declared is not None:
+                raise CostAccountingError(
+                    f"draw {envelope.draw_id} carries a declared upper-bound reconciliation "
+                    f"bound to envelope {declared.envelope_sha256[:12]}, but the persisted "
+                    f"envelope hashes to "
+                    f"{(envelope_sha256 or 'an unknown digest')[:12]} — refusing to apply a "
+                    f"bound that was declared against different bytes (R-E2/R-E5)")
             raise CostAccountingError(
                 f"draw {envelope.draw_id} was persisted without a returned cost "
                 f"(generation id {envelope.generation_id!r}); refusing to book 0.0 (R-E2)")
@@ -1229,6 +1454,9 @@ class V7Ledger:
             "total_spent_usd": self.total_spent_usd,
             "remaining_usd": self.remaining_usd,
             "is_exact": self.is_exact,
+            "reconciled_upper_bound_usd": self.reconciled_upper_bound_usd,
+            "n_reconciled_attempts": len(self._reconciled_upper_bounds),
+            "reconciled_draw_ids": self.reconciled_draw_ids(),
             "booked_draws": len(self._booked),
             "spend_by_bucket": self.spend_by_bucket(),
             "reconciliation": self.reconciliation.to_dict(),
@@ -1254,8 +1482,12 @@ def reconstruct_ledger(store: EnvelopeStore, *, manifest: RunManifest,
         hard_stop_usd = HARD_STOP_USD                  # module global, read at call time
 
     ledger = V7Ledger(reconciliation=reconciliation, hard_stop_usd=hard_stop_usd,
-                      manifest=manifest)
+                      manifest=manifest,
+                      # Loaded BEFORE any booking, so a costless attempt that has a declared
+                      # upper bound on disk is booked at that bound instead of failing closed.
+                      reconciliations=store.reconciliations())
 
+    digests = store.raw_digests()
     seen: set[str] = set()
     for envelope in store.envelopes():
         if not manifest.contains(envelope.draw_id):
@@ -1266,7 +1498,7 @@ def reconstruct_ledger(store: EnvelopeStore, *, manifest: RunManifest,
             raise ManifestBindingError(
                 f"draw {envelope.draw_id} appears more than once in {store.raw_dir}")
         seen.add(envelope.draw_id)
-        ledger.book_envelope(envelope)
+        ledger.book_envelope(envelope, digests.get(envelope.draw_id))
 
     return ledger
 
